@@ -25,7 +25,7 @@ export function AISuggestion({ ticketDescription }: AISuggestionProps) {
     if (result.suggestion) {
       setSuggestion(result.suggestion);
     } else {
-      setError(result.error || "Failed to fetch suggestion.");
+      setError(result.error || "No se pudo obtener la sugerencia.");
     }
     setIsLoading(false);
   };
@@ -33,29 +33,29 @@ export function AISuggestion({ ticketDescription }: AISuggestionProps) {
   useEffect(() => {
     fetchSuggestion();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticketDescription]); // Re-fetch if description changes, though typically it won't on detail view.
+  }, [ticketDescription]); 
 
   return (
     <Card className="bg-accent/20 border-accent shadow-lg">
       <CardHeader>
         <CardTitle className="flex items-center text-accent">
           <Lightbulb className="mr-2 h-6 w-6" />
-          AI Suggested Solution
+          Solución Sugerida por IA
         </CardTitle>
         <CardDescription>
-          Powered by generative AI, this suggestion may help resolve the issue.
+          Impulsada por IA generativa, esta sugerencia podría ayudar a resolver el problema.
         </CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading && (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-accent" />
-            <p className="ml-2 text-muted-foreground">Generating suggestion...</p>
+            <p className="ml-2 text-muted-foreground">Generando sugerencia...</p>
           </div>
         )}
         {error && !isLoading && (
           <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
+            <AlertTriangleIcon className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -68,7 +68,7 @@ export function AISuggestion({ ticketDescription }: AISuggestionProps) {
          <div className="mt-4 flex justify-end">
           <Button onClick={fetchSuggestion} variant="outline" size="sm" disabled={isLoading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            {isLoading ? "Refreshing..." : "Refresh Suggestion"}
+            {isLoading ? "Refrescando..." : "Refrescar Sugerencia"}
           </Button>
         </div>
       </CardContent>
@@ -76,8 +76,8 @@ export function AISuggestion({ ticketDescription }: AISuggestionProps) {
   );
 }
 
-// Helper Icon (not in lucide-react directly for AlertTriangle in Alert)
-const AlertTriangle = (props: React.SVGProps<SVGSVGElement>) => (
+// Renamed to avoid conflict if AlertTriangle is imported from lucide-react elsewhere
+const AlertTriangleIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="24"

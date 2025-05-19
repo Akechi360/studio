@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Ticket, TicketStatus } from "@/lib/types";
+import type { Ticket, TicketStatus, TicketPriority as TicketPriorityType } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +11,9 @@ import { AISuggestion } from "./ai-suggestion";
 import { CommentCard } from "./comment-card";
 import { AddCommentForm } from "./add-comment-form";
 import { format } from "date-fns";
-import { Paperclip, UserCircle, CalendarDays, Tag, Info, ListChecks, MessageSquare, ExternalLink, Edit } from "lucide-react";
-import { TICKET_STATUSES } from "@/lib/constants";
+import { es } from 'date-fns/locale';
+import { Paperclip, UserCircle, CalendarDays, Tag, Info, MessageSquare, ExternalLink } from "lucide-react";
+import { TICKET_STATUSES, TICKET_PRIORITIES_ENGLISH, TICKET_PRIORITIES as TICKET_PRIORITIES_SPANISH } from "@/lib/constants";
 import {
   Select,
   SelectContent,
@@ -29,18 +30,34 @@ interface TicketDetailViewProps {
   ticket: Ticket;
 }
 
-const priorityColors: Record<Ticket["priority"], string> = {
+// Map English priority names to Spanish for display if needed, or ensure constants are consistent
+const priorityDisplayMap: Record<TicketPriorityType, string> = {
+  High: "Alta",
+  Medium: "Media",
+  Low: "Baja",
+};
+
+const priorityColors: Record<TicketPriorityType, string> = {
   High: "bg-red-100 text-red-700 border-red-300",
   Medium: "bg-yellow-100 text-yellow-700 border-yellow-300",
   Low: "bg-green-100 text-green-700 border-green-300",
 };
 
-const statusColors: Record<Ticket["status"], string> = {
+// Map English status names to Spanish for display
+const statusDisplayMap: Record<TicketStatus, string> = {
+  Open: "Abierto",
+  "In Progress": "En Progreso",
+  Resolved: "Resuelto",
+  Closed: "Cerrado",
+};
+
+const statusColors: Record<TicketStatus, string> = {
   Open: "bg-blue-100 text-blue-700 border-blue-300",
   "In Progress": "bg-orange-100 text-orange-700 border-orange-300",
   Resolved: "bg-emerald-100 text-emerald-700 border-emerald-300",
   Closed: "bg-gray-100 text-gray-700 border-gray-300",
 };
+
 
 export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProps) {
   const { user, role } = useAuth();
@@ -48,27 +65,32 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
   const [ticket, setTicket] = useState<Ticket>(initialTicket);
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
 
-  const handleStatusChange = async (newStatus: TicketStatus) => {
+  const handleStatusChange = async (newStatusValue: string) => {
+    // Find the English status corresponding to the selected Spanish status
+    const statusEntry = Object.entries(statusDisplayMap).find(([_, spanish]) => spanish === newStatusValue);
+    const newStatus = statusEntry ? statusEntry[0] as TicketStatus : null;
+
+    if (!newStatus) {
+        toast({ title: "Error", description: "Estado inválido seleccionado.", variant: "destructive" });
+        return;
+    }
+    
     if (role !== 'Admin') {
-      toast({ title: "Permission Denied", description: "Only admins can change ticket status.", variant: "destructive" });
+      toast({ title: "Permiso Denegado", description: "Solo los administradores pueden cambiar el estado del ticket.", variant: "destructive" });
       return;
     }
     setIsStatusUpdating(true);
     const result = await updateTicketStatusAction(ticket.id, { status: newStatus });
     if (result.success) {
       setTicket(prev => ({ ...prev!, status: newStatus, updatedAt: new Date() }));
-      toast({ title: "Status Updated", description: result.message });
+      toast({ title: "Estado Actualizado", description: result.message });
     } else {
-      toast({ title: "Update Failed", description: result.message, variant: "destructive" });
+      toast({ title: "Actualización Fallida", description: result.message, variant: "destructive" });
     }
     setIsStatusUpdating(false);
   };
 
   const onCommentAdded = async () => {
-    // Re-fetch or update ticket comments, for now just faking an update to updatedAt
-    // In a real app, you might re-fetch the ticket or update the comments array directly
-    // For simplicity, if addCommentAction already revalidates, this might not be strictly needed
-    // but to reflect updatedAt change immediately:
     setTicket(prev => ({...prev!, updatedAt: new Date()})); 
   };
 
@@ -80,13 +102,13 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
             <div>
               <CardTitle className="text-3xl font-bold leading-tight">{ticket.subject}</CardTitle>
               <CardDescription className="text-sm text-muted-foreground mt-1">
-                Ticket #{ticket.id} &bull; Last updated: {format(new Date(ticket.updatedAt), "PPp")}
+                Ticket #{ticket.id} &bull; Última actualización: {format(new Date(ticket.updatedAt), "PPp", { locale: es })}
               </CardDescription>
             </div>
             {role === 'Admin' ? (
-              <Select onValueChange={(value) => handleStatusChange(value as TicketStatus)} defaultValue={ticket.status} disabled={isStatusUpdating}>
+              <Select onValueChange={(value) => handleStatusChange(value as string)} defaultValue={statusDisplayMap[ticket.status]} disabled={isStatusUpdating}>
                 <SelectTrigger className="w-full md:w-[180px] mt-2 md:mt-0">
-                  <SelectValue placeholder="Change status" />
+                  <SelectValue placeholder="Cambiar estado" />
                 </SelectTrigger>
                 <SelectContent>
                   {TICKET_STATUSES.map((status) => (
@@ -97,7 +119,7 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
                 </SelectContent>
               </Select>
             ) : (
-              <Badge className={cn("text-sm px-3 py-1", statusColors[ticket.status])}>{ticket.status}</Badge>
+              <Badge className={cn("text-sm px-3 py-1", statusColors[ticket.status])}>{statusDisplayMap[ticket.status]}</Badge>
             )}
           </div>
         </CardHeader>
@@ -106,36 +128,36 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
               <UserCircle className="h-5 w-5 text-primary" />
               <div>
-                <span className="font-medium">Reported by:</span> {ticket.userName}
+                <span className="font-medium">Reportado por:</span> {ticket.userName}
               </div>
             </div>
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
               <CalendarDays className="h-5 w-5 text-primary" />
               <div>
-                <span className="font-medium">Created:</span> {format(new Date(ticket.createdAt), "PPp")}
+                <span className="font-medium">Creado:</span> {format(new Date(ticket.createdAt), "PPp", { locale: es })}
               </div>
             </div>
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-              <Badge className={cn("text-xs px-2 py-0.5", priorityColors[ticket.priority])}>{ticket.priority} Priority</Badge>
+              <Badge className={cn("text-xs px-2 py-0.5", priorityColors[ticket.priority])}>Prioridad {priorityDisplayMap[ticket.priority]}</Badge>
             </div>
           </div>
           
           <Separator />
 
           <div>
-            <h3 className="text-lg font-semibold mb-2 flex items-center"><Info className="h-5 w-5 mr-2 text-primary"/>Description</h3>
+            <h3 className="text-lg font-semibold mb-2 flex items-center"><Info className="h-5 w-5 mr-2 text-primary"/>Descripción</h3>
             <p className="text-foreground/90 whitespace-pre-wrap p-4 bg-muted/30 rounded-md leading-relaxed">{ticket.description}</p>
           </div>
 
           {ticket.attachments.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold mb-2 flex items-center"><Paperclip className="h-5 w-5 mr-2 text-primary"/>Attachments</h3>
+              <h3 className="text-lg font-semibold mb-2 flex items-center"><Paperclip className="h-5 w-5 mr-2 text-primary"/>Archivos Adjuntos</h3>
               <ul className="space-y-2">
                 {ticket.attachments.map((att) => (
                   <li key={att.id} className="flex items-center">
                     <a href={att.url} target="_blank" rel="noopener noreferrer" 
                        className="text-primary hover:underline flex items-center gap-1 p-2 rounded-md hover:bg-primary/10 transition-colors"
-                       data-ai-hint="file download">
+                       data-ai-hint="descarga archivo">
                       <ExternalLink className="h-4 w-4" />
                       {att.fileName} ({(att.size / 1024).toFixed(1)} KB)
                     </a>
@@ -153,11 +175,11 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
 
       <Card className="shadow-xl">
         <CardHeader>
-          <CardTitle className="text-2xl flex items-center"><MessageSquare className="h-6 w-6 mr-2 text-primary"/>Comments ({ticket.comments.length})</CardTitle>
+          <CardTitle className="text-2xl flex items-center"><MessageSquare className="h-6 w-6 mr-2 text-primary"/>Comentarios ({ticket.comments.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {ticket.comments.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No comments yet.</p>
+            <p className="text-muted-foreground text-center py-4">Aún no hay comentarios.</p>
           ) : (
             <div className="space-y-2">
               {ticket.comments.map((comment) => (
@@ -168,7 +190,7 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
         </CardContent>
         <CardFooter>
           <div className="w-full">
-            <h4 className="text-lg font-semibold mb-3">Add Your Comment</h4>
+            <h4 className="text-lg font-semibold mb-3">Añade Tu Comentario</h4>
             <AddCommentForm ticketId={ticket.id} onCommentAdded={onCommentAdded} />
           </div>
         </CardFooter>

@@ -16,7 +16,7 @@ import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { LogOut, UserCircle, Settings, Sun, Moon } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { APP_NAME } from '@/lib/constants';
-import { useTheme } from 'next-themes'; // Assuming next-themes is or will be installed
+import { useTheme } from 'next-themes'; 
 import React, { useEffect, useState } from 'react';
 
 
@@ -24,7 +24,7 @@ export function AppHeader() {
   const { user, logout } = useAuth();
   const { isMobile } = useSidebar();
   const [mounted, setMounted] = useState(false);
-  const { theme, setTheme } = useTheme() ?? { theme: 'light', setTheme: () => {} }; // Provide default if useTheme is not ready or not available
+  const { theme, setTheme } = useTheme() ?? { theme: 'light', setTheme: () => {} }; 
 
   useEffect(() => setMounted(true), []);
 
@@ -47,7 +47,7 @@ export function AppHeader() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                aria-label="Toggle theme"
+                aria-label="Cambiar tema"
             >
                 {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
             </Button>
@@ -57,7 +57,7 @@ export function AppHeader() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name} data-ai-hint="profile avatar" />
+                  <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name} data-ai-hint="avatar perfil" />
                   <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
                 </Avatar>
               </Button>
@@ -75,17 +75,21 @@ export function AppHeader() {
               <DropdownMenuItem asChild>
                 <Link href="/profile" className="flex items-center">
                   <UserCircle className="mr-2 h-4 w-4" />
-                  Profile
+                  Perfil
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
+              {user.role === 'Admin' && (
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="flex items-center">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Configuración
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-red-600 dark:text-red-500 focus:bg-red-100 dark:focus:bg-red-700/50 focus:text-red-700 dark:focus:text-red-400 cursor-pointer">
                 <LogOut className="mr-2 h-4 w-4" />
-                Log out
+                Cerrar Sesión
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

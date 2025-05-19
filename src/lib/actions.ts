@@ -3,20 +3,20 @@
 
 import { z } from "zod";
 import type { Ticket, Comment, TicketPriority, TicketStatus, User } from "./types";
-import { mockTickets } from "./mock-data"; // Assuming mock data is used for now
+import { mockTickets } from "./mock-data"; 
 import { suggestSolution as genAiSuggestSolution } from "@/ai/flows/suggest-solution";
 import { revalidatePath } from "next/cache";
+import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
 
 // --- Ticket Creation ---
 const CreateTicketSchema = z.object({
-  subject: z.string().min(5, "Subject must be at least 5 characters."),
-  description: z.string().min(10, "Description must be at least 10 characters."),
-  priority: z.enum(["Low", "Medium", "High"]),
-  // attachments: z.array(z.object({ fileName: z.string(), url: z.string(), size: z.number() })).optional(), // Simplified
+  subject: z.string().min(5, "El asunto debe tener al menos 5 caracteres."),
+  description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
+  priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]), // Use English for backend consistency
 });
 
 export async function createTicketAction(
-  userId: string, // In a real app, this would come from the authenticated session
+  userId: string, 
   userName: string,
   values: z.infer<typeof CreateTicketSchema>
 ) {
@@ -25,27 +25,26 @@ export async function createTicketAction(
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
-      message: "Failed to create ticket due to validation errors.",
+      message: "Fallo al crear ticket debido a errores de validación.",
     };
   }
 
   const { subject, description, priority } = validatedFields.data;
 
-  // Simulate database operation
   const newTicket: Ticket = {
-    id: (mockTickets.length + 1).toString(),
+    id: (mockTickets.length + 1).toString(), // Simple ID generation for mock
     subject,
     description,
-    priority: priority as TicketPriority,
-    status: "Open",
-    attachments: [], // Simplified
+    priority: priority as TicketPriority, // priority is already English
+    status: "Open", // Default status in English
+    attachments: [], 
     userId,
     userName,
     createdAt: new Date(),
     updatedAt: new Date(),
     comments: [],
   };
-  mockTickets.unshift(newTicket); // Add to the beginning of the array
+  mockTickets.unshift(newTicket); 
 
   revalidatePath("/tickets");
   revalidatePath(`/tickets/${newTicket.id}`);
@@ -53,19 +52,19 @@ export async function createTicketAction(
 
   return {
     success: true,
-    message: "Ticket created successfully!",
+    message: "¡Ticket creado exitosamente!",
     ticketId: newTicket.id,
   };
 }
 
 // --- Add Comment ---
 const AddCommentSchema = z.object({
-  text: z.string().min(1, "Comment cannot be empty."),
+  text: z.string().min(1, "El comentario no puede estar vacío."),
 });
 
 export async function addCommentAction(
   ticketId: string,
-  commenter: User, // User object of the person commenting
+  commenter: User, 
   values: z.infer<typeof AddCommentSchema>
 ) {
   const validatedFields = AddCommentSchema.safeParse(values);
@@ -73,13 +72,13 @@ export async function addCommentAction(
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
-      message: "Failed to add comment due to validation errors.",
+      message: "Fallo al añadir comentario debido a errores de validación.",
     };
   }
 
   const ticket = mockTickets.find(t => t.id === ticketId);
   if (!ticket) {
-    return { message: "Ticket not found." };
+    return { success: false, message: "Ticket no encontrado." };
   }
 
   const newComment: Comment = {
@@ -95,18 +94,18 @@ export async function addCommentAction(
   ticket.updatedAt = new Date();
   
   revalidatePath(`/tickets/${ticketId}`);
-  revalidatePath("/tickets"); // For potential last updated sorting on list view
+  revalidatePath("/tickets"); 
   
   return {
     success: true,
-    message: "Comment added successfully!",
+    message: "¡Comentario añadido exitosamente!",
     comment: newComment,
   };
 }
 
 // --- Update Ticket Status ---
 const UpdateTicketStatusSchema = z.object({
-  status: z.enum(["Open", "In Progress", "Resolved", "Closed"]),
+  status: z.enum(TICKET_STATUSES_ENGLISH as [TicketStatus, ...TicketStatus[]]), // Use English for backend consistency
 });
 
 export async function updateTicketStatusAction(
@@ -117,14 +116,15 @@ export async function updateTicketStatusAction(
 
   if (!validatedFields.success) {
     return {
+      success: false,
       errors: validatedFields.error.flatten().fieldErrors,
-      message: "Failed to update status due to validation errors.",
+      message: "Fallo al actualizar estado debido a errores de validación.",
     };
   }
   
   const ticket = mockTickets.find(t => t.id === ticketId);
   if (!ticket) {
-    return { message: "Ticket not found." };
+    return { success: false, message: "Ticket no encontrado." };
   }
 
   ticket.status = validatedFields.data.status as TicketStatus;
@@ -134,9 +134,17 @@ export async function updateTicketStatusAction(
   revalidatePath("/tickets");
   revalidatePath("/dashboard");
 
+  // Translate status for the message
+  const statusDisplayMap: Record<TicketStatus, string> = {
+    Open: "Abierto",
+    "In Progress": "En Progreso",
+    Resolved: "Resuelto",
+    Closed: "Cerrado",
+  };
+
   return {
     success: true,
-    message: `Ticket status updated to ${ticket.status}.`,
+    message: `Estado del ticket actualizado a ${statusDisplayMap[ticket.status]}.`,
   };
 }
 
@@ -144,49 +152,54 @@ export async function updateTicketStatusAction(
 // --- AI Solution Suggestion ---
 export async function getAISolutionSuggestion(ticketDescription: string) {
   if (!ticketDescription || ticketDescription.trim().length < 10) {
-    return { suggestion: null, error: "Ticket description is too short for a meaningful suggestion." };
+    return { suggestion: null, error: "La descripción del ticket es demasiado corta para una sugerencia significativa." };
   }
   try {
+    // Assuming genAiSuggestSolution can handle Spanish input or is language-agnostic
     const result = await genAiSuggestSolution({ ticketDescription });
+    // If AI returns Spanish, great. If English, might need translation layer later.
     return { suggestion: result.suggestedSolution, error: null };
   } catch (error) {
-    console.error("Error fetching AI solution:", error);
-    return { suggestion: null, error: "Failed to fetch AI suggestion." };
+    console.error("Error al obtener sugerencia de IA:", error);
+    return { suggestion: null, error: "Fallo al obtener sugerencia de IA." };
   }
 }
 
 
 // --- Fetch Ticket by ID (Simulated) ---
 export async function getTicketById(ticketId: string): Promise<Ticket | null> {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 300));
+  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
   const ticket = mockTickets.find(t => t.id === ticketId);
   return ticket || null;
 }
 
 // --- Fetch All Tickets (Simulated) ---
 export async function getAllTickets(): Promise<Ticket[]> {
-   // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
   return [...mockTickets].sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 // --- Fetch Dashboard Stats (Simulated) ---
 export async function getDashboardStats() {
-  await new Promise(resolve => setTimeout(resolve, 200));
+  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
   const total = mockTickets.length;
   const open = mockTickets.filter(t => t.status === "Open").length;
   const inProgress = mockTickets.filter(t => t.status === "In Progress").length;
   const resolved = mockTickets.filter(t => t.status === "Resolved").length;
   const closed = mockTickets.filter(t => t.status === "Closed").length;
 
-  const byPriority = (["Low", "Medium", "High"] as TicketPriority[]).map(p => ({
-    name: p,
-    value: mockTickets.filter(t => t.priority === p).length,
+  // Map English keys to Spanish names for charts
+  const priorityDisplayMap: Record<TicketPriority, string> = { Low: "Baja", Medium: "Media", High: "Alta" };
+  const statusDisplayMap: Record<TicketStatus, string> = { Open: "Abierto", "In Progress": "En Progreso", Resolved: "Resuelto", Closed: "Cerrado"};
+  
+  const byPriority = (TICKET_PRIORITIES_ENGLISH).map(pKey  => ({
+    name: priorityDisplayMap[pKey],
+    value: mockTickets.filter(t => t.priority === pKey).length,
   }));
-  const byStatus = (["Open", "In Progress", "Resolved", "Closed"] as TicketStatus[]).map(s => ({
-    name: s,
-    value: mockTickets.filter(t => t.status === s).length,
+
+  const byStatus = (TICKET_STATUSES_ENGLISH).map(sKey => ({
+    name: statusDisplayMap[sKey],
+    value: mockTickets.filter(t => t.status === sKey).length,
   }));
 
   return {
@@ -194,4 +207,3 @@ export async function getDashboardStats() {
     stats: { byPriority, byStatus },
   };
 }
-

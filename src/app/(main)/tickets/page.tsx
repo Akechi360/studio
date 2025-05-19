@@ -19,20 +19,20 @@ async function TicketFilters() {
   return (
     <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4 items-end">
       <div className="md:col-span-2 lg:col-span-2">
-        <label htmlFor="search" className="block text-sm font-medium text-muted-foreground mb-1">Search Tickets</label>
+        <label htmlFor="search" className="block text-sm font-medium text-muted-foreground mb-1">Buscar Tickets</label>
         <div className="relative">
-          <Input id="search" placeholder="Search by subject or ID..." className="pl-10" />
+          <Input id="search" placeholder="Buscar por asunto o ID..." className="pl-10" />
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
       </div>
        <div>
-        <label htmlFor="status-filter" className="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+        <label htmlFor="status-filter" className="block text-sm font-medium text-muted-foreground mb-1">Estado</label>
         <Select>
           <SelectTrigger id="status-filter">
-            <SelectValue placeholder="All Statuses" />
+            <SelectValue placeholder="Todos los Estados" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="all">Todos los Estados</SelectItem>
             {TICKET_STATUSES.map(status => (
               <SelectItem key={status} value={status.toLowerCase().replace(' ', '-')}>{status}</SelectItem>
             ))}
@@ -40,13 +40,13 @@ async function TicketFilters() {
         </Select>
       </div>
       <div>
-        <label htmlFor="priority-filter" className="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+        <label htmlFor="priority-filter" className="block text-sm font-medium text-muted-foreground mb-1">Prioridad</label>
         <Select>
           <SelectTrigger id="priority-filter">
-            <SelectValue placeholder="All Priorities" />
+            <SelectValue placeholder="Todas las Prioridades" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Priorities</SelectItem>
+            <SelectItem value="all">Todas las Prioridades</SelectItem>
             {TICKET_PRIORITIES.map(priority => (
               <SelectItem key={priority} value={priority.toLowerCase()}>{priority}</SelectItem>
             ))}
@@ -59,21 +59,21 @@ async function TicketFilters() {
 
 
 export default async function TicketsPage() {
-  const tickets = await getAllTickets(); // Server action to fetch tickets
+  const tickets = await getAllTickets(); 
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Support Tickets</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Tickets de Soporte</h1>
           <p className="text-muted-foreground">
-            View, manage, and respond to support tickets.
+            Ver, gestionar y responder a los tickets de soporte.
           </p>
         </div>
         <Button asChild size="lg" className="shadow-md hover:shadow-lg transition-shadow">
           <Link href="/tickets/new">
             <PlusCircle className="mr-2 h-5 w-5" />
-            Create New Ticket
+            Crear Nuevo Ticket
           </Link>
         </Button>
       </div>
@@ -83,14 +83,14 @@ export default async function TicketsPage() {
       {tickets.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <Filter className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-xl font-semibold">No Tickets Found</h3>
+          <h3 className="mt-4 text-xl font-semibold">No Se Encontraron Tickets</h3>
           <p className="mb-4 mt-2 text-sm text-muted-foreground">
-            There are no tickets matching your current filters, or no tickets have been created yet.
+            No hay tickets que coincidan con tus filtros actuales, o aún no se han creado tickets.
           </p>
           <Button asChild>
             <Link href="/tickets/new">
               <PlusCircle className="mr-2 h-4 w-4" />
-              Create Your First Ticket
+              Crea Tu Primer Ticket
             </Link>
           </Button>
         </div>

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { AppSidebarNav } from "./app-sidebar-nav";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { APP_NAME } from "@/lib/constants";
 import Link from "next/link";
@@ -41,13 +41,12 @@ export function AppSidebar() {
       <SidebarFooter className="p-4">
         {user && (
           <div className={`flex items-center gap-2 ${sidebarState === "collapsed" ? "justify-center" : ""}`}>
-            {/* Placeholder for user avatar or settings icon - adjust as needed */}
           </div>
         )}
         <Button variant="ghost" onClick={logout} className={`w-full justify-start ${sidebarState === "collapsed" ? "px-2" : ""}`}>
           <LogOut className="mr-2 h-4 w-4" />
-          {sidebarState === "expanded" && <span>Logout</span>}
-          {sidebarState === "collapsed" && <span className="sr-only">Logout</span>}
+          {sidebarState === "expanded" && <span>Cerrar Sesión</span>}
+          {sidebarState === "collapsed" && <span className="sr-only">Cerrar Sesión</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>

@@ -24,9 +24,9 @@ import { APP_NAME } from '@/lib/constants';
 import { UserPlus, Loader2 } from 'lucide-react';
 
 const registerFormSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
+  email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
+  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
 });
 
 type RegisterFormValues = z.infer<typeof registerFormSchema>;
@@ -52,14 +52,14 @@ export default function RegisterPage() {
     setIsLoading(false);
     if (success) {
       toast({
-        title: "Registration Successful",
-        description: "Your account has been created. Welcome!",
+        title: "Registro Exitoso",
+        description: "Tu cuenta ha sido creada. ¡Bienvenido!",
       });
       router.push("/dashboard");
     } else {
       toast({
-        title: "Registration Failed",
-        description: "This email may already be in use. Please try another.",
+        title: "Fallo en el Registro",
+        description: "Este correo electrónico ya podría estar en uso. Por favor, intenta con otro.",
         variant: "destructive",
       });
     }
@@ -73,7 +73,7 @@ export default function RegisterPage() {
              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ticket-check"><path d="M4 20V10a4 4 0 0 1 4-4h1.5a2.5 2.5 0 0 0 0-5A1.5 1.5 0 0 0 8 2.5V2"/><path d="M20 20V10a4 4 0 0 0-4-4H8.5a2.5 2.5 0 0 1 0-5A1.5 1.5 0 0 1 16 2.5V2"/><path d="m9 12 2 2 4-4"/></svg>
           </div>
           <CardTitle className="text-3xl font-bold">{APP_NAME}</CardTitle>
-          <CardDescription>Create an account to start managing your support tickets.</CardDescription>
+          <CardDescription>Crea una cuenta para empezar a gestionar tus tickets de soporte.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -83,9 +83,9 @@ export default function RegisterPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Name</FormLabel>
+                    <FormLabel>Nombre Completo</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Doe" {...field} />
+                      <Input placeholder="Juan Pérez" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -96,9 +96,9 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Correo Electrónico</FormLabel>
                     <FormControl>
-                      <Input placeholder="you@example.com" {...field} />
+                      <Input placeholder="tu@ejemplo.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -109,7 +109,7 @@ export default function RegisterPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>Contraseña</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
@@ -123,16 +123,16 @@ export default function RegisterPage() {
                 ) : (
                   <UserPlus className="mr-2 h-4 w-4" />
                 )}
-                Create Account
+                Crear Cuenta
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
           <p className="text-sm text-muted-foreground">
-            Already have an account?{" "}
+            ¿Ya tienes una cuenta?{" "}
             <Link href="/login" className="font-medium text-primary hover:underline">
-              Sign In
+              Iniciar Sesión
             </Link>
           </p>
         </CardFooter>

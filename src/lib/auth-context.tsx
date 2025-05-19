@@ -6,20 +6,24 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter } from "next/navigation";
 
 // Mock users - in a real app, this would come from a database
-const mockUsers: User[] = [
+// This list is now also used for the User Management page.
+export const mockUsers: User[] = [
   { id: "1", name: "Admin User", email: "admin@example.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=AU" },
   { id: "2", name: "Regular User", email: "user@example.com", role: "User", avatarUrl: "https://placehold.co/100x100.png?text=RU" },
   { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC" },
+  { id: '4', name: 'Alice Wonderland', email: 'alice@example.com', role: 'User', avatarUrl: 'https://placehold.co/40x40.png?text=AW' },
+  { id: '5', name: 'Bob The Builder', email: 'bob@example.com', role: 'User', avatarUrl: 'https://placehold.co/40x40.png?text=BB' },
 ];
 
 interface AuthContextType {
   user: User | null;
   role: Role | null;
   isLoading: boolean;
-  login: (email: string, pass: string) => Promise<boolean>; // pass is unused for mock
+  login: (email: string, pass: string) => Promise<boolean>; 
   logout: () => void;
-  register: (name: string, email: string, pass: string) => Promise<boolean>; // pass is unused for mock
+  register: (name: string, email: string, pass: string) => Promise<boolean>; 
   updateProfile: (name: string, email: string) => Promise<boolean>;
+  getAllUsers: () => User[]; // Added to get users for admin page
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,17 +34,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
 
   useEffect(() => {
-    // Check localStorage for persisted user session (mock)
     try {
       const storedUser = localStorage.getItem("ticketflow_user");
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser) as User;
-        // Validate if this user still exists in our mock list
         const existingUser = mockUsers.find(u => u.id === parsedUser.id && u.email === parsedUser.email);
         if (existingUser) {
           setUser(existingUser);
         } else {
-          localStorage.removeItem("ticketflow_user"); // Clean up invalid stored user
+          localStorage.removeItem("ticketflow_user"); 
         }
       }
     } catch (error) {
@@ -52,7 +54,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string): Promise<boolean> => {
     setIsLoading(true);
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 500));
     const foundUser = mockUsers.find(u => u.email === email);
     if (foundUser) {
@@ -79,13 +80,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return false; // User already exists
     }
     const newUser: User = {
-      id: String(mockUsers.length + 1),
+      id: String(mockUsers.length + 1), // Ensure ID is unique for new mock users
       name,
       email,
-      role: "User", // Default role
+      role: "User", 
       avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,2).toUpperCase()}`
     };
-    mockUsers.push(newUser); // Add to mock list (in real app, save to DB)
+    mockUsers.push(newUser); 
     setUser(newUser);
     localStorage.setItem("ticketflow_user", JSON.stringify(newUser));
     setIsLoading(false);
@@ -98,6 +99,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 500));
     const userIndex = mockUsers.findIndex(u => u.id === user.id);
     if (userIndex !== -1) {
+      // Check if new email already exists for another user
+      if (email !== mockUsers[userIndex].email && mockUsers.some(u => u.email === email && u.id !== user.id)) {
+        setIsLoading(false);
+        // Potentially return a specific error or use toast here
+        // For now, just returning false
+        alert("El correo electrónico ya está en uso por otro usuario.");
+        return false;
+      }
       const updatedUser = { ...mockUsers[userIndex], name, email };
       mockUsers[userIndex] = updatedUser;
       setUser(updatedUser);
@@ -109,8 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
+  const getAllUsers = () => {
+    return [...mockUsers]; // Return a copy
+  };
+
   return (
-    <AuthContext.Provider value={{ user, role: user?.role || null, isLoading, login, logout, register, updateProfile }}>
+    <AuthContext.Provider value={{ user, role: user?.role || null, isLoading, login, logout, register, updateProfile, getAllUsers }}>
       {children}
     </AuthContext.Provider>
   );
@@ -119,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error("useAuth debe ser usado dentro de un AuthProvider");
   }
   return context;
 };

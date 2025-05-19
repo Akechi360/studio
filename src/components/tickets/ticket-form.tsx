@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -25,17 +25,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { TICKET_PRIORITIES } from "@/lib/constants";
+import { TICKET_PRIORITIES, TICKET_PRIORITIES_ENGLISH } from "@/lib/constants";
 import type { TicketPriority } from "@/lib/types";
 import { Loader2, Send } from "lucide-react";
 
+
 const ticketFormSchema = z.object({
-  subject: z.string().min(5, { message: "Subject must be at least 5 characters long." }).max(100, { message: "Subject must be at most 100 characters long." }),
-  description: z.string().min(10, { message: "Description must be at least 10 characters long." }).max(2000, { message: "Description must be at most 2000 characters long." }),
-  priority: z.enum(TICKET_PRIORITIES as [TicketPriority, ...TicketPriority[]], {
-    required_error: "You need to select a ticket priority.",
+  subject: z.string().min(5, { message: "El asunto debe tener al menos 5 caracteres." }).max(100, { message: "El asunto debe tener como máximo 100 caracteres." }),
+  description: z.string().min(10, { message: "La descripción debe tener al menos 10 caracteres." }).max(2000, { message: "La descripción debe tener como máximo 2000 caracteres." }),
+  priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]], { // Keep Zod enum with English values for backend
+    required_error: "Necesitas seleccionar una prioridad para el ticket.",
   }),
-  // attachments: z.array(z.instanceof(File)).optional(), // For actual file uploads
 });
 
 export type TicketFormValues = z.infer<typeof ticketFormSchema>;
@@ -51,7 +51,7 @@ export function TicketForm({
   onSubmit, 
   defaultValues,
   isSubmitting = false,
-  submitButtonText = "Submit Ticket"
+  submitButtonText = "Enviar Ticket"
 }: TicketFormProps) {
   
   const form = useForm<TicketFormValues>({
@@ -60,26 +60,21 @@ export function TicketForm({
       subject: defaultValues?.subject || "",
       description: defaultValues?.description || "",
       priority: defaultValues?.priority || "Medium",
-      // attachments: defaultValues?.attachments || [],
     },
   });
 
-  // const [selectedFiles, setSelectedFiles] = useState<File[]>(defaultValues?.attachments || []);
+  const priorityMap = {
+    "Low": "Baja",
+    "Medium": "Media",
+    "High": "Alta"
+  };
 
-  // const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  //   if (event.target.files) {
-  //     const filesArray = Array.from(event.target.files);
-  //     setSelectedFiles(prevFiles => [...prevFiles, ...filesArray]);
-  //     // Optionally, update form value if using react-hook-form for files
-  //     // form.setValue("attachments", [...selectedFiles, ...filesArray]);
-  //   }
-  // };
 
   return (
     <Card className="w-full shadow-xl">
       <CardHeader>
-        <CardTitle className="text-2xl">Create a New Support Ticket</CardTitle>
-        <CardDescription>Please fill out the form below to submit your support request. Provide as much detail as possible.</CardDescription>
+        <CardTitle className="text-2xl">Crear un Nuevo Ticket de Soporte</CardTitle>
+        <CardDescription>Por favor, completa el siguiente formulario para enviar tu solicitud de soporte. Proporciona tantos detalles como sea posible.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -89,12 +84,12 @@ export function TicketForm({
               name="subject"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Subject</FormLabel>
+                  <FormLabel>Asunto</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Unable to login" {...field} />
+                    <Input placeholder="Ej: No puedo iniciar sesión" {...field} />
                   </FormControl>
                   <FormDescription>
-                    A brief summary of your issue.
+                    Un breve resumen de tu problema.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -105,16 +100,16 @@ export function TicketForm({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>Descripción</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Please describe your issue in detail..."
+                      placeholder="Por favor, describe tu problema en detalle..."
                       className="min-h-[150px] resize-y"
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    Include steps to reproduce, error messages, and any other relevant information.
+                    Incluye pasos para reproducir, mensajes de error y cualquier otra información relevante.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -125,50 +120,29 @@ export function TicketForm({
               name="priority"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Priority</FormLabel>
+                  <FormLabel>Prioridad</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select ticket priority" />
+                        <SelectValue placeholder="Selecciona la prioridad del ticket" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {TICKET_PRIORITIES.map((priority) => (
-                        <SelectItem key={priority} value={priority}>
-                          {priority}
+                      {TICKET_PRIORITIES_ENGLISH.map((priorityKey) => (
+                        <SelectItem key={priorityKey} value={priorityKey}>
+                          {priorityMap[priorityKey]} 
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    How urgent is this issue?
+                    ¿Qué tan urgente es este problema?
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
             
-            {/* Basic attachment UI placeholder */}
-            {/* <FormItem>
-              <FormLabel>Attachments (Optional)</FormLabel>
-              <FormControl>
-                <Input type="file" multiple onChange={handleFileChange} />
-              </FormControl>
-              {selectedFiles.length > 0 && (
-                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  <p>Selected files:</p>
-                  <ul>
-                    {selectedFiles.map((file, index) => (
-                      <li key={index}>{file.name} ({(file.size / 1024).toFixed(2)} KB)</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <FormDescription>
-                You can attach screenshots or relevant files (max 5MB per file).
-              </FormDescription>
-            </FormItem> */}
-
             <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -36,27 +36,27 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard", label: "Panel de Control", icon: LayoutDashboard, exact: true },
   { 
     href: "/tickets", 
     label: "Tickets", 
     icon: Ticket,
     subItems: [
-      { href: "/tickets", label: "All Tickets", icon: FileText, exact: true },
-      { href: "/tickets/new", label: "New Ticket", icon: PlusCircle, exact: true },
+      { href: "/tickets", label: "Todos los Tickets", icon: FileText, exact: true },
+      { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true },
     ]
   },
-  { href: "/profile", label: "Profile", icon: User, exact: true },
-  { href: "/admin/users", label: "User Management", icon: Users, allowedRoles: ["Admin"], exact: true },
-  { href: "/admin/reports", label: "Reports", icon: BarChart3, allowedRoles: ["Admin"], exact: true },
-  { href: "/settings", label: "Settings", icon: Settings, allowedRoles: ["Admin"], exact: true },
-  { href: "/help", label: "Help & FAQ", icon: HelpCircle, exact: true },
+  { href: "/profile", label: "Perfil", icon: User, exact: true },
+  { href: "/admin/users", label: "Gestión de Usuarios", icon: Users, allowedRoles: ["Admin"], exact: true },
+  { href: "/admin/reports", label: "Reportes", icon: BarChart3, allowedRoles: ["Admin"], exact: true },
+  { href: "/settings", label: "Configuración", icon: Settings, allowedRoles: ["Admin"], exact: true },
+  { href: "/help", label: "Ayuda y FAQ", icon: HelpCircle, exact: true },
 ];
 
 export function AppSidebarNav() {
   const pathname = usePathname();
   const { state: sidebarState } = useSidebar();
-  const { role } = useAuth();
+  const { user } = useAuth(); // Use user object to get role
 
   const isItemActive = (item: NavItem) => {
     if (item.exact) return pathname === item.href;
@@ -66,7 +66,7 @@ export function AppSidebarNav() {
   return (
     <SidebarMenu>
       {navItems.map((item) => {
-        if (item.allowedRoles && role && !item.allowedRoles.includes(role)) {
+        if (item.allowedRoles && user?.role && !item.allowedRoles.includes(user.role)) {
           return null;
         }
 
@@ -92,7 +92,7 @@ export function AppSidebarNav() {
                 className={sidebarState === "collapsed" ? "hidden" : ""}
               >
                 {item.subItems.map((subItem) => {
-                  if (subItem.allowedRoles && role && !subItem.allowedRoles.includes(role)) {
+                  if (subItem.allowedRoles && user?.role && !subItem.allowedRoles.includes(user.role)) {
                     return null;
                   }
                   const SubIcon = subItem.icon;

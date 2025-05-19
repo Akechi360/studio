@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { Inter, Roboto_Mono } from 'next/font/google';
 import './globals.css';
@@ -17,8 +18,8 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'TicketFlow',
-  description: 'Efficient Support Ticket Management',
+  title: 'FlujoDeTickets',
+  description: 'Gestión Eficiente de Tickets de Soporte',
 };
 
 export default function RootLayout({
@@ -27,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning>
       <body className={`${inter.variable} ${robotoMono.variable} antialiased`}>
         <AuthProvider>
           {children}

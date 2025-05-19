@@ -21,14 +21,14 @@ import { addCommentAction } from '@/lib/actions';
 import { Loader2, Send } from 'lucide-react';
 
 const commentFormSchema = z.object({
-  text: z.string().min(1, { message: "Comment cannot be empty." }).max(1000, { message: "Comment cannot exceed 1000 characters."}),
+  text: z.string().min(1, { message: "El comentario no puede estar vacío." }).max(1000, { message: "El comentario no puede exceder los 1000 caracteres."}),
 });
 
 type CommentFormValues = z.infer<typeof commentFormSchema>;
 
 interface AddCommentFormProps {
   ticketId: string;
-  onCommentAdded?: () => void; // Optional callback after successful comment
+  onCommentAdded?: () => void; 
 }
 
 export function AddCommentForm({ ticketId, onCommentAdded }: AddCommentFormProps) {
@@ -46,8 +46,8 @@ export function AddCommentForm({ ticketId, onCommentAdded }: AddCommentFormProps
   async function onSubmit(data: CommentFormValues) {
     if (!user) {
       toast({
-        title: "Not Authenticated",
-        description: "You need to be logged in to add a comment.",
+        title: "No Autenticado",
+        description: "Necesitas iniciar sesión para añadir un comentario.",
         variant: "destructive",
       });
       return;
@@ -58,22 +58,22 @@ export function AddCommentForm({ ticketId, onCommentAdded }: AddCommentFormProps
       const result = await addCommentAction(ticketId, user, data);
       if (result.success) {
         toast({
-          title: "Comment Added",
-          description: "Your comment has been posted.",
+          title: "Comentario Añadido",
+          description: "Tu comentario ha sido publicado.",
         });
         form.reset();
         if (onCommentAdded) onCommentAdded();
       } else {
         toast({
-          title: "Failed to Add Comment",
-          description: result.message || "An unknown error occurred.",
+          title: "Fallo al Añadir Comentario",
+          description: result.message || "Ocurrió un error desconocido.",
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "An unexpected error occurred while adding the comment.",
+        description: "Ocurrió un error inesperado al añadir el comentario.",
         variant: "destructive",
       });
     } finally {
@@ -89,10 +89,10 @@ export function AddCommentForm({ ticketId, onCommentAdded }: AddCommentFormProps
           name="text"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="sr-only">Add a comment</FormLabel>
+              <FormLabel className="sr-only">Añadir un comentario</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Type your comment here..."
+                  placeholder="Escribe tu comentario aquí..."
                   className="min-h-[100px] resize-y"
                   {...field}
                 />
@@ -107,7 +107,7 @@ export function AddCommentForm({ ticketId, onCommentAdded }: AddCommentFormProps
           ) : (
             <Send className="mr-2 h-4 w-4" />
           )}
-          Add Comment
+          Añadir Comentario
         </Button>
       </form>
     </Form>

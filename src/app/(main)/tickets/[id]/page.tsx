@@ -18,13 +18,13 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Alert variant="destructive" className="max-w-md text-center shadow-lg">
           <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
-          <AlertTitle className="text-xl font-bold">Ticket Not Found</AlertTitle>
+          <AlertTitle className="text-xl font-bold">Ticket No Encontrado</AlertTitle>
           <AlertDescription className="mb-4">
-            The ticket you are looking for does not exist or may have been removed.
+            El ticket que estás buscando no existe o ha sido eliminado.
           </AlertDescription>
           <Button asChild variant="outline">
             <Link href="/tickets">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Go Back to Tickets
+              <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Tickets
             </Link>
           </Button>
         </Alert>
@@ -38,7 +38,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
 export async function generateMetadata({ params }: TicketDetailPageProps) {
   const ticket = await getTicketById(params.id);
   if (!ticket) {
-    return { title: "Ticket Not Found" };
+    return { title: "Ticket No Encontrado" };
   }
   return {
     title: `Ticket #${ticket.id}: ${ticket.subject}`,

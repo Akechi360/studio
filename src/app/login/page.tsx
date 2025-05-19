@@ -21,11 +21,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import { APP_NAME } from '@/lib/constants';
-import { LogIn } from 'lucide-react';
+import { LogIn, Loader2 } from 'lucide-react';
 
 const loginFormSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  password: z.string().min(1, { message: "Password is required." }), // In mock, password isn't actually checked for complexity
+  email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
+  password: z.string().min(1, { message: "La contraseña es obligatoria." }), 
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
@@ -50,14 +50,14 @@ export default function LoginPage() {
     setIsLoading(false);
     if (success) {
       toast({
-        title: "Login Successful",
-        description: "Welcome back!",
+        title: "Inicio de Sesión Exitoso",
+        description: "¡Bienvenido de nuevo!",
       });
       router.push("/dashboard");
     } else {
       toast({
-        title: "Login Failed",
-        description: "Invalid email or password. Please try again.",
+        title: "Fallo en el Inicio de Sesión",
+        description: "Correo electrónico o contraseña no válidos. Por favor, inténtalo de nuevo.",
         variant: "destructive",
       });
     }
@@ -71,7 +71,7 @@ export default function LoginPage() {
              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ticket-check"><path d="M4 20V10a4 4 0 0 1 4-4h1.5a2.5 2.5 0 0 0 0-5A1.5 1.5 0 0 0 8 2.5V2"/><path d="M20 20V10a4 4 0 0 0-4-4H8.5a2.5 2.5 0 0 1 0-5A1.5 1.5 0 0 1 16 2.5V2"/><path d="m9 12 2 2 4-4"/></svg>
           </div>
           <CardTitle className="text-3xl font-bold">{APP_NAME}</CardTitle>
-          <CardDescription>Sign in to access your tickets and dashboard.</CardDescription>
+          <CardDescription>Inicia sesión para acceder a tus tickets y panel de control.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -81,9 +81,9 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Correo Electrónico</FormLabel>
                     <FormControl>
-                      <Input placeholder="you@example.com" {...field} />
+                      <Input placeholder="tu@ejemplo.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -94,7 +94,7 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>Contraseña</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
@@ -104,20 +104,20 @@ export default function LoginPage() {
               />
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
-                  <LogIn className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <LogIn className="mr-2 h-4 w-4" />
                 )}
-                Sign In
+                Iniciar Sesión
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
             <p className="text-sm text-muted-foreground">
-                Don&apos;t have an account?{" "}
+                ¿No tienes una cuenta?{" "}
                 <Link href="/register" className="font-medium text-primary hover:underline">
-                    Sign Up
+                    Regístrate
                 </Link>
             </p>
         </CardFooter>

@@ -17,8 +17,8 @@ export default function NewTicketPage() {
   const handleSubmit = async (data: TicketFormValues) => {
     if (!user) {
       toast({
-        title: "Authentication Error",
-        description: "You must be logged in to create a ticket.",
+        title: "Error de Autenticación",
+        description: "Debes iniciar sesión para crear un ticket.",
         variant: "destructive",
       });
       router.push('/login');
@@ -27,32 +27,32 @@ export default function NewTicketPage() {
 
     setIsSubmitting(true);
     try {
+      // Convert priority back to English if necessary for the backend, or handle in backend
+      // For now, assuming backend handles Spanish priority strings if constants are Spanish
       const result = await createTicketAction(user.id, user.name, data);
       if (result.success && result.ticketId) {
         toast({
-          title: "Ticket Created!",
+          title: "¡Ticket Creado!",
           description: result.message,
         });
         router.push(`/tickets/${result.ticketId}`);
       } else {
         toast({
-          title: "Failed to Create Ticket",
-          description: result.message || "An unknown error occurred.",
+          title: "Fallo al Crear Ticket",
+          description: result.message || "Ocurrió un error desconocido.",
           variant: "destructive",
         });
-        // Handle field errors if `result.errors` exists
         if (result.errors) {
-          console.error("Validation errors:", result.errors);
-          // You could potentially map these errors to form fields if needed
+          console.error("Errores de validación:", result.errors);
         }
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "An unexpected error occurred while creating the ticket.",
+        description: "Ocurrió un error inesperado al crear el ticket.",
         variant: "destructive",
       });
-      console.error("Ticket creation error:", error);
+      console.error("Error al crear ticket:", error);
     } finally {
       setIsSubmitting(false);
     }
