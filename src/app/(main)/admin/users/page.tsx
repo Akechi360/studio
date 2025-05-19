@@ -4,8 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldAlert, Users, UserCog, Save, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert'; // Renamed to avoid conflict
+import { ShieldAlert, Users, UserCog, Save, Loader2, Trash2, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { User, Role } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,6 +20,17 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -48,17 +59,54 @@ const userEditFormSchema = z.object({
 
 type UserEditFormValues = z.infer<typeof userEditFormSchema>;
 
-interface EditUserDialogProps {
-  user: User | null;
+interface DeleteUserConfirmationDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onUserUpdate: () => void;
+  onConfirm: () => void;
+  userName: string;
+  isDeleting: boolean;
 }
 
-function EditUserDialog({ user, isOpen, onClose, onUserUpdate }: EditUserDialogProps) {
-  const { updateUserByAdmin } = useAuth();
+function DeleteUserConfirmationDialog({ isOpen, onClose, onConfirm, userName, isDeleting }: DeleteUserConfirmationDialogProps) {
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center">
+            <AlertTriangle className="mr-2 h-5 w-5 text-destructive" />
+            Confirmar Eliminación
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            ¿Estás seguro de que deseas eliminar al usuario <strong>{userName}</strong>? Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+            Eliminar Usuario
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+
+interface EditUserDialogProps {
+  user: User | null;
+  currentUser: User | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onUserUpdate: () => void; 
+}
+
+function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: EditUserDialogProps) {
+  const { updateUserByAdmin, deleteUserByAdmin } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const form = useForm<UserEditFormValues>({
     resolver: zodResolver(userEditFormSchema),
@@ -88,7 +136,7 @@ function EditUserDialog({ user, isOpen, onClose, onUserUpdate }: EditUserDialogP
         title: "Usuario Actualizado",
         description: `Los datos de ${data.name} han sido actualizados.`,
       });
-      onUserUpdate(); // Callback to refresh user list
+      onUserUpdate();
       onClose();
     } else {
       toast({
@@ -99,64 +147,120 @@ function EditUserDialog({ user, isOpen, onClose, onUserUpdate }: EditUserDialogP
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!user || (currentUser && currentUser.id === user.id)) {
+        toast({
+            title: "Acción no permitida",
+            description: "No puedes eliminar tu propia cuenta.",
+            variant: "destructive",
+        });
+        setIsDeleteConfirmOpen(false);
+        return;
+    }
+    setIsDeleting(true);
+    const result = await deleteUserByAdmin(user.id);
+    setIsDeleting(false);
+    
+    if (result.success) {
+        toast({
+            title: "Usuario Eliminado",
+            description: result.message,
+        });
+        onUserUpdate(); // Refresh list
+        onClose(); // Close edit dialog
+    } else {
+        toast({
+            title: "Eliminación Fallida",
+            description: result.message,
+            variant: "destructive",
+        });
+    }
+    setIsDeleteConfirmOpen(false); // Close confirmation dialog regardless of outcome
+  };
+
+  const canDelete = currentUser && user && currentUser.id !== user.id;
+
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Gestionar Usuario: {user.name}</DialogTitle>
-          <DialogDescription>
-            Modifica el nombre y el rol del usuario. Haz clic en guardar cuando termines.
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre Completo</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nombre del usuario" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Rol</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Gestionar Usuario: {user.name}</DialogTitle>
+            <DialogDescription>
+              Modifica el nombre y el rol del usuario, o elimínalo del sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre Completo</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un rol" />
-                      </SelectTrigger>
+                      <Input placeholder="Nombre del usuario" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="User">Usuario</SelectItem>
-                      <SelectItem value="Admin">Administrador</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">Cancelar</Button>
-              </DialogClose>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Guardar Cambios
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rol</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona un rol" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="User">Usuario</SelectItem>
+                        <SelectItem value="Admin">Administrador</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter className="flex flex-col sm:flex-row sm:justify-between items-center gap-2 pt-2">
+                <Button 
+                    type="button" 
+                    variant="destructive" 
+                    onClick={() => setIsDeleteConfirmOpen(true)} 
+                    disabled={isSubmitting || isDeleting || !canDelete}
+                    className="w-full sm:w-auto"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Eliminar Usuario
+                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <DialogClose asChild>
+                        <Button type="button" variant="outline" className="w-full sm:w-auto">Cancelar</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={isSubmitting || isDeleting} className="w-full sm:w-auto">
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Guardar Cambios
+                    </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <DeleteUserConfirmationDialog
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={handleDeleteUser}
+        userName={user.name}
+        isDeleting={isDeleting}
+      />
+    </>
   );
 }
 
@@ -217,7 +321,7 @@ export default function UserManagementPage() {
 
   const handleUserUpdate = () => {
      if (getAllUsers) {
-      setUsers(getAllUsers()); // Refresh the user list from the source
+      setUsers(getAllUsers()); 
     }
   };
 
@@ -227,7 +331,7 @@ export default function UserManagementPage() {
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4">
         <Alert variant="destructive" className="max-w-md text-center shadow-lg">
           <ShieldAlert className="h-8 w-8 mx-auto mb-3 text-destructive" />
-          <AlertTitle className="text-xl font-bold">Acceso Denegado</AlertTitle>
+          <RadixAlertTitle className="text-xl font-bold">Acceso Denegado</RadixAlertTitle>
           <AlertDescription className="mb-4">
             No tienes permiso para acceder a la Gestión de Usuarios. Esta área está restringida a administradores.
           </AlertDescription>
@@ -277,6 +381,7 @@ export default function UserManagementPage() {
       </Card>
       <EditUserDialog 
         user={selectedUser} 
+        currentUser={currentUser}
         isOpen={isEditUserDialogOpen} 
         onClose={handleCloseDialog}
         onUserUpdate={handleUserUpdate}
