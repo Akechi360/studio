@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 const mockUsers: User[] = [
   { id: "1", name: "Admin User", email: "admin@example.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=AU" },
   { id: "2", name: "Regular User", email: "user@example.com", role: "User", avatarUrl: "https://placehold.co/100x100.png?text=RU" },
+  { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC" },
 ];
 
 interface AuthContextType {
