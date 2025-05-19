@@ -184,7 +184,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-sm"> {/* Changed sm:max-w-md to sm:max-w-sm */}
           <DialogHeader>
             <DialogTitle>Gestionar Usuario: {user.name}</DialogTitle>
             <DialogDescription>
@@ -389,3 +389,4 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
