@@ -24,7 +24,7 @@ interface AuthContextType {
   register: (name: string, email: string, pass: string) => Promise<boolean>; 
   updateProfile: (name: string, email: string) => Promise<boolean>;
   getAllUsers: () => User[];
-  updateUserByAdmin: (userId: string, data: Partial<Pick<User, 'name' | 'role'>>) => Promise<boolean>;
+  updateUserByAdmin: (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email'>>) => Promise<{ success: boolean; message?: string }>;
   deleteUserByAdmin: (userId: string) => Promise<{ success: boolean; message: string }>;
 }
 
@@ -118,20 +118,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
-  const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role'>>): Promise<boolean> => {
-    // No setIsLoading here to avoid global loading state for this specific admin action
+  const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email'>>): Promise<{ success: boolean; message?: string }> => {
     await new Promise(resolve => setTimeout(resolve, 300)); 
     const userIndex = mockUsers.findIndex(u => u.id === userId);
-    if (userIndex !== -1) {
-      mockUsers[userIndex] = { ...mockUsers[userIndex], ...data };
-      if (user && user.id === userId) { // If admin updates their own info
-        const updatedSelf = { ...user, ...mockUsers[userIndex] };
-        setUser(updatedSelf);
-        localStorage.setItem("ticketflow_user", JSON.stringify(updatedSelf));
-      }
-      return true;
+    if (userIndex === -1) {
+      return { success: false, message: "Usuario no encontrado." };
     }
-    return false;
+
+    // Check for email conflict if email is being changed
+    if (data.email && data.email !== mockUsers[userIndex].email) {
+      if (mockUsers.some(u => u.email === data.email && u.id !== userId)) {
+        return { success: false, message: "El correo electrónico ya está en uso por otro usuario." };
+      }
+    }
+
+    mockUsers[userIndex] = { ...mockUsers[userIndex], ...data };
+    if (user && user.id === userId) { // If admin updates their own info
+      const updatedSelf = { ...user, ...mockUsers[userIndex] };
+      setUser(updatedSelf);
+      localStorage.setItem("ticketflow_user", JSON.stringify(updatedSelf));
+    }
+    return { success: true, message: "Usuario actualizado exitosamente." };
   };
 
   const deleteUserByAdmin = async (userId: string): Promise<{ success: boolean; message: string }> => {

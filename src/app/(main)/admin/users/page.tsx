@@ -52,6 +52,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const userEditFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
+  email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
   role: z.enum(["Admin", "User"], { required_error: "El rol es obligatorio." }),
 });
 
@@ -82,7 +83,7 @@ function DeleteUserConfirmationDialog({ isOpen, onClose, onConfirm, userName, is
           <AlertDialogCancel disabled={isDeleting} size="sm">Cancelar</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" size="sm">
             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-            Eliminar Usuario
+            Eliminar
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -110,6 +111,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
     resolver: zodResolver(userEditFormSchema),
     defaultValues: {
       name: user?.name || "",
+      email: user?.email || "",
       role: user?.role || "User",
     },
   });
@@ -118,6 +120,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
     if (user) {
       form.reset({
         name: user.name,
+        email: user.email,
         role: user.role,
       });
     }
@@ -127,19 +130,19 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
 
   const onSubmit = async (data: UserEditFormValues) => {
     setIsSubmitting(true);
-    const success = await updateUserByAdmin(user.id, data);
+    const result = await updateUserByAdmin(user.id, data);
     setIsSubmitting(false);
-    if (success) {
+    if (result.success) {
       toast({
         title: "Usuario Actualizado",
-        description: `Los datos de ${data.name} han sido actualizados.`,
+        description: result.message || `Los datos de ${data.name} han sido actualizados.`,
       });
       onUserUpdate();
       onClose();
     } else {
       toast({
         title: "Actualización Fallida",
-        description: "No se pudo actualizar el usuario. Por favor, inténtalo de nuevo.",
+        description: result.message || "No se pudo actualizar el usuario. Por favor, inténtalo de nuevo.",
         variant: "destructive",
       });
     }
@@ -164,8 +167,8 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
             title: "Usuario Eliminado",
             description: result.message,
         });
-        onUserUpdate(); // Refresh list
-        onClose(); // Close edit dialog
+        onUserUpdate(); 
+        onClose(); 
     } else {
         toast({
             title: "Eliminación Fallida",
@@ -173,7 +176,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
             variant: "destructive",
         });
     }
-    setIsDeleteConfirmOpen(false); // Close confirmation dialog regardless of outcome
+    setIsDeleteConfirmOpen(false); 
   };
 
   const canDelete = currentUser && user && currentUser.id !== user.id;
@@ -186,7 +189,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
           <DialogHeader>
             <DialogTitle>Gestionar Usuario: {user.name}</DialogTitle>
             <DialogDescription>
-              Modifica el nombre y el rol del usuario, o elimínalo del sistema.
+              Modifica los datos del usuario o elimínalo del sistema.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -199,6 +202,19 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
                     <FormLabel>Nombre Completo</FormLabel>
                     <FormControl>
                       <Input placeholder="Nombre del usuario" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Correo Electrónico</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="email@ejemplo.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -225,14 +241,14 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
                   </FormItem>
                 )}
               />
-              <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-6">
+              <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between sm:space-x-2 pt-6">
                 <Button
                     type="button"
                     variant="destructive"
                     size="sm"
                     onClick={() => setIsDeleteConfirmOpen(true)}
                     disabled={isSubmitting || isDeleting || !canDelete}
-                    className="w-full sm:w-auto sm:mr-auto"
+                    className="w-full sm:w-auto" 
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Eliminar
@@ -383,4 +399,3 @@ export default function UserManagementPage() {
     </div>
   );
 }
-
