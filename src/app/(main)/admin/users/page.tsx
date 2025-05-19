@@ -27,7 +27,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogTitle as RadixAlertDialogTitle, // Renamed
 } from "@/components/ui/alert-dialog";
 import {
   Form,
@@ -50,13 +50,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 
+const NO_DEPARTMENT_VALUE = "_NO_DEPARTMENT_"; // Special value for "Sin Departamento"
+
 const DEPARTMENTS = [
   "Admision", "Caja", "Radiologia", "Laboratorio", "CDI", "Cardiovascular",
   "Jefa Enfermeras", "Contabilidad", "Administracion", "RRHH", "Honorarios",
-  "Seguros", "Pediatria", "UCI", "Ocupacional", "Gerencia", "" // Empty string for "Sin Departamento"
+  "Seguros", "Pediatria", "UCI", "Ocupacional", "Gerencia", NO_DEPARTMENT_VALUE
 ];
+
 const DEPARTMENT_DISPLAY_MAP: { [key: string]: string } = {
-  "": "Sin Departamento",
+  [NO_DEPARTMENT_VALUE]: "Sin Departamento",
   "Admision": "Admisión",
   "Caja": "Caja",
   "Radiologia": "Radiología",
@@ -98,10 +101,10 @@ function DeleteUserConfirmationDialog({ isOpen, onClose, onConfirm, userName, is
     <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center">
+          <RadixAlertDialogTitle className="flex items-center">
             <AlertTriangle className="mr-2 h-5 w-5 text-destructive" />
             Confirmar Eliminación
-          </AlertDialogTitle>
+          </RadixAlertDialogTitle>
           <AlertDialogDescription>
             ¿Estás seguro de que deseas eliminar al usuario <strong>{userName}</strong>? Esta acción no se puede deshacer.
           </AlertDialogDescription>
@@ -140,7 +143,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
       name: user?.name || "",
       email: user?.email || "",
       role: user?.role || "User",
-      department: user?.department || "",
+      department: user?.department || NO_DEPARTMENT_VALUE,
     },
   });
 
@@ -150,7 +153,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
         name: user.name,
         email: user.email,
         role: user.role,
-        department: user.department || "", // Ensure empty string if undefined
+        department: user.department || NO_DEPARTMENT_VALUE,
       });
     }
   }, [user, form]);
@@ -159,9 +162,10 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
 
   const onSubmit = async (data: UserEditFormValues) => {
     setIsSubmitting(true);
-    // Pass department, it will be handled as undefined if empty string by auth context
-    const result = await updateUserByAdmin(user.id, { ...data, department: data.department === "" ? undefined : data.department });
+    const departmentToSave = data.department === NO_DEPARTMENT_VALUE ? undefined : data.department;
+    const result = await updateUserByAdmin(user.id, { ...data, department: departmentToSave });
     setIsSubmitting(false);
+
     if (result.success) {
       toast({
         title: "Usuario Actualizado",
@@ -277,16 +281,16 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Departamento</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || NO_DEPARTMENT_VALUE}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona un departamento" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {DEPARTMENTS.map((dept) => (
-                          <SelectItem key={dept} value={dept}>
-                            {DEPARTMENT_DISPLAY_MAP[dept] || dept}
+                        {DEPARTMENTS.map((deptKey) => (
+                          <SelectItem key={deptKey} value={deptKey}>
+                            {DEPARTMENT_DISPLAY_MAP[deptKey] || deptKey}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -302,12 +306,11 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
                     size="sm"
                     onClick={() => setIsDeleteConfirmOpen(true)}
                     disabled={isSubmitting || isDeleting || !canDelete}
-                    className="w-full sm:w-auto" 
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Eliminar
                 </Button>
-                <Button type="submit" size="sm" disabled={isSubmitting || isDeleting} className="w-full sm:w-auto">
+                <Button type="submit" size="sm" disabled={isSubmitting || isDeleting}>
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     Guardar
                 </Button>
@@ -372,7 +375,7 @@ export default function UserManagementPage() {
     if (getAllUsers) {
       setUsers(getAllUsers());
     }
-  }, [getAllUsers]);
+  }, [getAllUsers, user]); // Added user to dependency array to refresh if current admin's data changes
 
   const handleManageUser = (userToManage: User) => {
     setSelectedUser(userToManage);
@@ -437,21 +440,23 @@ export default function UserManagementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
-                  <UserRow key={user.id} user={user} onManageClick={handleManageUser} />
+                {users.map((userEntry) => ( // Renamed user to userEntry to avoid conflict with currentUser
+                  <UserRow key={userEntry.id} user={userEntry} onManageClick={handleManageUser} />
                 ))}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
-      <EditUserDialog
-        user={selectedUser}
-        currentUser={currentUser}
-        isOpen={isEditUserDialogOpen}
-        onClose={handleCloseDialog}
-        onUserUpdate={handleUserUpdate}
-      />
+      {selectedUser && (
+        <EditUserDialog
+          user={selectedUser}
+          currentUser={currentUser}
+          isOpen={isEditUserDialogOpen}
+          onClose={handleCloseDialog}
+          onUserUpdate={handleUserUpdate}
+        />
+      )}
     </div>
   );
 }
