@@ -18,7 +18,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -29,7 +28,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Form,
@@ -237,14 +235,11 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
                     className="w-full sm:w-auto sm:mr-auto"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Eliminar Usuario
+                  Eliminar
                 </Button>
-                <DialogClose asChild>
-                    <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto">Cancelar</Button>
-                </DialogClose>
                 <Button type="submit" size="sm" disabled={isSubmitting || isDeleting} className="w-full sm:w-auto">
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Guardar Cambios
+                    Guardar
                 </Button>
               </DialogFooter>
             </form>
