@@ -55,7 +55,9 @@ const NO_DEPARTMENT_VALUE = "_NO_DEPARTMENT_"; // Special value for "Sin Departa
 const DEPARTMENTS = [
   "Admision", "Caja", "Radiologia", "Laboratorio", "CDI", "Cardiovascular",
   "Jefa Enfermeras", "Contabilidad", "Administracion", "RRHH", "Honorarios",
-  "Seguros", "Pediatria", "UCI", "Ocupacional", "Gerencia", NO_DEPARTMENT_VALUE
+  "Seguros", "Pediatria", "UCI", "Ocupacional", "Gerencia", 
+  "Asistente Gerencia", "Sistemas", // Added new departments
+  NO_DEPARTMENT_VALUE
 ];
 
 const DEPARTMENT_DISPLAY_MAP: { [key: string]: string } = {
@@ -76,6 +78,8 @@ const DEPARTMENT_DISPLAY_MAP: { [key: string]: string } = {
   "UCI": "UCI",
   "Ocupacional": "Ocupacional",
   "Gerencia": "Gerencia",
+  "Asistente Gerencia": "Asistente Gerencia", // Added display mapping
+  "Sistemas": "Sistemas", // Added display mapping
 };
 
 
@@ -130,7 +134,7 @@ interface EditUserDialogProps {
   onUserUpdate: () => void;
 }
 
-function EditUserDialog({ user: userToEdit, currentUser, isOpen, onClose, onUserUpdate }: EditUserDialogProps) { // Renamed prop 'user' to 'userToEdit'
+function EditUserDialog({ user: userToEdit, currentUser, isOpen, onClose, onUserUpdate }: EditUserDialogProps) { 
   const { updateUserByAdmin, deleteUserByAdmin } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -199,14 +203,14 @@ function EditUserDialog({ user: userToEdit, currentUser, isOpen, onClose, onUser
     if (result.success) {
         toast({
             title: "Usuario Eliminado",
-            description: result.message || "Usuario eliminado.", // Provide a default message
+            description: result.message || "Usuario eliminado.", 
         });
         onUserUpdate(); 
         onClose(); 
     } else {
         toast({
             title: "Eliminación Fallida",
-            description: result.message || "No se pudo eliminar el usuario.", // Provide a default message
+            description: result.message || "No se pudo eliminar el usuario.", 
             variant: "destructive",
         });
     }
@@ -375,7 +379,7 @@ export default function UserManagementPage() {
     if (getAllUsers) {
       setUsers(getAllUsers());
     }
-  }, [getAllUsers, currentUser]); // Changed 'user' to 'currentUser'
+  }, [getAllUsers, currentUser]); 
 
   const handleManageUser = (userToManage: User) => {
     setSelectedUser(userToManage);
@@ -440,7 +444,7 @@ export default function UserManagementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((userEntry) => ( // Renamed user to userEntry to avoid conflict with currentUser
+                {users.map((userEntry) => ( 
                   <UserRow key={userEntry.id} user={userEntry} onManageClick={handleManageUser} />
                 ))}
               </TableBody>
@@ -450,8 +454,8 @@ export default function UserManagementPage() {
       </Card>
       {selectedUser && (
         <EditUserDialog
-          user={selectedUser} // This is the user being edited
-          currentUser={currentUser} // This is the currently logged-in admin
+          user={selectedUser} 
+          currentUser={currentUser} 
           isOpen={isEditUserDialogOpen}
           onClose={handleCloseDialog}
           onUserUpdate={handleUserUpdate}
@@ -460,3 +464,5 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
+    
