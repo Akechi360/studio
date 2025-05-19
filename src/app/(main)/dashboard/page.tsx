@@ -5,6 +5,8 @@ import { getDashboardStats } from "@/lib/actions";
 import { TicketStatsCharts } from "@/components/dashboard/ticket-stats-charts";
 import type { TicketSummary, TicketStats } from "@/lib/types";
 
+export const dynamic = 'force-dynamic'; // Ensure fresh data on every request
+
 function StatCard({ title, value, icon, description, colorClass = "text-primary" }: { title: string, value: string | number, icon: React.ElementType, description: string, colorClass?: string }) {
   const IconComponent = icon;
   return (

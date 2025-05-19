@@ -49,6 +49,7 @@ export async function createTicketAction(
   revalidatePath("/tickets");
   revalidatePath(`/tickets/${newTicket.id}`);
   revalidatePath("/dashboard");
+  revalidatePath("/admin/reports"); // Also revalidate admin reports
 
   return {
     success: true,
@@ -95,6 +96,8 @@ export async function addCommentAction(
   
   revalidatePath(`/tickets/${ticketId}`);
   revalidatePath("/tickets"); 
+  revalidatePath("/dashboard");
+  revalidatePath("/admin/reports");
   
   return {
     success: true,
@@ -133,6 +136,7 @@ export async function updateTicketStatusAction(
   revalidatePath(`/tickets/${ticketId}`);
   revalidatePath("/tickets");
   revalidatePath("/dashboard");
+  revalidatePath("/admin/reports");
 
   // Translate status for the message
   const statusDisplayMap: Record<TicketStatus, string> = {
@@ -168,20 +172,20 @@ export async function getAISolutionSuggestion(ticketDescription: string) {
 
 // --- Fetch Ticket by ID (Simulated) ---
 export async function getTicketById(ticketId: string): Promise<Ticket | null> {
-  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
+  // await new Promise(resolve => setTimeout(resolve, 50)); // Removed delay
   const ticket = mockTickets.find(t => t.id === ticketId);
   return ticket || null;
 }
 
 // --- Fetch All Tickets (Simulated) ---
 export async function getAllTickets(): Promise<Ticket[]> {
-  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
+  // await new Promise(resolve => setTimeout(resolve, 50)); // Removed delay
   return [...mockTickets].sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 // --- Fetch Dashboard Stats (Simulated) ---
 export async function getDashboardStats() {
-  await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay
+  // await new Promise(resolve => setTimeout(resolve, 50)); // Removed delay
   const total = mockTickets.length;
   const open = mockTickets.filter(t => t.status === "Open").length;
   const inProgress = mockTickets.filter(t => t.status === "In Progress").length;
