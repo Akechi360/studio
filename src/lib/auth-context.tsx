@@ -8,11 +8,11 @@ import { useRouter } from "next/navigation";
 // Mock users - in a real app, this would come from a database
 // This list is now also used for the User Management page.
 export const mockUsers: User[] = [
-  { id: "1", name: "Admin User", email: "admin@example.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=AU" },
-  { id: "2", name: "Regular User", email: "user@example.com", role: "User", avatarUrl: "https://placehold.co/100x100.png?text=RU" },
-  { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC" },
-  { id: '4', name: 'Alice Wonderland', email: 'alice@example.com', role: 'User', avatarUrl: 'https://placehold.co/40x40.png?text=AW' },
-  { id: '5', name: 'Bob The Builder', email: 'bob@example.com', role: 'User', avatarUrl: 'https://placehold.co/40x40.png?text=BB' },
+  { id: "1", name: "Admin User", email: "admin@example.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=AU", department: "Administracion" },
+  { id: "2", name: "Regular User", email: "user@example.com", role: "User", avatarUrl: "https://placehold.co/100x100.png?text=RU", department: "Laboratorio" },
+  { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC", department: "Gerencia" },
+  { id: '4', name: 'Alice Wonderland', email: 'alice@example.com', role: 'User', avatarUrl: 'https://placehold.co/40x40.png?text=AW', department: "Radiologia" },
+  { id: '5', name: 'Bob The Builder', email: 'bob@example.com', role: 'User', avatarUrl: 'https://placehold.co/40x40.png?text=BB' }, // No department initially
 ];
 
 interface AuthContextType {
@@ -24,7 +24,7 @@ interface AuthContextType {
   register: (name: string, email: string, pass: string) => Promise<boolean>; 
   updateProfile: (name: string, email: string) => Promise<boolean>;
   getAllUsers: () => User[];
-  updateUserByAdmin: (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email'>>) => Promise<{ success: boolean; message?: string }>;
+  updateUserByAdmin: (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department'>>) => Promise<{ success: boolean; message?: string }>;
   deleteUserByAdmin: (userId: string) => Promise<{ success: boolean; message: string }>;
 }
 
@@ -40,10 +40,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUser = localStorage.getItem("ticketflow_user");
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser) as User;
-        // Find user in the potentially updated mockUsers list
         const existingUser = mockUsers.find(u => u.id === parsedUser.id);
         if (existingUser) {
-          setUser(existingUser); // Use the user object from the current mockUsers
+          setUser(existingUser);
         } else {
           localStorage.removeItem("ticketflow_user"); 
         }
@@ -80,14 +79,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 500));
     if (mockUsers.find(u => u.email === email)) {
       setIsLoading(false);
-      return false; // User already exists
+      return false; 
     }
     const newUser: User = {
-      id: String(mockUsers.length + 1 + Date.now()), // Ensure unique ID
+      id: String(mockUsers.length + 1 + Date.now()), 
       name,
       email,
       role: "User", 
       avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,2).toUpperCase()}`
+      // department will be undefined by default
     };
     mockUsers.push(newUser); 
     setUser(newUser);
@@ -118,22 +118,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
-  const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email'>>): Promise<{ success: boolean; message?: string }> => {
+  const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department'>>): Promise<{ success: boolean; message?: string }> => {
     await new Promise(resolve => setTimeout(resolve, 300)); 
     const userIndex = mockUsers.findIndex(u => u.id === userId);
     if (userIndex === -1) {
       return { success: false, message: "Usuario no encontrado." };
     }
 
-    // Check for email conflict if email is being changed
     if (data.email && data.email !== mockUsers[userIndex].email) {
       if (mockUsers.some(u => u.email === data.email && u.id !== userId)) {
         return { success: false, message: "El correo electrónico ya está en uso por otro usuario." };
       }
     }
+    
+    const updatedUserData = { ...mockUsers[userIndex], ...data };
+    // If "Sin Departamento" was chosen (represented by an empty string from the form), store it as undefined.
+    if (data.department === "") {
+        updatedUserData.department = undefined;
+    }
 
-    mockUsers[userIndex] = { ...mockUsers[userIndex], ...data };
-    if (user && user.id === userId) { // If admin updates their own info
+    mockUsers[userIndex] = updatedUserData;
+
+    if (user && user.id === userId) { 
       const updatedSelf = { ...user, ...mockUsers[userIndex] };
       setUser(updatedSelf);
       localStorage.setItem("ticketflow_user", JSON.stringify(updatedSelf));

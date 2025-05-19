@@ -7,6 +7,7 @@ export interface User {
   email: string;
   role: Role;
   avatarUrl?: string;
+  department?: string; // Added department
 }
 
 export type TicketPriority = "Low" | "Medium" | "High";
@@ -51,6 +52,6 @@ export interface TicketSummary {
 }
 
 export interface TicketStats {
-  byPriority: { name: TicketPriority; value: number }[];
-  byStatus: { name: TicketStatus; value: number }[];
+  byPriority: { name: string; value: number }[]; // Adjusted to string for display name
+  byStatus: { name: string; value: number }[]; // Adjusted to string for display name
 }

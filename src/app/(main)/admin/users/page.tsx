@@ -5,9 +5,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert'; // Renamed to avoid conflict
-import { ShieldAlert, Users, UserCog, Save, Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, Users, UserCog, Save, Loader2, Trash2, AlertTriangle, Building } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { User, Role } from '@/lib/types';
+import type { User } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from "@/components/ui/button";
@@ -50,10 +50,37 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 
+const DEPARTMENTS = [
+  "Admision", "Caja", "Radiologia", "Laboratorio", "CDI", "Cardiovascular",
+  "Jefa Enfermeras", "Contabilidad", "Administracion", "RRHH", "Honorarios",
+  "Seguros", "Pediatria", "UCI", "Ocupacional", "Gerencia", "" // Empty string for "Sin Departamento"
+];
+const DEPARTMENT_DISPLAY_MAP: { [key: string]: string } = {
+  "": "Sin Departamento",
+  "Admision": "Admisión",
+  "Caja": "Caja",
+  "Radiologia": "Radiología",
+  "Laboratorio": "Laboratorio",
+  "CDI": "CDI",
+  "Cardiovascular": "Cardiovascular",
+  "Jefa Enfermeras": "Jefa Enfermeras",
+  "Contabilidad": "Contabilidad",
+  "Administracion": "Administración",
+  "RRHH": "RRHH",
+  "Honorarios": "Honorarios",
+  "Seguros": "Seguros",
+  "Pediatria": "Pediatría",
+  "UCI": "UCI",
+  "Ocupacional": "Ocupacional",
+  "Gerencia": "Gerencia",
+};
+
+
 const userEditFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
   email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
   role: z.enum(["Admin", "User"], { required_error: "El rol es obligatorio." }),
+  department: z.string().optional(),
 });
 
 type UserEditFormValues = z.infer<typeof userEditFormSchema>;
@@ -113,6 +140,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
       name: user?.name || "",
       email: user?.email || "",
       role: user?.role || "User",
+      department: user?.department || "",
     },
   });
 
@@ -122,6 +150,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
         name: user.name,
         email: user.email,
         role: user.role,
+        department: user.department || "", // Ensure empty string if undefined
       });
     }
   }, [user, form]);
@@ -130,7 +159,8 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
 
   const onSubmit = async (data: UserEditFormValues) => {
     setIsSubmitting(true);
-    const result = await updateUserByAdmin(user.id, data);
+    // Pass department, it will be handled as undefined if empty string by auth context
+    const result = await updateUserByAdmin(user.id, { ...data, department: data.department === "" ? undefined : data.department });
     setIsSubmitting(false);
     if (result.success) {
       toast({
@@ -241,6 +271,30 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Departamento</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona un departamento" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {DEPARTMENTS.map((dept) => (
+                          <SelectItem key={dept} value={dept}>
+                            {DEPARTMENT_DISPLAY_MAP[dept] || dept}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between sm:space-x-2 pt-6">
                 <Button
                     type="button"
@@ -297,6 +351,7 @@ function UserRow({ user, onManageClick }: { user: User; onManageClick: (user: Us
           {user.role === "Admin" ? "Administrador" : "Usuario"}
         </Badge>
       </TableCell>
+      <TableCell>{user.department ? (DEPARTMENT_DISPLAY_MAP[user.department] || user.department) : <span className="text-muted-foreground">N/A</span>}</TableCell>
       <TableCell className="text-right">
         <Button variant="outline" size="sm" onClick={() => onManageClick(user)}>
           <UserCog className="mr-2 h-4 w-4" />
@@ -355,7 +410,7 @@ export default function UserManagementPage() {
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold tracking-tight flex items-center"><Users className="mr-3 h-8 w-8 text-primary" />Gestión de Usuarios</h1>
         <p className="text-muted-foreground">
-          Gestionar usuarios, roles y permisos.
+          Gestionar usuarios, roles, departamentos y permisos.
         </p>
       </div>
       <Card className="shadow-lg">
@@ -377,6 +432,7 @@ export default function UserManagementPage() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Correo Electrónico</TableHead>
                   <TableHead>Rol</TableHead>
+                  <TableHead>Departamento</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
