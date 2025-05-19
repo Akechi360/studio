@@ -49,7 +49,7 @@ const navItems: NavItem[] = [
   { href: "/profile", label: "Profile", icon: User, exact: true },
   { href: "/admin/users", label: "User Management", icon: Users, allowedRoles: ["Admin"], exact: true },
   { href: "/admin/reports", label: "Reports", icon: BarChart3, allowedRoles: ["Admin"], exact: true },
-  { href: "/settings", label: "Settings", icon: Settings, exact: true },
+  { href: "/settings", label: "Settings", icon: Settings, allowedRoles: ["Admin"], exact: true },
   { href: "/help", label: "Help & FAQ", icon: HelpCircle, exact: true },
 ];
 
