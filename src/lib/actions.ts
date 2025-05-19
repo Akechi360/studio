@@ -3,7 +3,13 @@
 
 import { z } from "zod";
 import type { Ticket, Comment, TicketPriority, TicketStatus, User } from "./types";
-import { mockTickets } from "./mock-data"; 
+// Import new mock data functions
+import { 
+  addTicketToMock, 
+  getAllTicketsFromMock, 
+  getTicketByIdFromMock,
+  getRawTicketsStoreForStats
+} from "./mock-data"; 
 import { suggestSolution as genAiSuggestSolution } from "@/ai/flows/suggest-solution";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
@@ -12,7 +18,7 @@ import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants"
 const CreateTicketSchema = z.object({
   subject: z.string().min(5, "El asunto debe tener al menos 5 caracteres."),
   description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
-  priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]), // Use English for backend consistency
+  priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]),
 });
 
 export async function createTicketAction(
@@ -30,13 +36,15 @@ export async function createTicketAction(
   }
 
   const { subject, description, priority } = validatedFields.data;
-
+  
+  // Use current length of the store for ID generation
+  const currentTickets = getRawTicketsStoreForStats(); // Get current state for length
   const newTicket: Ticket = {
-    id: (mockTickets.length + 1).toString(), // Simple ID generation for mock
+    id: (currentTickets.length + 1).toString(),
     subject,
     description,
-    priority: priority as TicketPriority, // priority is already English
-    status: "Open", // Default status in English
+    priority: priority as TicketPriority,
+    status: "Open",
     attachments: [], 
     userId,
     userName,
@@ -44,12 +52,13 @@ export async function createTicketAction(
     updatedAt: new Date(),
     comments: [],
   };
-  mockTickets.unshift(newTicket); 
+  
+  addTicketToMock(newTicket); // Use the new function to add to the store
 
   revalidatePath("/tickets");
   revalidatePath(`/tickets/${newTicket.id}`);
   revalidatePath("/dashboard");
-  revalidatePath("/admin/reports"); // Also revalidate admin reports
+  revalidatePath("/admin/reports");
 
   return {
     success: true,
@@ -77,7 +86,7 @@ export async function addCommentAction(
     };
   }
 
-  const ticket = mockTickets.find(t => t.id === ticketId);
+  const ticket = getTicketByIdFromMock(ticketId); // Use new function
   if (!ticket) {
     return { success: false, message: "Ticket no encontrado." };
   }
@@ -91,6 +100,8 @@ export async function addCommentAction(
     createdAt: new Date(),
   };
 
+  // Direct mutation is okay here because getTicketByIdFromMock returns a reference
+  // to the object within the persistent store (for dev).
   ticket.comments.push(newComment);
   ticket.updatedAt = new Date();
   
@@ -108,7 +119,7 @@ export async function addCommentAction(
 
 // --- Update Ticket Status ---
 const UpdateTicketStatusSchema = z.object({
-  status: z.enum(TICKET_STATUSES_ENGLISH as [TicketStatus, ...TicketStatus[]]), // Use English for backend consistency
+  status: z.enum(TICKET_STATUSES_ENGLISH as [TicketStatus, ...TicketStatus[]]),
 });
 
 export async function updateTicketStatusAction(
@@ -125,11 +136,12 @@ export async function updateTicketStatusAction(
     };
   }
   
-  const ticket = mockTickets.find(t => t.id === ticketId);
+  const ticket = getTicketByIdFromMock(ticketId); // Use new function
   if (!ticket) {
     return { success: false, message: "Ticket no encontrado." };
   }
 
+  // Direct mutation is okay here
   ticket.status = validatedFields.data.status as TicketStatus;
   ticket.updatedAt = new Date();
 
@@ -138,7 +150,6 @@ export async function updateTicketStatusAction(
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
 
-  // Translate status for the message
   const statusDisplayMap: Record<TicketStatus, string> = {
     Open: "Abierto",
     "In Progress": "En Progreso",
@@ -159,9 +170,7 @@ export async function getAISolutionSuggestion(ticketDescription: string) {
     return { suggestion: null, error: "La descripción del ticket es demasiado corta para una sugerencia significativa." };
   }
   try {
-    // Assuming genAiSuggestSolution can handle Spanish input or is language-agnostic
     const result = await genAiSuggestSolution({ ticketDescription });
-    // If AI returns Spanish, great. If English, might need translation layer later.
     return { suggestion: result.suggestedSolution, error: null };
   } catch (error) {
     console.error("Error al obtener sugerencia de IA:", error);
@@ -170,40 +179,37 @@ export async function getAISolutionSuggestion(ticketDescription: string) {
 }
 
 
-// --- Fetch Ticket by ID (Simulated) ---
+// --- Fetch Ticket by ID ---
 export async function getTicketById(ticketId: string): Promise<Ticket | null> {
-  // await new Promise(resolve => setTimeout(resolve, 50)); // Removed delay
-  const ticket = mockTickets.find(t => t.id === ticketId);
-  return ticket || null;
+  return getTicketByIdFromMock(ticketId); // Use new function
 }
 
-// --- Fetch All Tickets (Simulated) ---
+// --- Fetch All Tickets ---
 export async function getAllTickets(): Promise<Ticket[]> {
-  // await new Promise(resolve => setTimeout(resolve, 50)); // Removed delay
-  return [...mockTickets].sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return getAllTicketsFromMock(); // Use new function
 }
 
-// --- Fetch Dashboard Stats (Simulated) ---
+// --- Fetch Dashboard Stats ---
 export async function getDashboardStats() {
-  // await new Promise(resolve => setTimeout(resolve, 50)); // Removed delay
-  const total = mockTickets.length;
-  const open = mockTickets.filter(t => t.status === "Open").length;
-  const inProgress = mockTickets.filter(t => t.status === "In Progress").length;
-  const resolved = mockTickets.filter(t => t.status === "Resolved").length;
-  const closed = mockTickets.filter(t => t.status === "Closed").length;
+  const currentTickets = getRawTicketsStoreForStats(); // Use new function to get raw data
+  
+  const total = currentTickets.length;
+  const open = currentTickets.filter(t => t.status === "Open").length;
+  const inProgress = currentTickets.filter(t => t.status === "In Progress").length;
+  const resolved = currentTickets.filter(t => t.status === "Resolved").length;
+  const closed = currentTickets.filter(t => t.status === "Closed").length;
 
-  // Map English keys to Spanish names for charts
   const priorityDisplayMap: Record<TicketPriority, string> = { Low: "Baja", Medium: "Media", High: "Alta" };
   const statusDisplayMap: Record<TicketStatus, string> = { Open: "Abierto", "In Progress": "En Progreso", Resolved: "Resuelto", Closed: "Cerrado"};
   
   const byPriority = (TICKET_PRIORITIES_ENGLISH).map(pKey  => ({
     name: priorityDisplayMap[pKey],
-    value: mockTickets.filter(t => t.priority === pKey).length,
+    value: currentTickets.filter(t => t.priority === pKey).length,
   }));
 
   const byStatus = (TICKET_STATUSES_ENGLISH).map(sKey => ({
     name: statusDisplayMap[sKey],
-    value: mockTickets.filter(t => t.status === sKey).length,
+    value: currentTickets.filter(t => t.status === sKey).length,
   }));
 
   return {
