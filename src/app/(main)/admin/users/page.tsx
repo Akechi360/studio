@@ -98,7 +98,7 @@ interface EditUserDialogProps {
   currentUser: User | null;
   isOpen: boolean;
   onClose: () => void;
-  onUserUpdate: () => void; 
+  onUserUpdate: () => void;
 }
 
 function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: EditUserDialogProps) {
@@ -160,7 +160,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
     setIsDeleting(true);
     const result = await deleteUserByAdmin(user.id);
     setIsDeleting(false);
-    
+
     if (result.success) {
         toast({
             title: "Usuario Eliminado",
@@ -184,7 +184,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-        <DialogContent className="sm:max-w-sm"> {/* Changed sm:max-w-md to sm:max-w-sm */}
+        <DialogContent className="sm:max-w-md"> {/* Reverted to sm:max-w-md for wider modal */}
           <DialogHeader>
             <DialogTitle>Gestionar Usuario: {user.name}</DialogTitle>
             <DialogDescription>
@@ -192,7 +192,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-6"> {/* Adjusted form spacing */}
               <FormField
                 control={form.control}
                 name="name"
@@ -227,26 +227,25 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
                   </FormItem>
                 )}
               />
-              <DialogFooter className="flex flex-col sm:flex-row sm:justify-between items-center gap-2 pt-2">
-                <Button 
-                    type="button" 
-                    variant="destructive" 
-                    onClick={() => setIsDeleteConfirmOpen(true)} 
+              {/* Standardized DialogFooter layout */}
+              <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-6">
+                <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => setIsDeleteConfirmOpen(true)}
                     disabled={isSubmitting || isDeleting || !canDelete}
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto sm:mr-auto" /* Delete button pushed left on sm+ */
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Eliminar Usuario
                 </Button>
-                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <DialogClose asChild>
-                        <Button type="button" variant="outline" className="w-full sm:w-auto">Cancelar</Button>
-                    </DialogClose>
-                    <Button type="submit" disabled={isSubmitting || isDeleting} className="w-full sm:w-auto">
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Guardar Cambios
-                    </Button>
-                </div>
+                <DialogClose asChild>
+                    <Button type="button" variant="outline" className="w-full sm:w-auto">Cancelar</Button>
+                </DialogClose>
+                <Button type="submit" disabled={isSubmitting || isDeleting} className="w-full sm:w-auto">
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Guardar Cambios
+                </Button>
               </DialogFooter>
             </form>
           </Form>
@@ -321,7 +320,7 @@ export default function UserManagementPage() {
 
   const handleUserUpdate = () => {
      if (getAllUsers) {
-      setUsers(getAllUsers()); 
+      setUsers(getAllUsers());
     }
   };
 
@@ -379,10 +378,10 @@ export default function UserManagementPage() {
           )}
         </CardContent>
       </Card>
-      <EditUserDialog 
-        user={selectedUser} 
+      <EditUserDialog
+        user={selectedUser}
         currentUser={currentUser}
-        isOpen={isEditUserDialogOpen} 
+        isOpen={isEditUserDialogOpen}
         onClose={handleCloseDialog}
         onUserUpdate={handleUserUpdate}
       />
