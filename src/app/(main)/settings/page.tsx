@@ -1,50 +1,116 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, Settings as SettingsIcon, Save, BellRing, Mail, MessageCircle } from 'lucide-react';
+import { ShieldAlert, Settings as SettingsIcon, Save, BellRing, Mail, MessageCircle, Lightbulb, Paintbrush } from 'lucide-react';
+import { APP_NAME } from '@/lib/constants';
 
 interface NotificationPreferences {
   emailOnNewTicket: boolean;
   emailOnNewComment: boolean;
 }
 
+interface AIPreferences {
+  suggestionsEnabled: boolean;
+}
+
+interface CustomizationPreferences {
+  appName: string;
+}
+
+interface AdminSettings {
+  notificationPrefs: NotificationPreferences;
+  aiPrefs: AIPreferences;
+  customizationPrefs: CustomizationPreferences;
+}
+
+const defaultSettings: AdminSettings = {
+  notificationPrefs: {
+    emailOnNewTicket: true,
+    emailOnNewComment: true,
+  },
+  aiPrefs: {
+    suggestionsEnabled: true,
+  },
+  customizationPrefs: {
+    appName: APP_NAME, // Default from constants
+  },
+};
+
 export default function SettingsPage() {
   const { role } = useAuth();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
-  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
-    emailOnNewTicket: true,
-    emailOnNewComment: true,
-  });
+  const [settings, setSettings] = useState<AdminSettings>(defaultSettings);
 
   useEffect(() => {
-    const savedPrefs = localStorage.getItem('adminNotificationPrefs');
-    if (savedPrefs) {
-      setNotificationPrefs(JSON.parse(savedPrefs));
+    const savedSettingsRaw = localStorage.getItem('adminSettings');
+    if (savedSettingsRaw) {
+      try {
+        const savedSettings = JSON.parse(savedSettingsRaw);
+        // Merge with defaults to ensure all keys are present if structure changed
+        setSettings(prev => ({
+          ...defaultSettings,
+          ...savedSettings,
+          notificationPrefs: {
+            ...defaultSettings.notificationPrefs,
+            ...(savedSettings.notificationPrefs || {}),
+          },
+          aiPrefs: {
+            ...defaultSettings.aiPrefs,
+            ...(savedSettings.aiPrefs || {}),
+          },
+          customizationPrefs: {
+            ...defaultSettings.customizationPrefs,
+            ...(savedSettings.customizationPrefs || {}),
+          },
+        }));
+      } catch (error) {
+        console.error("Error al cargar configuración de admin:", error);
+        setSettings(defaultSettings); // Reset to defaults on error
+      }
     }
   }, []);
 
-  const handlePreferenceChange = (key: keyof NotificationPreferences, value: boolean) => {
-    setNotificationPrefs(prev => ({ ...prev, [key]: value }));
+  const handleNotificationPrefChange = (key: keyof NotificationPreferences, value: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      notificationPrefs: { ...prev.notificationPrefs, [key]: value },
+    }));
+  };
+
+  const handleAIPrefChange = (key: keyof AIPreferences, value: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      aiPrefs: { ...prev.aiPrefs, [key]: value },
+    }));
+  };
+  
+  const handleCustomizationPrefChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setSettings(prev => ({
+      ...prev,
+      customizationPrefs: { ...prev.customizationPrefs, [name as keyof CustomizationPreferences]: value },
+    }));
   };
 
   const handleSaveSettings = () => {
     setIsSaving(true);
-    localStorage.setItem('adminNotificationPrefs', JSON.stringify(notificationPrefs));
+    localStorage.setItem('adminSettings', JSON.stringify(settings));
     // Simulate API call
     setTimeout(() => {
       setIsSaving(false);
       toast({
         title: "Configuración Guardada",
-        description: "Tus preferencias de notificación han sido actualizadas.",
+        description: "Tus preferencias han sido actualizadas.",
       });
     }, 700);
   };
@@ -72,6 +138,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {/* Notification Preferences Card */}
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center"><BellRing className="mr-2 h-5 w-5 text-primary"/>Preferencias de Notificación</CardTitle>
@@ -87,8 +154,8 @@ export default function SettingsPage() {
             </div>
             <Switch
               id="emailOnNewTicket"
-              checked={notificationPrefs.emailOnNewTicket}
-              onCheckedChange={(value) => handlePreferenceChange('emailOnNewTicket', value)}
+              checked={settings.notificationPrefs.emailOnNewTicket}
+              onCheckedChange={(value) => handleNotificationPrefChange('emailOnNewTicket', value)}
               aria-label="Recibir correo para nuevos tickets creados"
             />
           </div>
@@ -102,48 +169,83 @@ export default function SettingsPage() {
             </div>
             <Switch
               id="emailOnNewComment"
-              checked={notificationPrefs.emailOnNewComment}
-              onCheckedChange={(value) => handlePreferenceChange('emailOnNewComment', value)}
+              checked={settings.notificationPrefs.emailOnNewComment}
+              onCheckedChange={(value) => handleNotificationPrefChange('emailOnNewComment', value)}
               aria-label="Recibir correo para nuevos comentarios en mis tickets"
             />
-          </div>
-          
-          <div className="mt-8 flex justify-end">
-            <Button onClick={handleSaveSettings} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Guardar Cambios
-                </>
-              )}
-            </Button>
           </div>
         </CardContent>
       </Card>
 
+      {/* AI Preferences Card */}
       <Card className="shadow-lg">
         <CardHeader>
-            <CardTitle>Más Opciones de Configuración</CardTitle>
-            <CardDescription>Otras configuraciones de la aplicación aparecerán aquí a medida que se desarrollen.</CardDescription>
+          <CardTitle className="flex items-center"><Lightbulb className="mr-2 h-5 w-5 text-primary"/>Preferencias de IA</CardTitle>
+          <CardDescription>Configura las funcionalidades de Inteligencia Artificial.</CardDescription>
         </CardHeader>
-        <CardContent>
-            <div className="mt-2 p-8 border border-dashed rounded-lg text-center">
-                <SettingsIcon className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                <p className="font-semibold">Próximamente más configuraciones.</p>
-                <p className="text-sm text-muted-foreground">Este es un buen lugar para ajustes de apariencia, integraciones, etc.</p>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between space-x-2 p-4 border rounded-lg shadow-sm bg-muted/20">
+            <div className="flex items-center space-x-3">
+              <Lightbulb className="h-5 w-5 text-primary" />
+              <Label htmlFor="aiSuggestionsEnabled" className="font-medium">
+                Habilitar Sugerencias de Solución por IA
+              </Label>
             </div>
+            <Switch
+              id="aiSuggestionsEnabled"
+              checked={settings.aiPrefs.suggestionsEnabled}
+              onCheckedChange={(value) => handleAIPrefChange('suggestionsEnabled', value)}
+              aria-label="Habilitar Sugerencias de Solución por IA"
+            />
+          </div>
+           <p className="text-xs text-muted-foreground px-1">
+            Nota: Si está deshabilitado, la sección de sugerencias de IA no aparecerá en la vista de detalle del ticket. (Requiere actualizar el componente `AISuggestion` para leer esta preferencia).
+          </p>
         </CardContent>
       </Card>
+      
+      {/* Customization Preferences Card */}
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center"><Paintbrush className="mr-2 h-5 w-5 text-primary"/>Personalización de la Aplicación</CardTitle>
+          <CardDescription>Ajusta la apariencia y el nombre de la aplicación.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2 p-4 border rounded-lg shadow-sm bg-muted/20">
+            <Label htmlFor="appName" className="font-medium">Nombre de la Aplicación</Label>
+            <Input
+              id="appName"
+              name="appName"
+              value={settings.customizationPrefs.appName}
+              onChange={handleCustomizationPrefChange}
+              placeholder="Ej: Mi Sistema de Tickets"
+            />
+            <p className="text-xs text-muted-foreground pt-1">
+              Este nombre se mostrará en la cabecera y páginas de inicio de sesión/registro. (Cambiarlo dinámicamente en toda la app requiere integración adicional).
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="mt-8 flex justify-end">
+        <Button onClick={handleSaveSettings} disabled={isSaving} size="lg">
+          {isSaving ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Guardando...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Guardar Todos los Cambios
+            </>
+          )}
+        </Button>
+      </div>
 
     </div>
   );
 }
-
