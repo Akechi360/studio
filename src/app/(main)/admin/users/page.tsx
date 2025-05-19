@@ -130,7 +130,7 @@ interface EditUserDialogProps {
   onUserUpdate: () => void;
 }
 
-function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: EditUserDialogProps) {
+function EditUserDialog({ user: userToEdit, currentUser, isOpen, onClose, onUserUpdate }: EditUserDialogProps) { // Renamed prop 'user' to 'userToEdit'
   const { updateUserByAdmin, deleteUserByAdmin } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -140,30 +140,30 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
   const form = useForm<UserEditFormValues>({
     resolver: zodResolver(userEditFormSchema),
     defaultValues: {
-      name: user?.name || "",
-      email: user?.email || "",
-      role: user?.role || "User",
-      department: user?.department || NO_DEPARTMENT_VALUE,
+      name: userToEdit?.name || "",
+      email: userToEdit?.email || "",
+      role: userToEdit?.role || "User",
+      department: userToEdit?.department || NO_DEPARTMENT_VALUE,
     },
   });
 
   useEffect(() => {
-    if (user) {
+    if (userToEdit) {
       form.reset({
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        department: user.department || NO_DEPARTMENT_VALUE,
+        name: userToEdit.name,
+        email: userToEdit.email,
+        role: userToEdit.role,
+        department: userToEdit.department || NO_DEPARTMENT_VALUE,
       });
     }
-  }, [user, form]);
+  }, [userToEdit, form]);
 
-  if (!user) return null;
+  if (!userToEdit) return null;
 
   const onSubmit = async (data: UserEditFormValues) => {
     setIsSubmitting(true);
     const departmentToSave = data.department === NO_DEPARTMENT_VALUE ? undefined : data.department;
-    const result = await updateUserByAdmin(user.id, { ...data, department: departmentToSave });
+    const result = await updateUserByAdmin(userToEdit.id, { ...data, department: departmentToSave });
     setIsSubmitting(false);
 
     if (result.success) {
@@ -183,7 +183,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
   };
 
   const handleDeleteUser = async () => {
-    if (!user || (currentUser && currentUser.id === user.id)) {
+    if (!userToEdit || (currentUser && currentUser.id === userToEdit.id)) {
         toast({
             title: "Acción no permitida",
             description: "No puedes eliminar tu propia cuenta.",
@@ -193,27 +193,27 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
         return;
     }
     setIsDeleting(true);
-    const result = await deleteUserByAdmin(user.id);
+    const result = await deleteUserByAdmin(userToEdit.id);
     setIsDeleting(false);
 
     if (result.success) {
         toast({
             title: "Usuario Eliminado",
-            description: result.message,
+            description: result.message || "Usuario eliminado.", // Provide a default message
         });
         onUserUpdate(); 
         onClose(); 
     } else {
         toast({
             title: "Eliminación Fallida",
-            description: result.message,
+            description: result.message || "No se pudo eliminar el usuario.", // Provide a default message
             variant: "destructive",
         });
     }
     setIsDeleteConfirmOpen(false); 
   };
 
-  const canDelete = currentUser && user && currentUser.id !== user.id;
+  const canDelete = currentUser && userToEdit && currentUser.id !== userToEdit.id;
 
 
   return (
@@ -221,7 +221,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
       <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Gestionar Usuario: {user.name}</DialogTitle>
+            <DialogTitle>Gestionar Usuario: {userToEdit.name}</DialogTitle>
             <DialogDescription>
               Modifica los datos del usuario o elimínalo del sistema.
             </DialogDescription>
@@ -324,7 +324,7 @@ function EditUserDialog({ user, currentUser, isOpen, onClose, onUserUpdate }: Ed
         isOpen={isDeleteConfirmOpen}
         onClose={() => setIsDeleteConfirmOpen(false)}
         onConfirm={handleDeleteUser}
-        userName={user.name}
+        userName={userToEdit.name}
         isDeleting={isDeleting}
       />
     </>
@@ -375,7 +375,7 @@ export default function UserManagementPage() {
     if (getAllUsers) {
       setUsers(getAllUsers());
     }
-  }, [getAllUsers, user]); // Added user to dependency array to refresh if current admin's data changes
+  }, [getAllUsers, currentUser]); // Changed 'user' to 'currentUser'
 
   const handleManageUser = (userToManage: User) => {
     setSelectedUser(userToManage);
@@ -450,8 +450,8 @@ export default function UserManagementPage() {
       </Card>
       {selectedUser && (
         <EditUserDialog
-          user={selectedUser}
-          currentUser={currentUser}
+          user={selectedUser} // This is the user being edited
+          currentUser={currentUser} // This is the currently logged-in admin
           isOpen={isEditUserDialogOpen}
           onClose={handleCloseDialog}
           onUserUpdate={handleUserUpdate}
