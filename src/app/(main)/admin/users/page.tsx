@@ -1,17 +1,167 @@
 
 "use client";
 
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldAlert, Users, UserCog } from 'lucide-react';
+import { ShieldAlert, Users, UserCog, Save, Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { User } from '@/lib/types';
+import type { User, Role } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Button } from "@/components/ui/button"; // Added import
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useToast } from "@/hooks/use-toast";
 
-function UserRow({ user }: { user: User }) {
+const userEditFormSchema = z.object({
+  name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
+  role: z.enum(["Admin", "User"], { required_error: "El rol es obligatorio." }),
+});
+
+type UserEditFormValues = z.infer<typeof userEditFormSchema>;
+
+interface EditUserDialogProps {
+  user: User | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onUserUpdate: () => void;
+}
+
+function EditUserDialog({ user, isOpen, onClose, onUserUpdate }: EditUserDialogProps) {
+  const { updateUserByAdmin } = useAuth();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const form = useForm<UserEditFormValues>({
+    resolver: zodResolver(userEditFormSchema),
+    defaultValues: {
+      name: user?.name || "",
+      role: user?.role || "User",
+    },
+  });
+
+  useEffect(() => {
+    if (user) {
+      form.reset({
+        name: user.name,
+        role: user.role,
+      });
+    }
+  }, [user, form]);
+
+  if (!user) return null;
+
+  const onSubmit = async (data: UserEditFormValues) => {
+    setIsSubmitting(true);
+    const success = await updateUserByAdmin(user.id, data);
+    setIsSubmitting(false);
+    if (success) {
+      toast({
+        title: "Usuario Actualizado",
+        description: `Los datos de ${data.name} han sido actualizados.`,
+      });
+      onUserUpdate(); // Callback to refresh user list
+      onClose();
+    } else {
+      toast({
+        title: "Actualización Fallida",
+        description: "No se pudo actualizar el usuario. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Gestionar Usuario: {user.name}</DialogTitle>
+          <DialogDescription>
+            Modifica el nombre y el rol del usuario. Haz clic en guardar cuando termines.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre Completo</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nombre del usuario" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rol</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un rol" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="User">Usuario</SelectItem>
+                      <SelectItem value="Admin">Administrador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancelar</Button>
+              </DialogClose>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar Cambios
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+function UserRow({ user, onManageClick }: { user: User; onManageClick: (user: User) => void; }) {
   const getInitials = (name?: string) => {
     if (!name) return '??';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -21,7 +171,7 @@ function UserRow({ user }: { user: User }) {
       <TableCell>
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.avatarUrl || `https://placehold.co/40x40.png?text=${getInitials(user.name)}`} alt={user.name} data-ai-hint="avatar perfil" />
+            <AvatarImage src={user.avatarUrl || `https://placehold.co/40x40.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} data-ai-hint="avatar perfil" />
             <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
           </Avatar>
           {user.name}
@@ -34,7 +184,7 @@ function UserRow({ user }: { user: User }) {
         </Badge>
       </TableCell>
       <TableCell className="text-right">
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => onManageClick(user)}>
           <UserCog className="mr-2 h-4 w-4" />
           Gestionar
         </Button>
@@ -44,8 +194,33 @@ function UserRow({ user }: { user: User }) {
 }
 
 export default function UserManagementPage() {
-  const { role, getAllUsers } = useAuth();
-  const users = getAllUsers ? getAllUsers() : [];
+  const { user: currentUser, role, getAllUsers } = useAuth();
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (getAllUsers) {
+      setUsers(getAllUsers());
+    }
+  }, [getAllUsers]);
+
+  const handleManageUser = (userToManage: User) => {
+    setSelectedUser(userToManage);
+    setIsEditUserDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsEditUserDialogOpen(false);
+    setSelectedUser(null);
+  };
+
+  const handleUserUpdate = () => {
+     if (getAllUsers) {
+      setUsers(getAllUsers()); // Refresh the user list from the source
+    }
+  };
+
 
   if (role !== "Admin") {
     return (
@@ -93,13 +268,19 @@ export default function UserManagementPage() {
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
-                  <UserRow key={user.id} user={user} />
+                  <UserRow key={user.id} user={user} onManageClick={handleManageUser} />
                 ))}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
+      <EditUserDialog 
+        user={selectedUser} 
+        isOpen={isEditUserDialogOpen} 
+        onClose={handleCloseDialog}
+        onUserUpdate={handleUserUpdate}
+      />
     </div>
   );
 }

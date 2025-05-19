@@ -23,7 +23,8 @@ interface AuthContextType {
   logout: () => void;
   register: (name: string, email: string, pass: string) => Promise<boolean>; 
   updateProfile: (name: string, email: string) => Promise<boolean>;
-  getAllUsers: () => User[]; // Added to get users for admin page
+  getAllUsers: () => User[];
+  updateUserByAdmin: (userId: string, data: Partial<Pick<User, 'name' | 'role'>>) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,7 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return false; // User already exists
     }
     const newUser: User = {
-      id: String(mockUsers.length + 1), // Ensure ID is unique for new mock users
+      id: String(mockUsers.length + 1), 
       name,
       email,
       role: "User", 
@@ -99,11 +100,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await new Promise(resolve => setTimeout(resolve, 500));
     const userIndex = mockUsers.findIndex(u => u.id === user.id);
     if (userIndex !== -1) {
-      // Check if new email already exists for another user
       if (email !== mockUsers[userIndex].email && mockUsers.some(u => u.email === email && u.id !== user.id)) {
         setIsLoading(false);
-        // Potentially return a specific error or use toast here
-        // For now, just returning false
         alert("El correo electrónico ya está en uso por otro usuario.");
         return false;
       }
@@ -118,12 +116,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
+  const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role'>>): Promise<boolean> => {
+    setIsLoading(true); // Potentially set loading state for admin operations
+    await new Promise(resolve => setTimeout(resolve, 300)); // Simulate API call
+    const userIndex = mockUsers.findIndex(u => u.id === userId);
+    if (userIndex !== -1) {
+      mockUsers[userIndex] = { ...mockUsers[userIndex], ...data };
+      // If the admin is updating their own info and it's currently loaded in `user` state
+      if (user && user.id === userId) {
+        const updatedSelf = { ...user, ...data };
+        setUser(updatedSelf);
+        localStorage.setItem("ticketflow_user", JSON.stringify(updatedSelf));
+      }
+      setIsLoading(false);
+      return true;
+    }
+    setIsLoading(false);
+    return false;
+  };
+
   const getAllUsers = () => {
-    return [...mockUsers]; // Return a copy
+    return [...mockUsers]; 
   };
 
   return (
-    <AuthContext.Provider value={{ user, role: user?.role || null, isLoading, login, logout, register, updateProfile, getAllUsers }}>
+    <AuthContext.Provider value={{ user, role: user?.role || null, isLoading, login, logout, register, updateProfile, getAllUsers, updateUserByAdmin }}>
       {children}
     </AuthContext.Provider>
   );
