@@ -18,7 +18,7 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'FlujoDeTickets',
+  title: 'Tickets de Soporte IEQ',
   description: 'Gestión Eficiente de Tickets de Soporte',
 };
 
