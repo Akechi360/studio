@@ -101,7 +101,7 @@ export interface InventoryItem {
   ram?: string;
   storageType?: StorageType;
   storage?: string; // For capacity like "500GB", "1TB"
-  processor?: string;
+  processor?: string; // Nuevo campo
   screenSize?: string;
   ipAddress?: string;
   quantity: number;
@@ -117,3 +117,4 @@ export interface InventoryItem {
   updatedAt: Date;
   lastSeen?: Date;
 }
+

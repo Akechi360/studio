@@ -10,7 +10,9 @@ import {
   getRawTicketsStoreForStats,
   getAllInventoryItemsFromMock,
   addInventoryItemToMock,
-  getRawInventoryStore // Corrected: Import this function
+  getRawInventoryStore,
+  updateInventoryItemInMock, // Nueva importación
+  deleteInventoryItemFromMock // Nueva importación
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
@@ -32,7 +34,7 @@ export async function createTicketAction(
 
   if (!validatedFields.success) {
     return {
-      success: false, // Added success field
+      success: false,
       errors: validatedFields.error.flatten().fieldErrors,
       message: "Fallo al crear ticket debido a errores de validación.",
     };
@@ -84,7 +86,7 @@ export async function addCommentAction(
 
   if (!validatedFields.success) {
     return {
-      success: false, // Added success field
+      success: false, 
       errors: validatedFields.error.flatten().fieldErrors,
       message: "Fallo al añadir comentario debido a errores de validación.",
     };
@@ -210,17 +212,19 @@ export async function getAllInventoryItems(): Promise<InventoryItem[]> {
   return getAllInventoryItemsFromMock();
 }
 
-// Define RAM options for Zod schema if you want to restrict it
-// For now, allowing any string for RAM and Storage from the Select components, which have predefined lists
-const AddInventoryItemSchema = z.object({
+const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
+const STORAGE_TYPES_ZOD_ENUM = ["HDD", "SSD"] as [StorageType, ...StorageType[]];
+
+const BaseInventoryItemSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres.").max(100),
   category: z.enum(INVENTORY_ITEM_CATEGORIES),
   brand: z.string().max(50).optional(),
   model: z.string().max(50).optional(),
   serialNumber: z.string().max(100).optional(),
-  ram: z.string().optional(), // RAM can be a string like "8GB", "16GB" or "No Especificado"
-  storageType: z.enum(["HDD", "SSD"] as [StorageType, ...StorageType[]]).optional(),
-  storage: z.string().max(50).optional(), // Storage capacity like "500GB", "1TB"
+  processor: z.string().max(100).optional(), // Nuevo campo
+  ram: z.enum(RAM_OPTIONS).optional(),
+  storageType: z.enum(STORAGE_TYPES_ZOD_ENUM).optional(),
+  storage: z.string().max(50).optional(),
   quantity: z.coerce.number().int().min(1, "La cantidad debe ser al menos 1."),
   location: z.string().max(100).optional(),
   status: z.enum(INVENTORY_ITEM_STATUSES),
@@ -229,9 +233,9 @@ const AddInventoryItemSchema = z.object({
 
 export async function addInventoryItemAction(
   currentUser: Pick<User, 'id' | 'name'>,
-  values: z.infer<typeof AddInventoryItemSchema> // This will now include ram, storageType, storage
+  values: z.infer<typeof BaseInventoryItemSchema>
 ) {
-  const validatedFields = AddInventoryItemSchema.safeParse(values);
+  const validatedFields = BaseInventoryItemSchema.safeParse(values);
 
   if (!validatedFields.success) {
     return {
@@ -246,18 +250,9 @@ export async function addInventoryItemAction(
 
   const newItem: InventoryItem = {
     id: `inv-${currentItems.length + 1}-${Date.now()}`,
-    name: data.name,
-    category: data.category as InventoryItemCategory,
-    brand: data.brand,
-    model: data.model,
-    serialNumber: data.serialNumber,
-    ram: data.ram, // Add RAM
-    storageType: data.storageType, // Add Storage Type
-    storage: data.storage, // Add Storage Capacity
-    quantity: data.quantity,
-    location: data.location,
-    status: data.status as InventoryItemStatus,
-    notes: data.notes,
+    ...data, // Spread validated data
+    category: data.category as InventoryItemCategory, // Ensure correct type
+    status: data.status as InventoryItemStatus, // Ensure correct type
     addedByUserId: currentUser.id,
     addedByUserName: currentUser.name,
     createdAt: new Date(),
@@ -273,3 +268,52 @@ export async function addInventoryItemAction(
     item: newItem,
   };
 }
+
+export async function updateInventoryItemAction(
+  itemId: string,
+  values: z.infer<typeof BaseInventoryItemSchema>
+) {
+  const validatedFields = BaseInventoryItemSchema.safeParse(values);
+
+  if (!validatedFields.success) {
+    return {
+      success: false,
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: "Fallo al actualizar artículo debido a errores de validación.",
+    };
+  }
+  const itemToUpdate = getInventoryItemByIdFromMock(itemId);
+  if (!itemToUpdate) {
+    return { success: false, message: "Artículo no encontrado." };
+  }
+  
+  const updatedData = validatedFields.data;
+
+  const updatedItem: InventoryItem = {
+    ...itemToUpdate,
+    ...updatedData,
+    category: updatedData.category as InventoryItemCategory,
+    status: updatedData.status as InventoryItemStatus,
+    updatedAt: new Date(),
+  };
+
+  const success = updateInventoryItemInMock(updatedItem);
+
+  if (success) {
+    revalidatePath("/inventory");
+    return { success: true, message: `Artículo "${updatedItem.name}" actualizado exitosamente.` };
+  } else {
+    return { success: false, message: "No se pudo actualizar el artículo." };
+  }
+}
+
+export async function deleteInventoryItemAction(itemId: string) {
+  const success = deleteInventoryItemFromMock(itemId);
+  if (success) {
+    revalidatePath("/inventory");
+    return { success: true, message: "Artículo eliminado exitosamente." };
+  } else {
+    return { success: false, message: "No se pudo eliminar el artículo o no fue encontrado." };
+  }
+}
+

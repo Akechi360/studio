@@ -1,20 +1,20 @@
 
-import type { Ticket, InventoryItem } from '@/lib/types'; // Añadido InventoryItem
+import type { Ticket, InventoryItem } from '@/lib/types';
 
 // --- Almacén de Tickets ---
 declare global {
   // eslint-disable-next-line no-var
   var __mock_tickets_store__: Ticket[] | undefined;
   // eslint-disable-next-line no-var
-  var __mock_inventory_store__: InventoryItem[] | undefined; // Nuevo almacén para inventario
+  var __mock_inventory_store__: InventoryItem[] | undefined;
 }
 
 let ticketsStore_internal: Ticket[];
-let inventoryStore_internal: InventoryItem[]; // Variable para el almacén de inventario
+let inventoryStore_internal: InventoryItem[];
 
 if (process.env.NODE_ENV === 'production') {
   ticketsStore_internal = [];
-  inventoryStore_internal = []; // Inicializar en producción
+  inventoryStore_internal = [];
 } else {
   if (!global.__mock_tickets_store__) {
     global.__mock_tickets_store__ = [];
@@ -22,7 +22,7 @@ if (process.env.NODE_ENV === 'production') {
   ticketsStore_internal = global.__mock_tickets_store__;
 
   if (!global.__mock_inventory_store__) {
-    global.__mock_inventory_store__ = []; // Inicializar si no existe en global
+    global.__mock_inventory_store__ = [];
   }
   inventoryStore_internal = global.__mock_inventory_store__;
 }
@@ -51,7 +51,6 @@ export function getRawTicketsStoreForStats(): Ticket[] {
 
 // --- Funciones para Inventario ---
 export function getAllInventoryItemsFromMock(): InventoryItem[] {
-  // Ordenar por fecha de creación descendente, por ejemplo
   return [...inventoryStore_internal].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
@@ -64,9 +63,25 @@ export function addInventoryItemToMock(item: InventoryItem): void {
   if (existingIndex !== -1) {
     inventoryStore_internal[existingIndex] = item;
   } else {
-    inventoryStore_internal.unshift(item); // Añadir al principio
+    inventoryStore_internal.unshift(item);
   }
 }
+
+export function updateInventoryItemInMock(updatedItem: InventoryItem): boolean {
+  const itemIndex = inventoryStore_internal.findIndex(item => item.id === updatedItem.id);
+  if (itemIndex !== -1) {
+    inventoryStore_internal[itemIndex] = { ...inventoryStore_internal[itemIndex], ...updatedItem, updatedAt: new Date() };
+    return true;
+  }
+  return false;
+}
+
+export function deleteInventoryItemFromMock(itemId: string): boolean {
+  const initialLength = inventoryStore_internal.length;
+  inventoryStore_internal = inventoryStore_internal.filter(item => item.id !== itemId);
+  return inventoryStore_internal.length < initialLength;
+}
+
 
 export function getRawInventoryStore(): InventoryItem[] {
   return inventoryStore_internal;
@@ -74,4 +89,5 @@ export function getRawInventoryStore(): InventoryItem[] {
 
 // Para compatibilidad con código antiguo (debería refactorizarse)
 export const mockTickets: Ticket[] = ticketsStore_internal;
-export const mockInventory: InventoryItem[] = inventoryStore_internal; // Exportar si es necesario para pruebas
+export const mockInventory: InventoryItem[] = inventoryStore_internal;
+

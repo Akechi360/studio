@@ -3,12 +3,14 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Archive, PlusCircle, Loader2, Pencil, Trash2 } from "lucide-react"; // Added Pencil, Trash2
+import { Archive, PlusCircle, Loader2, Pencil, Trash2 } from "lucide-react";
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAllInventoryItems } from "@/lib/actions";
+import { getAllInventoryItems, deleteInventoryItemAction } from "@/lib/actions";
 import type { InventoryItem } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { AddItemDialog } from '@/components/inventory/add-item-dialog';
+import { EditItemDialog } from '@/components/inventory/edit-item-dialog'; // Import EditItemDialog
+import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog'; // Import DeleteItemDialog
 import { InventoryFilters } from '@/components/inventory/inventory-filters';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +18,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"; // Added Tooltip components
+} from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 
 const getInitialsForItem = (name: string) => {
   return name.substring(0, 2).toUpperCase();
@@ -34,10 +38,19 @@ const statusColors: Record<InventoryItem["status"], string> = {
 
 export default function InventoryPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [allItems, setAllItems] = useState<InventoryItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogVisible, setIsAddDialogVisible] = useState(false);
+  
+  const [selectedItemForEdit, setSelectedItemForEdit] = useState<InventoryItem | null>(null);
+  const [isEditDialogVisible, setIsEditDialogVisible] = useState(false);
+  
+  const [selectedItemForDelete, setSelectedItemForDelete] = useState<InventoryItem | null>(null);
+  const [isConfirmDeleteDialogVisible, setIsConfirmDeleteDialogVisible] = useState(false);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
+
   const [currentFilters, setCurrentFilters] = useState<{ category: string; location: string }>({ category: "all", location: "all" });
 
   const fetchItems = useCallback(async () => {
@@ -62,38 +75,44 @@ export default function InventoryPage() {
     setFilteredItems(itemsToFilter);
   }, [allItems, currentFilters]);
   
-  const handleItemAdded = () => {
+  const handleItemAddedOrUpdated = () => {
     fetchItems(); 
     setIsAddDialogVisible(false);
+    setIsEditDialogVisible(false);
   };
 
   const handleFilterChange = (filters: { category: string; location: string }) => {
     setCurrentFilters(filters);
   };
 
-  const handleEditItem = (itemId: string) => {
-    // Placeholder for edit functionality
-    console.log("TODO: Implementar edición para el artículo:", itemId);
-    // Example:
-    // const itemToEdit = allItems.find(item => item.id === itemId);
-    // if (itemToEdit) {
-    //   setSelectedItemForEdit(itemToEdit);
-    //   setIsEditDialogVisible(true);
-    // }
+  const handleEditItem = (item: InventoryItem) => {
+    setSelectedItemForEdit(item);
+    setIsEditDialogVisible(true);
   };
 
-  const handleDeleteItem = (itemId: string) => {
-    // Placeholder for delete functionality
-    console.log("TODO: Implementar eliminación para el artículo:", itemId);
-    // Example:
-    // const itemToDelete = allItems.find(item => item.id === itemId);
-    // if (itemToDelete) {
-    //   setSelectedItemForDelete(itemToDelete);
-    //   setIsConfirmDeleteDialogVisible(true);
-    // }
+  const handleDeleteItem = (item: InventoryItem) => {
+    setSelectedItemForDelete(item);
+    setIsConfirmDeleteDialogVisible(true);
+  };
+
+  const confirmDeleteItem = async () => {
+    if (!selectedItemForDelete) return;
+    setIsDeletingItem(true);
+    const result = await deleteInventoryItemAction(selectedItemForDelete.id);
+    setIsDeletingItem(false);
+    setIsConfirmDeleteDialogVisible(false);
+
+    if (result.success) {
+      toast({ title: "Artículo Eliminado", description: result.message });
+      fetchItems(); // Refrescar la lista
+    } else {
+      toast({ title: "Fallo al Eliminar", description: result.message, variant: "destructive" });
+    }
+    setSelectedItemForDelete(null);
   };
 
   return (
+    <TooltipProvider>
     <div className="space-y-8">
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
@@ -187,7 +206,7 @@ export default function InventoryPage() {
                       <div className="flex items-center justify-end gap-1">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => handleEditItem(item.id)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleEditItem(item)}>
                               <Pencil className="h-4 w-4" />
                               <span className="sr-only">Editar Artículo</span>
                             </Button>
@@ -198,7 +217,7 @@ export default function InventoryPage() {
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/90" onClick={() => handleDeleteItem(item.id)}>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/90" onClick={() => handleDeleteItem(item)}>
                               <Trash2 className="h-4 w-4" />
                               <span className="sr-only">Eliminar Artículo</span>
                             </Button>
@@ -221,10 +240,30 @@ export default function InventoryPage() {
         <AddItemDialog 
           isOpen={isAddDialogVisible} 
           onClose={() => setIsAddDialogVisible(false)} 
-          onItemAdded={handleItemAdded}
+          onItemAdded={handleItemAddedOrUpdated}
           currentUser={user}
         /> 
       )}
+
+      {selectedItemForEdit && user && (
+        <EditItemDialog
+          itemToEdit={selectedItemForEdit}
+          isOpen={isEditDialogVisible}
+          onClose={() => { setIsEditDialogVisible(false); setSelectedItemForEdit(null); }}
+          onItemUpdated={handleItemAddedOrUpdated}
+        />
+      )}
+
+      {selectedItemForDelete && (
+        <DeleteItemDialog
+          isOpen={isConfirmDeleteDialogVisible}
+          onClose={() => { setIsConfirmDeleteDialogVisible(false); setSelectedItemForDelete(null); }}
+          onConfirm={confirmDeleteItem}
+          itemName={selectedItemForDelete.name}
+          isDeleting={isDeletingItem}
+        />
+      )}
     </div>
+    </TooltipProvider>
   );
 }

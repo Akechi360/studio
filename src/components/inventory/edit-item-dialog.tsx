@@ -33,23 +33,22 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { addInventoryItemAction } from '@/lib/actions';
-import type { User, InventoryItemCategory, InventoryItemStatus, StorageType } from '@/lib/types';
+import { updateInventoryItemAction } from '@/lib/actions';
+import type { InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType } from '@/lib/types';
 import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from '@/lib/types';
-import { Loader2, PlusCircle, Save } from 'lucide-react';
+import { Loader2, Save, Edit3 } from 'lucide-react';
 
 const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
 const STORAGE_TYPES_WITH_NONE = ["No Especificado", "HDD", "SSD"] as const;
 const STORAGE_TYPES_ZOD_ENUM = ["HDD", "SSD"] as [StorageType, ...StorageType[]];
 
-
-const inventoryItemFormSchema = z.object({
+const inventoryItemEditFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }).max(100, { message: "Máximo 100 caracteres."}),
   category: z.enum(INVENTORY_ITEM_CATEGORIES, { required_error: "La categoría es obligatoria."}),
   brand: z.string().max(50, { message: "Máximo 50 caracteres."}).optional(),
   model: z.string().max(50, { message: "Máximo 50 caracteres."}).optional(),
   serialNumber: z.string().max(100, { message: "Máximo 100 caracteres."}).optional(),
-  processor: z.string().max(100, { message: "Máximo 100 caracteres."}).optional(), // Nuevo campo
+  processor: z.string().max(100, { message: "Máximo 100 caracteres."}).optional(),
   ram: z.enum(RAM_OPTIONS).optional(),
   storageType: z.enum(STORAGE_TYPES_ZOD_ENUM).optional(),
   storage: z.string().max(50, { message: "Máximo 50 caracteres."}).optional(),
@@ -59,28 +58,28 @@ const inventoryItemFormSchema = z.object({
   notes: z.string().max(500, { message: "Máximo 500 caracteres."}).optional(),
 });
 
-export type InventoryItemFormValues = z.infer<typeof inventoryItemFormSchema>;
+export type InventoryItemEditFormValues = z.infer<typeof inventoryItemEditFormSchema>;
 
-interface AddItemDialogProps {
+interface EditItemDialogProps {
+  itemToEdit: InventoryItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onItemAdded: () => void;
-  currentUser: User | null;
+  onItemUpdated: () => void;
 }
 
-export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: AddItemDialogProps) {
+export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: EditItemDialogProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<InventoryItemFormValues>({
-    resolver: zodResolver(inventoryItemFormSchema),
+  const form = useForm<InventoryItemEditFormValues>({
+    resolver: zodResolver(inventoryItemEditFormSchema),
     defaultValues: {
       name: "",
       category: undefined,
       brand: "",
       model: "",
       serialNumber: "",
-      processor: "", // Nuevo campo
+      processor: "",
       ram: "No Especificado",
       storageType: undefined,
       storage: "",
@@ -91,6 +90,26 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
     },
   });
 
+  useEffect(() => {
+    if (itemToEdit) {
+      form.reset({
+        name: itemToEdit.name,
+        category: itemToEdit.category,
+        brand: itemToEdit.brand || "",
+        model: itemToEdit.model || "",
+        serialNumber: itemToEdit.serialNumber || "",
+        processor: itemToEdit.processor || "",
+        ram: (itemToEdit.ram as typeof RAM_OPTIONS[number]) || "No Especificado",
+        storageType: itemToEdit.storageType || undefined,
+        storage: itemToEdit.storage || "",
+        quantity: itemToEdit.quantity,
+        location: itemToEdit.location || "",
+        status: itemToEdit.status,
+        notes: itemToEdit.notes || "",
+      });
+    }
+  }, [itemToEdit, form]);
+
   const watchedCategory = form.watch("category");
 
   useEffect(() => {
@@ -98,22 +117,20 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
       form.setValue("ram", "No Especificado");
       form.setValue("storageType", undefined);
       form.setValue("storage", "");
-      form.setValue("processor", ""); // Limpiar procesador
+      form.setValue("processor", "");
     }
-  }, [watchedCategory, form]);
+  }, [watchedCategory, form, itemToEdit]); // Added itemToEdit to ensure initial setup for non-computer items is correct
 
-  const onSubmit = async (data: InventoryItemFormValues) => {
-    if (!currentUser) {
-      toast({ title: "Error de Autenticación", description: "Debes iniciar sesión.", variant: "destructive" });
-      return;
-    }
+  if (!itemToEdit) return null;
+
+  const onSubmit = async (data: InventoryItemEditFormValues) => {
     setIsSubmitting(true);
-
-    let dataToSend: Partial<InventoryItemFormValues> = { ...data };
+    
+    let dataToSend: Partial<InventoryItemEditFormValues> = { ...data };
     
     if (data.category === "Computadora") {
         dataToSend.ram = data.ram === "No Especificado" ? undefined : data.ram;
-        dataToSend.storageType = data.storageType; 
+        dataToSend.storageType = data.storageType;
         dataToSend.storage = data.storage;
         dataToSend.processor = data.processor;
     } else {
@@ -123,27 +140,26 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
         dataToSend.processor = undefined;
     }
 
-
-    const result = await addInventoryItemAction({ id: currentUser.id, name: currentUser.name }, dataToSend as InventoryItemFormValues);
+    const result = await updateInventoryItemAction(itemToEdit.id, dataToSend as InventoryItemEditFormValues);
     setIsSubmitting(false);
 
     if (result.success) {
       toast({
-        title: "Artículo Añadido",
+        title: "Artículo Actualizado",
         description: result.message,
       });
-      form.reset(); 
-      onItemAdded();
+      onItemUpdated();
+      onClose();
     } else {
       toast({
-        title: "Fallo al Añadir Artículo",
+        title: "Fallo al Actualizar Artículo",
         description: result.message || "Ocurrió un error desconocido.",
         variant: "destructive",
       });
-       if (result.errors) {
+      if (result.errors) {
         Object.entries(result.errors).forEach(([fieldName, errors]) => {
           if (errors && errors.length > 0) {
-            form.setError(fieldName as keyof InventoryItemFormValues, {
+            form.setError(fieldName as keyof InventoryItemEditFormValues, {
               type: 'server',
               message: errors.join(', '),
             });
@@ -158,11 +174,11 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center">
-            <PlusCircle className="mr-2 h-6 w-6 text-primary" />
-            Añadir Nuevo Artículo al Inventario
+            <Edit3 className="mr-2 h-6 w-6 text-primary" />
+            Editar Artículo del Inventario: {itemToEdit.name}
           </DialogTitle>
           <DialogDescription>
-            Completa los detalles del nuevo artículo. Los campos marcados con * son obligatorios.
+            Modifica los detalles del artículo. Los campos marcados con * son obligatorios.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -186,7 +202,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Categoría *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecciona una categoría" />
@@ -246,7 +262,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
 
             {watchedCategory === "Computadora" && (
               <>
-                 <FormField
+                <FormField
                     control={form.control}
                     name="processor"
                     render={({ field }) => (
@@ -296,8 +312,8 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
                                 </FormControl>
                                 <SelectContent>
                                 {STORAGE_TYPES_WITH_NONE.map((type) => (
-                                    <SelectItem key={type} value={type}>
-                                      {type === "No Especificado" ? type : type}
+                                    <SelectItem key={type} value={type === "No Especificado" ? "No Especificado" : type}>
+                                        {type}
                                     </SelectItem>
                                 ))}
                                 </SelectContent>
@@ -324,7 +340,6 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
               </>
             )}
 
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                 control={form.control}
@@ -345,7 +360,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
                 render={({ field }) => (
                     <FormItem>
                     <FormLabel>Estado *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                         <SelectTrigger>
                             <SelectValue placeholder="Selecciona un estado" />
@@ -396,7 +411,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
               </DialogClose>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Guardar Artículo
+                Guardar Cambios
               </Button>
             </DialogFooter>
           </form>
@@ -405,4 +420,3 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
     </Dialog>
   );
 }
-
