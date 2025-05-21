@@ -13,7 +13,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import { LogOut, UserCircle, Settings, Sun, Moon } from 'lucide-react';
+import { LogOut, UserCircle, Settings, Sun, Moon, Hospital } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { APP_NAME } from '@/lib/constants';
 import { useTheme } from 'next-themes'; 
@@ -38,7 +38,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-md md:px-6">
       {isMobile && <SidebarTrigger />}
       <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold md:text-base">
-        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ticket-check text-primary"><path d="M4 20V10a4 4 0 0 1 4-4h1.5a2.5 2.5 0 0 0 0-5A1.5 1.5 0 0 0 8 2.5V2"/><path d="M20 20V10a4 4 0 0 0-4-4H8.5a2.5 2.5 0 0 1 0-5A1.5 1.5 0 0 1 16 2.5V2"/><path d="m9 12 2 2 4-4"/></svg>
+        <Hospital className="h-7 w-7 text-primary"/>
         <span className="font-bold">{APP_NAME}</span>
       </Link>
       <div className="ml-auto flex items-center gap-4">
@@ -98,3 +98,4 @@ export function AppHeader() {
     </header>
   );
 }
+

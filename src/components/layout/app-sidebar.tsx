@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { AppSidebarNav } from "./app-sidebar-nav";
-import { LogOut } from "lucide-react";
+import { LogOut, Hospital } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { APP_NAME } from "@/lib/constants";
 import Link from "next/link";
@@ -25,7 +25,7 @@ export function AppSidebar() {
     <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r">
       <SidebarHeader className="p-4">
          <Link href="/dashboard" className="flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ticket-check text-primary"><path d="M4 20V10a4 4 0 0 1 4-4h1.5a2.5 2.5 0 0 0 0-5A1.5 1.5 0 0 0 8 2.5V2"/><path d="M20 20V10a4 4 0 0 0-4-4H8.5a2.5 2.5 0 0 1 0-5A1.5 1.5 0 0 1 16 2.5V2"/><path d="m9 12 2 2 4-4"/></svg>
+          <Hospital className="h-8 w-8 text-primary"/>
           {sidebarState === "expanded" && <span className="text-xl font-semibold">{APP_NAME}</span>}
         </Link>
       </SidebarHeader>
@@ -52,3 +52,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+

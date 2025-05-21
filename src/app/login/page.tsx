@@ -21,7 +21,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import { APP_NAME } from '@/lib/constants';
-import { LogIn, Loader2 } from 'lucide-react';
+import { LogIn, Loader2, Hospital } from 'lucide-react';
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
@@ -68,7 +68,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ticket-check"><path d="M4 20V10a4 4 0 0 1 4-4h1.5a2.5 2.5 0 0 0 0-5A1.5 1.5 0 0 0 8 2.5V2"/><path d="M20 20V10a4 4 0 0 0-4-4H8.5a2.5 2.5 0 0 1 0-5A1.5 1.5 0 0 1 16 2.5V2"/><path d="m9 12 2 2 4-4"/></svg>
+             <Hospital className="h-8 w-8" />
           </div>
           <CardTitle className="text-3xl font-bold">{APP_NAME}</CardTitle>
           <CardDescription>Inicia sesión para acceder a tus tickets y panel de control.</CardDescription>
@@ -125,3 +125,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
