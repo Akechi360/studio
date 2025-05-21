@@ -13,7 +13,7 @@ import {
   getRawInventoryStore,
   updateInventoryItemInMock,
   deleteInventoryItemFromMock,
-  getInventoryItemByIdFromMock // Added import
+  getInventoryItemByIdFromMock
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
@@ -232,6 +232,26 @@ const BaseInventoryItemSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+const categoryPrefixMap: Record<InventoryItemCategory, string> = {
+  Computadora: "PC",
+  Monitor: "MON",
+  Teclado: "TEC",
+  Mouse: "MOU",
+  Impresora: "IMP",
+  Escaner: "ESC",
+  Router: "ROU",
+  Switch: "SWI",
+  Servidor: "SRV",
+  Laptop: "LAP",
+  Tablet: "TAB",
+  Proyector: "PRO",
+  "Telefono IP": "TIP",
+  "Otro Periferico": "PER",
+  Software: "SOF",
+  Licencia: "LIC",
+  Otro: "OTR",
+};
+
 export async function addInventoryItemAction(
   currentUser: Pick<User, 'id' | 'name'>,
   values: z.infer<typeof BaseInventoryItemSchema>
@@ -247,10 +267,30 @@ export async function addInventoryItemAction(
   }
 
   const data = validatedFields.data;
-  const currentItems = getRawInventoryStore();
+  
+  const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
+  const allItems = getRawInventoryStore(); 
+
+  let maxNum = 0;
+  allItems.forEach(item => {
+    if (item.id.startsWith(`${prefix}-IEQ-`)) {
+      try {
+        const numPart = parseInt(item.id.substring(item.id.lastIndexOf('-') + 1), 10);
+        if (numPart > maxNum) {
+          maxNum = numPart;
+        }
+      } catch (e) {
+        console.error("Error parsing item ID number:", item.id, e);
+      }
+    }
+  });
+
+  const newNum = maxNum + 1;
+  const formattedNum = String(newNum).padStart(3, '0');
+  const newId = `${prefix}-IEQ-${formattedNum}`;
 
   const newItem: InventoryItem = {
-    id: `inv-${currentItems.length + 1}-${Date.now()}`,
+    id: newId,
     ...data, 
     category: data.category as InventoryItemCategory, 
     status: data.status as InventoryItemStatus, 
@@ -265,7 +305,7 @@ export async function addInventoryItemAction(
 
   return {
     success: true,
-    message: `Artículo "${newItem.name}" añadido exitosamente.`,
+    message: `Artículo "${newItem.name}" con ID "${newId}" añadido exitosamente.`,
     item: newItem,
   };
 }
@@ -317,3 +357,5 @@ export async function deleteInventoryItemAction(itemId: string) {
     return { success: false, message: "No se pudo eliminar el artículo o no fue encontrado." };
   }
 }
+
+    
