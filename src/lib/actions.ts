@@ -11,8 +11,9 @@ import {
   getAllInventoryItemsFromMock,
   addInventoryItemToMock,
   getRawInventoryStore,
-  updateInventoryItemInMock, // Nueva importación
-  deleteInventoryItemFromMock // Nueva importación
+  updateInventoryItemInMock,
+  deleteInventoryItemFromMock,
+  getInventoryItemByIdFromMock // Added import
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
@@ -221,7 +222,7 @@ const BaseInventoryItemSchema = z.object({
   brand: z.string().max(50).optional(),
   model: z.string().max(50).optional(),
   serialNumber: z.string().max(100).optional(),
-  processor: z.string().max(100).optional(), // Nuevo campo
+  processor: z.string().max(100).optional(), 
   ram: z.enum(RAM_OPTIONS).optional(),
   storageType: z.enum(STORAGE_TYPES_ZOD_ENUM).optional(),
   storage: z.string().max(50).optional(),
@@ -250,9 +251,9 @@ export async function addInventoryItemAction(
 
   const newItem: InventoryItem = {
     id: `inv-${currentItems.length + 1}-${Date.now()}`,
-    ...data, // Spread validated data
-    category: data.category as InventoryItemCategory, // Ensure correct type
-    status: data.status as InventoryItemStatus, // Ensure correct type
+    ...data, 
+    category: data.category as InventoryItemCategory, 
+    status: data.status as InventoryItemStatus, 
     addedByUserId: currentUser.id,
     addedByUserName: currentUser.name,
     createdAt: new Date(),
@@ -316,4 +317,3 @@ export async function deleteInventoryItemAction(itemId: string) {
     return { success: false, message: "No se pudo eliminar el artículo o no fue encontrado." };
   }
 }
-
