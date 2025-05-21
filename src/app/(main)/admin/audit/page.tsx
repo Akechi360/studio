@@ -8,17 +8,25 @@ import { ShieldAlert, ClipboardList, UserCheck, History, Search } from 'lucide-r
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useState, useEffect } from 'react'; // Import useState and useEffect
 
-// Placeholder data for audit logs
-const placeholderLogs = [
-  { id: '1', timestamp: new Date(Date.now() - 3600000).toISOString(), user: 'sistemas@clinicaieq.com', action: 'Usuario "juan.perez@example.com" creado.', details: 'Rol: Usuario, Departamento: Admisión' },
-  { id: '2', timestamp: new Date(Date.now() - 7200000).toISOString(), user: 'sistemas@clinicaieq.com', action: 'Ticket #TICK-001 actualizado.', details: 'Estado cambiado a "En Progreso"' },
-  { id: '3', timestamp: new Date(Date.now() - 10800000).toISOString(), user: 'ana.gomez@example.com', action: 'Nuevo comentario en Ticket #TICK-002.', details: 'Comentario: "Solución aplicada."' },
-];
+// Interface for AuditLog (adapt as needed when implementing actual logging)
+interface AuditLogEntry {
+  id: string;
+  timestamp: string; // ISO string
+  user: string; // email or user ID/name
+  action: string;
+  details?: string;
+}
+
+// Initially empty logs, to be populated by actual system activity logging
+const initialLogs: AuditLogEntry[] = [];
 
 
 export default function AuditLogPage() {
   const { role } = useAuth();
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(initialLogs);
+  // Add useEffect or other logic here to fetch/subscribe to actual logs when implemented
 
   if (role !== "Admin") {
     return (
@@ -61,7 +69,7 @@ export default function AuditLogPage() {
             <Button variant="outline"><Search className="mr-2 h-4 w-4" /> Filtrar</Button>
           </div>
           
-          {placeholderLogs.length > 0 ? (
+          {auditLogs.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -72,7 +80,7 @@ export default function AuditLogPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {placeholderLogs.map((log) => (
+                {auditLogs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell>{new Date(log.timestamp).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}</TableCell>
                     <TableCell>{log.user}</TableCell>
@@ -86,20 +94,13 @@ export default function AuditLogPage() {
             <div className="text-center py-10">
               <History className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
               <p className="font-semibold">No hay registros de auditoría disponibles.</p>
-              <p className="text-sm text-muted-foreground">La actividad del sistema se registrará aquí.</p>
+              <p className="text-sm text-muted-foreground">La actividad importante del sistema se registrará aquí cuando se implemente la funcionalidad de auditoría.</p>
             </div>
           )}
-
-          <Alert className="mt-8">
-            <UserCheck className="h-4 w-4" />
-            <AlertTitle>Funcionalidad de Registro Real</AlertTitle>
-            <AlertDescription>
-              Esta es una visualización de ejemplo. En un sistema real, los eventos se registrarían automáticamente a medida que ocurren.
-              La implementación completa del guardado y filtrado de logs está pendiente.
-            </AlertDescription>
-          </Alert>
+          {/* Alert for real logging functionality removed */}
         </CardContent>
       </Card>
     </div>
   );
 }
+
