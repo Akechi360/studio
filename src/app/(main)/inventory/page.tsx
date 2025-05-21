@@ -9,7 +9,23 @@ import { getAllInventoryItems } from "@/lib/actions";
 import type { InventoryItem } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { AddItemDialog } from '@/components/inventory/add-item-dialog';
-import { InventoryFilters } from '@/components/inventory/inventory-filters'; // Importar filtros
+import { InventoryFilters } from '@/components/inventory/inventory-filters';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+const getInitialsForItem = (name: string) => {
+  return name.substring(0, 2).toUpperCase();
+};
+
+const statusColors: Record<InventoryItem["status"], string> = {
+  "En Uso": "bg-green-500 text-green-50",
+  "En Almacen": "bg-blue-500 text-blue-50",
+  "En Reparacion": "bg-yellow-500 text-yellow-50",
+  "De Baja": "bg-red-500 text-red-50",
+  "Perdido": "bg-gray-500 text-gray-50",
+};
+
 
 export default function InventoryPage() {
   const { user } = useAuth();
@@ -103,34 +119,53 @@ export default function InventoryPage() {
               )}
             </div>
           ) : (
-            <div>
-              {/* Aquí se renderizará la tabla de artículos del inventario */}
-              <p className="text-center text-muted-foreground py-8">
-                La tabla de artículos del inventario se mostrará aquí. ({filteredItems.length} artículo(s) encontrado(s) de {allItems.length} total(es))
-              </p>
-              {/* 
-                Ejemplo de cómo se podría iterar (la tabla real será más compleja):
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Categoría</TableHead>
+                  <TableHead>Marca</TableHead>
+                  <TableHead>Modelo</TableHead>
+                  <TableHead>N/S</TableHead>
+                  <TableHead className="text-center">Cant.</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Ubicación</TableHead>
+                  {/* <TableHead className="text-right">Acciones</TableHead> */}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredItems.map(item => (
-                  <Card key={item.id} className="flex flex-col">
-                    <CardHeader>
-                      <CardTitle>{item.name}</CardTitle>
-                      <CardDescription>{item.category} - {item.brand || ''} {item.model || ''}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow">
-                      <p className="text-sm">Serial: {item.serialNumber || 'N/A'}</p>
-                      <p className="text-sm">Cantidad: {item.quantity}</p>
-                      <p className="text-sm">Estado: {item.status}</p>
-                      {item.location && <p className="text-sm">Ubicación: {item.location}</p>}
-                    </CardContent>
-                    <CardFooter>
-                       <Button variant="outline" size="sm">Ver Detalles</Button> 
-                    </CardFooter>
-                  </Card>
+                  <TableRow key={item.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9 hidden sm:flex">
+                           {/* Placeholder image, can be customized later based on category */}
+                          <AvatarImage src={`https://placehold.co/40x40.png?text=${getInitialsForItem(item.name)}`} alt={item.name} data-ai-hint="item activo" />
+                          <AvatarFallback>{getInitialsForItem(item.name)}</AvatarFallback>
+                        </Avatar>
+                        <div className="font-medium">{item.name}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>{item.category}</TableCell>
+                    <TableCell>{item.brand || <span className="text-muted-foreground">N/A</span>}</TableCell>
+                    <TableCell>{item.model || <span className="text-muted-foreground">N/A</span>}</TableCell>
+                    <TableCell>{item.serialNumber || <span className="text-muted-foreground">N/A</span>}</TableCell>
+                    <TableCell className="text-center">{item.quantity}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={`${statusColors[item.status]} border-none`}>
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{item.location || <span className="text-muted-foreground">N/A</span>}</TableCell>
+                    {/* <TableCell className="text-right">
+                      <Button variant="outline" size="sm">
+                        <Settings className="mr-2 h-4 w-4" /> Gestionar
+                      </Button>
+                    </TableCell> */}
+                  </TableRow>
                 ))}
-                </div>
-              */}
-            </div>
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
