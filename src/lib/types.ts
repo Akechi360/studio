@@ -57,50 +57,61 @@ export interface TicketStats {
 }
 
 // --- Tipos de Inventario ---
-export type InventoryItemCategory = 
-  | "Computadora" 
-  | "Monitor" 
-  | "Teclado" 
-  | "Mouse" 
-  | "Impresora"
-  | "Escaner"
-  | "Router"
-  | "Switch"
-  | "Servidor"
-  | "Laptop"
-  | "Tablet"
-  | "Proyector"
-  | "Telefono IP"
-  | "Otro Periferico"
-  | "Software"
-  | "Licencia"
-  | "Otro";
+export const INVENTORY_ITEM_CATEGORIES = [
+  "Computadora", 
+  "Monitor", 
+  "Teclado", 
+  "Mouse", 
+  "Impresora",
+  "Escaner",
+  "Router",
+  "Switch",
+  "Servidor",
+  "Laptop",
+  "Tablet",
+  "Proyector",
+  "Telefono IP",
+  "Otro Periferico",
+  "Software",
+  "Licencia",
+  "Otro"
+] as const;
+
+export type InventoryItemCategory = typeof INVENTORY_ITEM_CATEGORIES[number];
+
+export const INVENTORY_ITEM_STATUSES = [
+  "En Uso", 
+  "En Almacen", 
+  "En Reparacion", 
+  "De Baja", 
+  "Perdido"
+] as const;
+
+export type InventoryItemStatus = typeof INVENTORY_ITEM_STATUSES[number];
 
 export interface InventoryItem {
   id: string;
-  name: string; // Nombre descriptivo, ej: "PC Enfermería Piso 1" o "Monitor Dell Recepción"
+  name: string; 
   category: InventoryItemCategory;
   brand?: string;
   model?: string;
   serialNumber?: string;
-  // Campos específicos según categoría (se pueden expandir luego)
-  ram?: string; // Para Computadora, Laptop, Servidor
-  storage?: string; // Para Computadora, Laptop, Servidor (ej: "512GB SSD", "1TB HDD")
-  processor?: string; // Para Computadora, Laptop, Servidor
-  screenSize?: string; // Para Monitor, Laptop, Tablet
-  ipAddress?: string; // Para dispositivos de red
-  // Campos generales
+  ram?: string; 
+  storage?: string; 
+  processor?: string; 
+  screenSize?: string; 
+  ipAddress?: string; 
   quantity: number;
-  location?: string; // ej: "Recepción", "Consultorio 3", "Almacén Sistemas"
-  purchaseDate?: string; // Se puede usar un componente de fecha luego
+  location?: string; 
+  purchaseDate?: string; 
   supplier?: string;
-  warrantyEndDate?: string; // Se puede usar un componente de fecha luego
-  status: "En Uso" | "En Almacen" | "En Reparacion" | "De Baja" | "Perdido";
+  warrantyEndDate?: string; 
+  status: InventoryItemStatus;
   notes?: string;
-  // Auditoría
-  addedByUserId: string; // ID del usuario que añadió el item
-  addedByUserName: string; // Nombre del usuario que añadió el item
+  addedByUserId: string; 
+  addedByUserName: string; 
   createdAt: Date;
   updatedAt: Date;
-  lastSeen?: Date; // Para auditoría de inventario físico
+  lastSeen?: Date; 
 }
+

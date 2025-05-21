@@ -2,17 +2,18 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem } from "./types"; // Añadido InventoryItem
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus } from "./types";
 import { 
   addTicketToMock, 
   getAllTicketsFromMock, 
   getTicketByIdFromMock,
   getRawTicketsStoreForStats,
-  getAllInventoryItemsFromMock, // Nueva importación
-  addInventoryItemToMock // Nueva importación
+  getAllInventoryItemsFromMock,
+  addInventoryItemToMock 
 } from "./mock-data"; 
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
+import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from "./types"; // Import new constants
 
 // --- Ticket Creation ---
 const CreateTicketSchema = z.object({
@@ -39,7 +40,7 @@ export async function createTicketAction(
   
   const currentTickets = getRawTicketsStoreForStats();
   const newTicket: Ticket = {
-    id: (currentTickets.length + 1).toString() + Date.now().toString(), // ID más único
+    id: (currentTickets.length + 1).toString() + Date.now().toString(), 
     subject,
     description,
     priority: priority as TicketPriority,
@@ -58,6 +59,7 @@ export async function createTicketAction(
   revalidatePath(`/tickets/${newTicket.id}`);
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
+
 
   return {
     success: true,
@@ -202,10 +204,56 @@ export async function getDashboardStats() {
 
 // Fetch All Inventory Items
 export async function getAllInventoryItems(): Promise<InventoryItem[]> {
-  // Simular un pequeño retraso como si fuera una API real
-  await new Promise(resolve => setTimeout(resolve, 200)); 
   return getAllInventoryItemsFromMock();
 }
 
-// (El esquema para añadir artículos del inventario se definirá cuando creemos el formulario)
-// export async function addInventoryItemAction(...) { ... }
+// Add Inventory Item
+const AddInventoryItemSchema = z.object({
+  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres.").max(100),
+  category: z.enum(INVENTORY_ITEM_CATEGORIES),
+  brand: z.string().optional(),
+  model: z.string().optional(),
+  serialNumber: z.string().optional(),
+  quantity: z.coerce.number().int().min(1, "La cantidad debe ser al menos 1."),
+  location: z.string().optional(),
+  status: z.enum(INVENTORY_ITEM_STATUSES),
+  notes: z.string().optional(),
+});
+
+export async function addInventoryItemAction(
+  currentUser: Pick<User, 'id' | 'name'>,
+  values: z.infer<typeof AddInventoryItemSchema>
+) {
+  const validatedFields = AddInventoryItemSchema.safeParse(values);
+
+  if (!validatedFields.success) {
+    return {
+      success: false,
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: "Fallo al añadir artículo debido a errores de validación.",
+    };
+  }
+
+  const data = validatedFields.data;
+  const currentItems = getRawInventoryStore(); // Get current items for ID generation
+
+  const newItem: InventoryItem = {
+    id: `inv-${currentItems.length + 1}-${Date.now()}`,
+    ...data,
+    category: data.category as InventoryItemCategory, // Zod enum ensures this
+    status: data.status as InventoryItemStatus, // Zod enum ensures this
+    addedByUserId: currentUser.id,
+    addedByUserName: currentUser.name,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  addInventoryItemToMock(newItem);
+  revalidatePath("/inventory");
+
+  return {
+    success: true,
+    message: `Artículo "${newItem.name}" añadido exitosamente.`,
+    item: newItem,
+  };
+}
