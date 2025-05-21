@@ -20,9 +20,11 @@ import {
   FileText,
   Users,
   Settings,
-  BarChart3,
+  BarChart3, // Kept for potential future use or if user changes mind
   HelpCircle,
-  Archive
+  Archive,
+  BarChartBig, // New icon for Analytics
+  ClipboardList, // New icon for Audit
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { Role } from "@/lib/types";
@@ -50,7 +52,8 @@ const navItems: NavItem[] = [
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
   { href: "/profile", label: "Perfil", icon: User, exact: true },
   { href: "/admin/users", label: "Gestión de Usuarios", icon: Users, allowedRoles: ["Admin"], exact: true },
-  // { href: "/admin/reports", label: "Reportes", icon: BarChart3, allowedRoles: ["Admin"], exact: true }, // Removed
+  { href: "/admin/analytics", label: "Analíticas", icon: BarChartBig, allowedRoles: ["Admin"], exact: true },
+  { href: "/admin/audit", label: "Auditoría", icon: ClipboardList, allowedRoles: ["Admin"], exact: true },
   { href: "/settings", label: "Configuración", icon: Settings, allowedRoles: ["Admin"], exact: true },
   { href: "/help", label: "Ayuda y FAQ", icon: HelpCircle, exact: true },
 ];
