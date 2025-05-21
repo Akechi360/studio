@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, Settings as SettingsIcon, Save, BellRing, Mail, MessageCircle, Lightbulb, Paintbrush } from 'lucide-react';
+import { ShieldAlert, Settings as SettingsIcon, Save, BellRing, Mail, MessageCircle, Paintbrush } from 'lucide-react'; // Lightbulb removed
 import { APP_NAME } from '@/lib/constants';
 
 interface NotificationPreferences {
@@ -18,9 +18,7 @@ interface NotificationPreferences {
   emailOnNewComment: boolean;
 }
 
-interface AIPreferences {
-  suggestionsEnabled: boolean;
-}
+// AIPreferences interface removed
 
 interface CustomizationPreferences {
   appName: string;
@@ -28,7 +26,7 @@ interface CustomizationPreferences {
 
 interface AdminSettings {
   notificationPrefs: NotificationPreferences;
-  aiPrefs: AIPreferences;
+  // aiPrefs removed
   customizationPrefs: CustomizationPreferences;
 }
 
@@ -37,9 +35,7 @@ const defaultSettings: AdminSettings = {
     emailOnNewTicket: true,
     emailOnNewComment: true,
   },
-  aiPrefs: {
-    suggestionsEnabled: true,
-  },
+  // aiPrefs removed
   customizationPrefs: {
     appName: APP_NAME, // Default from constants
   },
@@ -64,10 +60,7 @@ export default function SettingsPage() {
             ...defaultSettings.notificationPrefs,
             ...(savedSettings.notificationPrefs || {}),
           },
-          aiPrefs: {
-            ...defaultSettings.aiPrefs,
-            ...(savedSettings.aiPrefs || {}),
-          },
+          // aiPrefs merging removed
           customizationPrefs: {
             ...defaultSettings.customizationPrefs,
             ...(savedSettings.customizationPrefs || {}),
@@ -87,12 +80,7 @@ export default function SettingsPage() {
     }));
   };
 
-  const handleAIPrefChange = (key: keyof AIPreferences, value: boolean) => {
-    setSettings(prev => ({
-      ...prev,
-      aiPrefs: { ...prev.aiPrefs, [key]: value },
-    }));
-  };
+  // handleAIPrefChange function removed
   
   const handleCustomizationPrefChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -177,32 +165,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* AI Preferences Card */}
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center"><Lightbulb className="mr-2 h-5 w-5 text-primary"/>Preferencias de IA</CardTitle>
-          <CardDescription>Configura las funcionalidades de Inteligencia Artificial.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between space-x-2 p-4 border rounded-lg shadow-sm bg-muted/20">
-            <div className="flex items-center space-x-3">
-              <Lightbulb className="h-5 w-5 text-primary" />
-              <Label htmlFor="aiSuggestionsEnabled" className="font-medium">
-                Habilitar Sugerencias de Solución por IA
-              </Label>
-            </div>
-            <Switch
-              id="aiSuggestionsEnabled"
-              checked={settings.aiPrefs.suggestionsEnabled}
-              onCheckedChange={(value) => handleAIPrefChange('suggestionsEnabled', value)}
-              aria-label="Habilitar Sugerencias de Solución por IA"
-            />
-          </div>
-           <p className="text-xs text-muted-foreground px-1">
-            Nota: Si está deshabilitado, la sección de sugerencias de IA no aparecerá en la vista de detalle del ticket. (Requiere actualizar el componente `AISuggestion` para leer esta preferencia).
-          </p>
-        </CardContent>
-      </Card>
+      {/* AI Preferences Card Removed */}
       
       {/* Customization Preferences Card */}
       <Card className="shadow-lg">

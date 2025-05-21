@@ -10,7 +10,7 @@ import {
   getTicketByIdFromMock,
   getRawTicketsStoreForStats
 } from "./mock-data"; 
-import { suggestSolution as genAiSuggestSolution } from "@/ai/flows/suggest-solution";
+// Removed: import { suggestSolution as genAiSuggestSolution } from "@/ai/flows/suggest-solution";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
 
@@ -92,7 +92,7 @@ export async function addCommentAction(
   }
 
   const newComment: Comment = {
-    id: `comment-${ticketId}-${ticket.comments.length + 1}`,
+    id: `comment-${ticketId}-${ticket.comments.length + 1}-${Date.now()}`, // Added Date.now() for more unique ID
     text: validatedFields.data.text,
     userId: commenter.id,
     userName: commenter.name,
@@ -164,19 +164,8 @@ export async function updateTicketStatusAction(
 }
 
 
-// --- AI Solution Suggestion ---
-export async function getAISolutionSuggestion(ticketDescription: string) {
-  if (!ticketDescription || ticketDescription.trim().length < 10) {
-    return { suggestion: null, error: "La descripción del ticket es demasiado corta para una sugerencia significativa." };
-  }
-  try {
-    const result = await genAiSuggestSolution({ ticketDescription });
-    return { suggestion: result.suggestedSolution, error: null };
-  } catch (error) {
-    console.error("Error al obtener sugerencia de IA:", error);
-    return { suggestion: null, error: "Fallo al obtener sugerencia de IA." };
-  }
-}
+// --- AI Solution Suggestion Function (Removed) ---
+// export async function getAISolutionSuggestion(ticketDescription: string) { ... }
 
 
 // --- Fetch Ticket by ID ---

@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { AISuggestion } from "./ai-suggestion";
 import { CommentCard } from "./comment-card";
 import { AddCommentForm } from "./add-comment-form";
 import { format } from "date-fns";
@@ -21,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateTicketStatusAction } from "@/lib/actions";
+import { updateTicketStatusAction, getTicketById } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -91,7 +90,16 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
   };
 
   const onCommentAdded = async () => {
-    setTicket(prev => ({...prev!, updatedAt: new Date()})); 
+    const updatedTicketData = await getTicketById(ticket.id);
+    if (updatedTicketData) {
+      setTicket(updatedTicketData);
+    } else {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la información del ticket después de añadir el comentario.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -169,9 +177,7 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
         </CardContent>
       </Card>
 
-      {role === "Admin" && (
-        <AISuggestion ticketDescription={ticket.description} />
-      )}
+      {/* AI Suggestion component removed from here */}
 
       <Card className="shadow-xl">
         <CardHeader>
