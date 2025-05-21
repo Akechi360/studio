@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Archive, PlusCircle, Loader2 } from "lucide-react";
+import { Archive, PlusCircle, Loader2, Pencil, Trash2 } from "lucide-react"; // Added Pencil, Trash2
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAllInventoryItems } from "@/lib/actions";
 import type { InventoryItem } from "@/lib/types";
@@ -13,6 +13,11 @@ import { InventoryFilters } from '@/components/inventory/inventory-filters';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"; // Added Tooltip components
 
 const getInitialsForItem = (name: string) => {
   return name.substring(0, 2).toUpperCase();
@@ -64,6 +69,28 @@ export default function InventoryPage() {
 
   const handleFilterChange = (filters: { category: string; location: string }) => {
     setCurrentFilters(filters);
+  };
+
+  const handleEditItem = (itemId: string) => {
+    // Placeholder for edit functionality
+    console.log("TODO: Implementar edición para el artículo:", itemId);
+    // Example:
+    // const itemToEdit = allItems.find(item => item.id === itemId);
+    // if (itemToEdit) {
+    //   setSelectedItemForEdit(itemToEdit);
+    //   setIsEditDialogVisible(true);
+    // }
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    // Placeholder for delete functionality
+    console.log("TODO: Implementar eliminación para el artículo:", itemId);
+    // Example:
+    // const itemToDelete = allItems.find(item => item.id === itemId);
+    // if (itemToDelete) {
+    //   setSelectedItemForDelete(itemToDelete);
+    //   setIsConfirmDeleteDialogVisible(true);
+    // }
   };
 
   return (
@@ -130,7 +157,7 @@ export default function InventoryPage() {
                   <TableHead className="text-center">Cant.</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Ubicación</TableHead>
-                  {/* <TableHead className="text-right">Acciones</TableHead> */}
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -139,7 +166,6 @@ export default function InventoryPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9 hidden sm:flex">
-                           {/* Placeholder image, can be customized later based on category */}
                           <AvatarImage src={`https://placehold.co/40x40.png?text=${getInitialsForItem(item.name)}`} alt={item.name} data-ai-hint="item activo" />
                           <AvatarFallback>{getInitialsForItem(item.name)}</AvatarFallback>
                         </Avatar>
@@ -157,11 +183,32 @@ export default function InventoryPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{item.location || <span className="text-muted-foreground">N/A</span>}</TableCell>
-                    {/* <TableCell className="text-right">
-                      <Button variant="outline" size="sm">
-                        <Settings className="mr-2 h-4 w-4" /> Gestionar
-                      </Button>
-                    </TableCell> */}
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={() => handleEditItem(item.id)}>
+                              <Pencil className="h-4 w-4" />
+                              <span className="sr-only">Editar Artículo</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Editar Artículo</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/90" onClick={() => handleDeleteItem(item.id)}>
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Eliminar Artículo</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Eliminar Artículo</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
