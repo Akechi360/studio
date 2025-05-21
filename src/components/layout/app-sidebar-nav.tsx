@@ -37,7 +37,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Panel de Control", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { 
     href: "/tickets", 
     label: "Tickets", 
@@ -47,10 +47,10 @@ const navItems: NavItem[] = [
       { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true },
     ]
   },
-  { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] }, // Restringido a Admin
+  { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
   { href: "/profile", label: "Perfil", icon: User, exact: true },
   { href: "/admin/users", label: "Gestión de Usuarios", icon: Users, allowedRoles: ["Admin"], exact: true },
-  { href: "/admin/reports", label: "Reportes", icon: BarChart3, allowedRoles: ["Admin"], exact: true },
+  // { href: "/admin/reports", label: "Reportes", icon: BarChart3, allowedRoles: ["Admin"], exact: true }, // Removed
   { href: "/settings", label: "Configuración", icon: Settings, allowedRoles: ["Admin"], exact: true },
   { href: "/help", label: "Ayuda y FAQ", icon: HelpCircle, exact: true },
 ];
