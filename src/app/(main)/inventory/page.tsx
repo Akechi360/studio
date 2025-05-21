@@ -3,14 +3,15 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Archive, PlusCircle, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Archive, PlusCircle, Loader2, Pencil, Trash2, Eye } from "lucide-react"; // Added Eye
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAllInventoryItems, deleteInventoryItemAction } from "@/lib/actions";
 import type { InventoryItem } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { AddItemDialog } from '@/components/inventory/add-item-dialog';
-import { EditItemDialog } from '@/components/inventory/edit-item-dialog'; // Import EditItemDialog
-import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog'; // Import DeleteItemDialog
+import { EditItemDialog } from '@/components/inventory/edit-item-dialog';
+import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
+import { ViewItemDetailsDialog } from '@/components/inventory/view-item-details-dialog'; // Import ViewItemDetailsDialog
 import { InventoryFilters } from '@/components/inventory/inventory-filters';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 const getInitialsForItem = (name: string) => {
+  if (!name) return '??';
   return name.substring(0, 2).toUpperCase();
 };
 
@@ -50,6 +52,9 @@ export default function InventoryPage() {
   const [selectedItemForDelete, setSelectedItemForDelete] = useState<InventoryItem | null>(null);
   const [isConfirmDeleteDialogVisible, setIsConfirmDeleteDialogVisible] = useState(false);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
+
+  const [selectedItemForView, setSelectedItemForView] = useState<InventoryItem | null>(null);
+  const [isViewDetailsDialogVisible, setIsViewDetailsDialogVisible] = useState(false);
 
   const [currentFilters, setCurrentFilters] = useState<{ category: string; location: string }>({ category: "all", location: "all" });
 
@@ -104,11 +109,21 @@ export default function InventoryPage() {
 
     if (result.success) {
       toast({ title: "Artículo Eliminado", description: result.message });
-      fetchItems(); // Refrescar la lista
+      fetchItems(); 
     } else {
       toast({ title: "Fallo al Eliminar", description: result.message, variant: "destructive" });
     }
     setSelectedItemForDelete(null);
+  };
+
+  const handleViewItemDetails = (item: InventoryItem) => {
+    setSelectedItemForView(item);
+    setIsViewDetailsDialogVisible(true);
+  };
+
+  const handleCloseViewDetailsDialog = () => {
+    setSelectedItemForView(null);
+    setIsViewDetailsDialogVisible(false);
   };
 
   return (
@@ -137,7 +152,7 @@ export default function InventoryPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Artículos</CardTitle>
-          <CardDescription>Visualiza los artículos del inventario según los filtros aplicados.</CardDescription>
+          <CardDescription>Visualiza los artículos del inventario según los filtros aplicados. Haz clic en el nombre para ver detalles.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -188,7 +203,14 @@ export default function InventoryPage() {
                           <AvatarImage src={`https://placehold.co/40x40.png?text=${getInitialsForItem(item.name)}`} alt={item.name} data-ai-hint="item activo" />
                           <AvatarFallback>{getInitialsForItem(item.name)}</AvatarFallback>
                         </Avatar>
-                        <div className="font-medium">{item.name}</div>
+                        <Button 
+                            variant="link" 
+                            className="font-medium p-0 h-auto hover:underline text-foreground text-left"
+                            onClick={() => handleViewItemDetails(item)}
+                            title={`Ver detalles de ${item.name}`}
+                        >
+                            {item.name}
+                        </Button>
                       </div>
                     </TableCell>
                     <TableCell>{item.category}</TableCell>
@@ -261,6 +283,14 @@ export default function InventoryPage() {
           onConfirm={confirmDeleteItem}
           itemName={selectedItemForDelete.name}
           isDeleting={isDeletingItem}
+        />
+      )}
+
+      {selectedItemForView && (
+        <ViewItemDetailsDialog
+            item={selectedItemForView}
+            isOpen={isViewDetailsDialogVisible}
+            onClose={handleCloseViewDetailsDialog}
         />
       )}
     </div>
