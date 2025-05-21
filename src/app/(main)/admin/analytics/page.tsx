@@ -4,10 +4,45 @@
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldAlert, BarChartBig, TrendingUp, Clock, Users2, PieChart, FileDown } from 'lucide-react';
+import { ShieldAlert, BarChartBig, TrendingUp, Clock, Users2, PieChart as PieChartLucide, FileDown, AlertTriangle, Ticket, CheckCircle } from 'lucide-react'; // Renamed PieChart to PieChartLucide
+import { useEffect, useState } from 'react';
+import { getDashboardStats } from '@/lib/actions';
+import type { TicketSummary, TicketStats } from '@/lib/types';
+import { TicketStatsCharts } from '@/components/dashboard/ticket-stats-charts';
+import { Loader2 } from 'lucide-react';
+
+function StatCard({ title, value, icon, description, colorClass = "text-primary" }: { title: string, value: string | number, icon: React.ElementType, description: string, colorClass?: string }) {
+  const IconComponent = icon;
+  return (
+    <Card className="shadow-md">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <IconComponent className={`h-5 w-5 ${colorClass}`} />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AnalyticsPage() {
   const { role } = useAuth();
+  const [statsData, setStatsData] = useState<{ summary: TicketSummary; stats: TicketStats } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (role === "Admin") {
+      const fetchStats = async () => {
+        setIsLoading(true);
+        const data = await getDashboardStats();
+        setStatsData(data);
+        setIsLoading(false);
+      };
+      fetchStats();
+    }
+  }, [role]);
 
   if (role !== "Admin") {
     return (
@@ -28,18 +63,69 @@ export default function AnalyticsPage() {
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold tracking-tight flex items-center">
           <BarChartBig className="mr-3 h-8 w-8 text-primary" />
-          Informes y Analíticas Avanzadas
+          Analíticas del Sistema de Tickets
         </h1>
         <p className="text-muted-foreground">
-          Análisis detallado del rendimiento del sistema de tickets y tendencias.
+          Resumen del rendimiento actual y funcionalidades de análisis avanzado planeadas.
         </p>
       </div>
 
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center p-8">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="mt-2 text-muted-foreground">Cargando datos de analíticas...</p>
+        </div>
+      )}
+
+      {!isLoading && statsData && (
+        <>
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle>Resumen de Tickets Actual</CardTitle>
+              <CardDescription>Estadísticas generales del sistema de tickets.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard title="Tickets Totales" value={statsData.summary.total} icon={Ticket} description="Todos los tickets creados" />
+                <StatCard title="Tickets Abiertos" value={statsData.summary.open} icon={AlertTriangle} description="Tickets que necesitan atención" colorClass="text-destructive" />
+                <StatCard title="En Progreso" value={statsData.summary.inProgress} icon={Clock} description="Tickets en los que se está trabajando actualmente" colorClass="text-yellow-500" />
+                <StatCard title="Resueltos/Cerrados" value={statsData.summary.resolved + statsData.summary.closed} icon={CheckCircle} description="Tickets completados exitosamente" colorClass="text-green-500" />
+              </div>
+              {statsData.summary.total > 0 ? (
+                <TicketStatsCharts stats={statsData.stats} />
+              ) : (
+                <div className="mt-6 p-8 border border-dashed rounded-lg text-center">
+                  <BarChartBig className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                  <p className="font-semibold">No hay datos de tickets para graficar.</p>
+                  <p className="text-sm text-muted-foreground">Crea algunos tickets para ver los gráficos aquí.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+      
+      {!isLoading && !statsData && role === "Admin" && (
+         <Card className="shadow-lg">
+            <CardHeader>
+                <CardTitle>Resumen de Tickets Actual</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-col items-center justify-center min-h-[200px] p-4 text-center">
+                    <BarChartBig className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                    <p className="font-semibold">No hay datos de reportes disponibles actualmente.</p>
+                    <p className="text-sm text-muted-foreground">Los datos aparecerán aquí una vez que haya actividad en el sistema.</p>
+                </div>
+            </CardContent>
+         </Card>
+      )}
+
+
       <Card className="shadow-lg">
         <CardHeader>
-          <CardTitle>Funcionalidades Planeadas</CardTitle>
+          <CardTitle>Analíticas Avanzadas Planeadas</CardTitle>
           <CardDescription>
-            Esta sección ofrecerá reportes detallados y personalizables para una toma de decisiones informada.
+            Funcionalidades detalladas y personalizables para una toma de decisiones informada que se implementarán a futuro.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -56,11 +142,11 @@ export default function AnalyticsPage() {
             />
             <InfoCard
               icon={Users2}
-              title="Rendimiento por Agente/Equipo"
-              description="Mide los tickets resueltos y pendientes por agente o equipo (funcionalidad futura)."
+              title="Data Detallada de Tickets"
+              description="Analiza métricas detalladas de tickets, incluyendo asignaciones, progresos y otros KPIs relevantes (funcionalidad futura)."
             />
             <InfoCard
-              icon={PieChart}
+              icon={PieChartLucide}
               title="Distribución de Tickets"
               description="Desglosa los tickets por categoría, prioridad, estado, departamento, etc."
             />
@@ -70,16 +156,16 @@ export default function AnalyticsPage() {
               description="Opción para exportar los datos de los reportes en formatos como CSV o PDF."
             />
              <InfoCard
-              icon={BarChartBig}
+              icon={BarChartBig} // Using BarChartBig as BarChart is also a component name
               title="Gráficos Interactivos"
               description="Presentación de datos mediante gráficos dinámicos y fáciles de interpretar."
             />
           </div>
-           <Alert className="mt-6">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>En Desarrollo</AlertTitle>
-            <AlertDescription>
-              Las funcionalidades de analíticas avanzadas están planificadas y se implementarán en futuras actualizaciones.
+           <Alert className="mt-6 border-primary/50 bg-primary/5">
+            <AlertTriangle className="h-5 w-5 text-primary" />
+            <AlertTitle className="font-semibold text-primary">En Desarrollo</AlertTitle>
+            <AlertDescription className="text-primary/80">
+              Las funcionalidades de analíticas avanzadas detalladas aquí están planificadas y se implementarán en futuras actualizaciones del sistema.
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -100,9 +186,4 @@ function InfoCard({ icon: Icon, title, description }: { icon: React.ElementType,
   );
 }
 
-// Placeholder for AlertTriangle if not imported elsewhere, or ensure it's imported from lucide-react
-const AlertTriangle = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>
-  </svg>
-);
+    
