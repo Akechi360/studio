@@ -16,15 +16,15 @@ export type TicketStatus = "Open" | "In Progress" | "Resolved" | "Closed";
 export interface Attachment {
   id: string;
   fileName: string;
-  url: string; 
-  size: number; 
+  url: string;
+  size: number;
 }
 
 export interface Comment {
   id: string;
   text: string;
-  userId: string; 
-  userName: string; 
+  userId: string;
+  userName: string;
   userAvatarUrl?: string;
   createdAt: Date;
 }
@@ -36,8 +36,8 @@ export interface Ticket {
   priority: TicketPriority;
   status: TicketStatus;
   attachments: Attachment[];
-  userId: string; 
-  userName: string; 
+  userId: string;
+  userName: string;
   createdAt: Date;
   updatedAt: Date;
   comments: Comment[];
@@ -58,10 +58,10 @@ export interface TicketStats {
 
 // --- Tipos de Inventario ---
 export const INVENTORY_ITEM_CATEGORIES = [
-  "Computadora", 
-  "Monitor", 
-  "Teclado", 
-  "Mouse", 
+  "Computadora",
+  "Monitor",
+  "Teclado",
+  "Mouse",
   "Impresora",
   "Escaner",
   "Router",
@@ -80,38 +80,40 @@ export const INVENTORY_ITEM_CATEGORIES = [
 export type InventoryItemCategory = typeof INVENTORY_ITEM_CATEGORIES[number];
 
 export const INVENTORY_ITEM_STATUSES = [
-  "En Uso", 
-  "En Almacen", 
-  "En Reparacion", 
-  "De Baja", 
+  "En Uso",
+  "En Almacen",
+  "En Reparacion",
+  "De Baja",
   "Perdido"
 ] as const;
 
 export type InventoryItemStatus = typeof INVENTORY_ITEM_STATUSES[number];
 
+export type StorageType = "HDD" | "SSD";
+
 export interface InventoryItem {
   id: string;
-  name: string; 
+  name: string;
   category: InventoryItemCategory;
   brand?: string;
   model?: string;
   serialNumber?: string;
-  ram?: string; 
-  storage?: string; 
-  processor?: string; 
-  screenSize?: string; 
-  ipAddress?: string; 
+  ram?: string;
+  storageType?: StorageType;
+  storage?: string; // For capacity like "500GB", "1TB"
+  processor?: string;
+  screenSize?: string;
+  ipAddress?: string;
   quantity: number;
-  location?: string; 
-  purchaseDate?: string; 
+  location?: string;
+  purchaseDate?: string;
   supplier?: string;
-  warrantyEndDate?: string; 
+  warrantyEndDate?: string;
   status: InventoryItemStatus;
   notes?: string;
-  addedByUserId: string; 
-  addedByUserName: string; 
+  addedByUserId: string;
+  addedByUserName: string;
   createdAt: Date;
   updatedAt: Date;
-  lastSeen?: Date; 
+  lastSeen?: Date;
 }
-

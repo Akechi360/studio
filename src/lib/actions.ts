@@ -2,18 +2,19 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus } from "./types";
-import { 
-  addTicketToMock, 
-  getAllTicketsFromMock, 
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType } from "./types";
+import {
+  addTicketToMock,
+  getAllTicketsFromMock,
   getTicketByIdFromMock,
   getRawTicketsStoreForStats,
   getAllInventoryItemsFromMock,
-  addInventoryItemToMock 
-} from "./mock-data"; 
+  addInventoryItemToMock,
+  getRawInventoryStore // Corrected: Import this function
+} from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
-import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from "./types"; // Import new constants
+import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from "./types";
 
 // --- Ticket Creation ---
 const CreateTicketSchema = z.object({
@@ -23,7 +24,7 @@ const CreateTicketSchema = z.object({
 });
 
 export async function createTicketAction(
-  userId: string, 
+  userId: string,
   userName: string,
   values: z.infer<typeof CreateTicketSchema>
 ) {
@@ -31,28 +32,29 @@ export async function createTicketAction(
 
   if (!validatedFields.success) {
     return {
+      success: false, // Added success field
       errors: validatedFields.error.flatten().fieldErrors,
       message: "Fallo al crear ticket debido a errores de validación.",
     };
   }
 
   const { subject, description, priority } = validatedFields.data;
-  
+
   const currentTickets = getRawTicketsStoreForStats();
   const newTicket: Ticket = {
-    id: (currentTickets.length + 1).toString() + Date.now().toString(), 
+    id: (currentTickets.length + 1).toString() + Date.now().toString(),
     subject,
     description,
     priority: priority as TicketPriority,
     status: "Open",
-    attachments: [], 
+    attachments: [],
     userId,
     userName,
     createdAt: new Date(),
     updatedAt: new Date(),
     comments: [],
   };
-  
+
   addTicketToMock(newTicket);
 
   revalidatePath("/tickets");
@@ -75,13 +77,14 @@ const AddCommentSchema = z.object({
 
 export async function addCommentAction(
   ticketId: string,
-  commenter: User, 
+  commenter: User,
   values: z.infer<typeof AddCommentSchema>
 ) {
   const validatedFields = AddCommentSchema.safeParse(values);
 
   if (!validatedFields.success) {
     return {
+      success: false, // Added success field
       errors: validatedFields.error.flatten().fieldErrors,
       message: "Fallo al añadir comentario debido a errores de validación.",
     };
@@ -103,12 +106,12 @@ export async function addCommentAction(
 
   ticket.comments.push(newComment);
   ticket.updatedAt = new Date();
-  
+
   revalidatePath(`/tickets/${ticketId}`);
-  revalidatePath("/tickets"); 
+  revalidatePath("/tickets");
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
-  
+
   return {
     success: true,
     message: "¡Comentario añadido exitosamente!",
@@ -134,7 +137,7 @@ export async function updateTicketStatusAction(
       message: "Fallo al actualizar estado debido a errores de validación.",
     };
   }
-  
+
   const ticket = getTicketByIdFromMock(ticketId);
   if (!ticket) {
     return { success: false, message: "Ticket no encontrado." };
@@ -174,7 +177,7 @@ export async function getAllTickets(): Promise<Ticket[]> {
 // --- Fetch Dashboard Stats ---
 export async function getDashboardStats() {
   const currentTickets = getRawTicketsStoreForStats();
-  
+
   const total = currentTickets.length;
   const open = currentTickets.filter(t => t.status === "Open").length;
   const inProgress = currentTickets.filter(t => t.status === "In Progress").length;
@@ -183,7 +186,7 @@ export async function getDashboardStats() {
 
   const priorityDisplayMap: Record<TicketPriority, string> = { Low: "Baja", Medium: "Media", High: "Alta" };
   const statusDisplayMap: Record<TicketStatus, string> = { Open: "Abierto", "In Progress": "En Progreso", Resolved: "Resuelto", Closed: "Cerrado"};
-  
+
   const byPriority = (TICKET_PRIORITIES_ENGLISH).map(pKey  => ({
     name: priorityDisplayMap[pKey],
     value: currentTickets.filter(t => t.priority === pKey).length,
@@ -207,22 +210,26 @@ export async function getAllInventoryItems(): Promise<InventoryItem[]> {
   return getAllInventoryItemsFromMock();
 }
 
-// Add Inventory Item
+// Define RAM options for Zod schema if you want to restrict it
+// For now, allowing any string for RAM and Storage from the Select components, which have predefined lists
 const AddInventoryItemSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres.").max(100),
   category: z.enum(INVENTORY_ITEM_CATEGORIES),
-  brand: z.string().optional(),
-  model: z.string().optional(),
-  serialNumber: z.string().optional(),
+  brand: z.string().max(50).optional(),
+  model: z.string().max(50).optional(),
+  serialNumber: z.string().max(100).optional(),
+  ram: z.string().optional(), // RAM can be a string like "8GB", "16GB" or "No Especificado"
+  storageType: z.enum(["HDD", "SSD"] as [StorageType, ...StorageType[]]).optional(),
+  storage: z.string().max(50).optional(), // Storage capacity like "500GB", "1TB"
   quantity: z.coerce.number().int().min(1, "La cantidad debe ser al menos 1."),
-  location: z.string().optional(),
+  location: z.string().max(100).optional(),
   status: z.enum(INVENTORY_ITEM_STATUSES),
-  notes: z.string().optional(),
+  notes: z.string().max(500).optional(),
 });
 
 export async function addInventoryItemAction(
   currentUser: Pick<User, 'id' | 'name'>,
-  values: z.infer<typeof AddInventoryItemSchema>
+  values: z.infer<typeof AddInventoryItemSchema> // This will now include ram, storageType, storage
 ) {
   const validatedFields = AddInventoryItemSchema.safeParse(values);
 
@@ -235,13 +242,22 @@ export async function addInventoryItemAction(
   }
 
   const data = validatedFields.data;
-  const currentItems = getRawInventoryStore(); // Get current items for ID generation
+  const currentItems = getRawInventoryStore();
 
   const newItem: InventoryItem = {
     id: `inv-${currentItems.length + 1}-${Date.now()}`,
-    ...data,
-    category: data.category as InventoryItemCategory, // Zod enum ensures this
-    status: data.status as InventoryItemStatus, // Zod enum ensures this
+    name: data.name,
+    category: data.category as InventoryItemCategory,
+    brand: data.brand,
+    model: data.model,
+    serialNumber: data.serialNumber,
+    ram: data.ram, // Add RAM
+    storageType: data.storageType, // Add Storage Type
+    storage: data.storage, // Add Storage Capacity
+    quantity: data.quantity,
+    location: data.location,
+    status: data.status as InventoryItemStatus,
+    notes: data.notes,
     addedByUserId: currentUser.id,
     addedByUserName: currentUser.name,
     createdAt: new Date(),

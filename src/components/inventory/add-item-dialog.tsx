@@ -34,9 +34,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { addInventoryItemAction } from '@/lib/actions';
-import type { User, InventoryItemCategory, InventoryItemStatus } from '@/lib/types';
+import type { User, InventoryItemCategory, InventoryItemStatus, StorageType } from '@/lib/types';
 import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from '@/lib/types';
 import { Loader2, PlusCircle, Save } from 'lucide-react';
+
+const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
+const STORAGE_TYPES = ["No Especificado", "HDD", "SSD"] as const;
 
 const inventoryItemFormSchema = z.object({
   name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }).max(100, { message: "Máximo 100 caracteres."}),
@@ -44,6 +47,9 @@ const inventoryItemFormSchema = z.object({
   brand: z.string().max(50, { message: "Máximo 50 caracteres."}).optional(),
   model: z.string().max(50, { message: "Máximo 50 caracteres."}).optional(),
   serialNumber: z.string().max(100, { message: "Máximo 100 caracteres."}).optional(),
+  ram: z.enum(RAM_OPTIONS).optional(),
+  storageType: z.enum(STORAGE_TYPES.slice(1) as [StorageType, ...StorageType[]]).optional(), // Exclude "No Especificado" for Zod enum type
+  storage: z.string().max(50, { message: "Máximo 50 caracteres."}).optional(), // For capacity
   quantity: z.coerce.number({invalid_type_error: "Debe ser un número."}).int("Debe ser un entero.").min(1, { message: "La cantidad debe ser al menos 1." }),
   location: z.string().max(100, { message: "Máximo 100 caracteres."}).optional(),
   status: z.enum(INVENTORY_ITEM_STATUSES, { required_error: "El estado es obligatorio."}),
@@ -67,10 +73,13 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
     resolver: zodResolver(inventoryItemFormSchema),
     defaultValues: {
       name: "",
-      category: undefined, 
+      category: undefined,
       brand: "",
       model: "",
       serialNumber: "",
+      ram: "No Especificado",
+      storageType: undefined, // Will map "No Especificado" to undefined before sending to action
+      storage: "",
       quantity: 1,
       location: "",
       status: "En Uso",
@@ -84,7 +93,18 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
       return;
     }
     setIsSubmitting(true);
-    const result = await addInventoryItemAction({ id: currentUser.id, name: currentUser.name }, data);
+
+    // Handle "No Especificado" for optional enum fields before sending to action
+    const dataToSend = {
+      ...data,
+      ram: data.ram === "No Especificado" ? undefined : data.ram,
+      // storageType is already optional and will be undefined if "No Especificado" is selected (or if not changed from default)
+      // For Zod schema, 'No Especificado' is not a valid StorageType, so if it's chosen, it maps to undefined
+      storageType: data.storageType === "No Especificado" ? undefined : data.storageType as StorageType | undefined,
+    };
+
+
+    const result = await addInventoryItemAction({ id: currentUser.id, name: currentUser.name }, dataToSend);
     setIsSubmitting(false);
 
     if (result.success) {
@@ -93,7 +113,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
         description: result.message,
       });
       form.reset();
-      onItemAdded(); 
+      onItemAdded();
     } else {
       toast({
         title: "Fallo al Añadir Artículo",
@@ -203,6 +223,71 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="ram"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Memoria RAM</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecciona RAM" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {RAM_OPTIONS.map((ram) => (
+                                <SelectItem key={ram} value={ram}>{ram}</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="storageType"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Tipo de Disco</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecciona tipo" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {STORAGE_TYPES.map((type) => (
+                                <SelectItem key={type} value={type} disabled={type === "No Especificado" && field.value !== undefined && field.value !== "No Especificado"}>
+                                  {type}
+                                </SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            </div>
+
+            <FormField
+                control={form.control}
+                name="storage"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Capacidad de Almacenamiento</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Ej: 512GB SSD, 1TB HDD" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
+
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                 control={form.control}
