@@ -8,6 +8,7 @@ export interface User {
   role: Role;
   avatarUrl?: string;
   department?: string;
+  password?: string; // Added password field
 }
 
 export type TicketPriority = "Low" | "Medium" | "High";
@@ -101,7 +102,7 @@ export interface InventoryItem {
   ram?: string;
   storageType?: StorageType;
   storage?: string; // For capacity like "500GB", "1TB"
-  processor?: string; // Nuevo campo
+  processor?: string; 
   screenSize?: string;
   ipAddress?: string;
   quantity: number;

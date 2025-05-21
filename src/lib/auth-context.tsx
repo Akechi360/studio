@@ -5,10 +5,8 @@ import type { User, Role } from "@/lib/types";
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-// Mock users - in a real app, this would come from a database
-// This list is now also used for the User Management page.
 export const mockUsers: User[] = [
-  { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC", department: "Gerencia" },
+  { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC", department: "Gerencia", password: "adminpassword" },
 ];
 
 interface AuthContextType {
@@ -19,8 +17,9 @@ interface AuthContextType {
   logout: () => void;
   register: (name: string, email: string, pass: string) => Promise<boolean>; 
   updateProfile: (name: string, email: string) => Promise<boolean>;
+  updateSelfPassword: (newPassword: string) => Promise<boolean>;
   getAllUsers: () => User[];
-  updateUserByAdmin: (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department'>>) => Promise<{ success: boolean; message?: string }>;
+  updateUserByAdmin: (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>) => Promise<{ success: boolean; message?: string }>;
   deleteUserByAdmin: (userId: string) => Promise<{ success: boolean; message: string }>;
 }
 
@@ -36,12 +35,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUser = localStorage.getItem("ticketflow_user");
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser) as User;
-        // Find user from the potentially updated mockUsers array
         const existingUser = mockUsers.find(u => u.id === parsedUser.id);
         if (existingUser) {
-          setUser(existingUser); // Use the current version from mockUsers
+          setUser(existingUser); 
         } else {
-           // If user from localStorage is not in mockUsers (e.g., after cleanup), clear it
           localStorage.removeItem("ticketflow_user"); 
         }
       }
@@ -52,10 +49,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string): Promise<boolean> => {
+  const login = async (email: string, pass: string): Promise<boolean> => { // pass parameter is kept for signature consistency, but not used
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500));
-    const foundUser = mockUsers.find(u => u.email === email);
+    const foundUser = mockUsers.find(u => u.email === email); // In mock, we don't check password
     if (foundUser) {
       setUser(foundUser);
       localStorage.setItem("ticketflow_user", JSON.stringify(foundUser));
@@ -72,7 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.push("/login");
   };
 
-  const register = async (name: string, email: string): Promise<boolean> => {
+  const register = async (name: string, email: string, pass: string): Promise<boolean> => {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500));
     if (mockUsers.find(u => u.email === email)) {
@@ -84,8 +81,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       name,
       email,
       role: "User", 
-      avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,2).toUpperCase()}`
-      // department will be undefined by default
+      avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,2).toUpperCase()}`,
+      password: pass, // Store password
     };
     mockUsers.push(newUser); 
     setUser(newUser);
@@ -102,8 +99,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (userIndex !== -1) {
       if (email !== mockUsers[userIndex].email && mockUsers.some(u => u.email === email && u.id !== user.id)) {
         setIsLoading(false);
-        alert("El correo electrónico ya está en uso por otro usuario.");
-        return false;
+        // alert("El correo electrónico ya está en uso por otro usuario."); // Using toast instead
+        return false; // Indicate failure for toast handling in component
       }
       const updatedUser = { ...mockUsers[userIndex], name, email };
       mockUsers[userIndex] = updatedUser;
@@ -116,7 +113,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
-  const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department'>>): Promise<{ success: boolean; message?: string }> => {
+  const updateSelfPassword = async (newPassword: string): Promise<boolean> => {
+    if (!user) return false;
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const userIndex = mockUsers.findIndex(u => u.id === user.id);
+    if (userIndex !== -1) {
+      const updatedUser = { ...mockUsers[userIndex], password: newPassword };
+      mockUsers[userIndex] = updatedUser;
+      setUser(updatedUser); // Update current user state
+      localStorage.setItem("ticketflow_user", JSON.stringify(updatedUser)); // Update localStorage
+      setIsLoading(false);
+      return true;
+    }
+    setIsLoading(false);
+    return false;
+  };
+
+  const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>): Promise<{ success: boolean; message?: string }> => {
     await new Promise(resolve => setTimeout(resolve, 300)); 
     const userIndex = mockUsers.findIndex(u => u.id === userId);
     if (userIndex === -1) {
@@ -131,11 +145,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const updatedUserData = { ...mockUsers[userIndex], ...data };
     
-    // Correctly handle "Sin Departamento" which is stored as undefined
-    if (data.department === "_NO_DEPARTMENT_") { // Check against the special value from the form
+    if (data.department === "_NO_DEPARTMENT_") { 
         updatedUserData.department = undefined;
-    } else if (data.department !== undefined) { // Explicitly set department if provided
+    } else if (data.department !== undefined) { 
         updatedUserData.department = data.department;
+    }
+
+    // If password is provided and not empty, update it. Otherwise, keep the old one.
+    if (data.password && data.password.trim() !== "") {
+      updatedUserData.password = data.password;
+    } else {
+      updatedUserData.password = mockUsers[userIndex].password; // Keep existing if not provided or empty
     }
 
 
@@ -167,7 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, role: user?.role || null, isLoading, login, logout, register, updateProfile, getAllUsers, updateUserByAdmin, deleteUserByAdmin }}>
+    <AuthContext.Provider value={{ user, role: user?.role || null, isLoading, login, logout, register, updateProfile, updateSelfPassword, getAllUsers, updateUserByAdmin, deleteUserByAdmin }}>
       {children}
     </AuthContext.Provider>
   );
