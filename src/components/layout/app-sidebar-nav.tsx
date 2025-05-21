@@ -21,7 +21,8 @@ import {
   Users,
   Settings,
   BarChart3,
-  HelpCircle
+  HelpCircle,
+  Archive // Icono para Inventario
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { Role } from "@/lib/types";
@@ -46,6 +47,7 @@ const navItems: NavItem[] = [
       { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true },
     ]
   },
+  { href: "/inventory", label: "Inventario", icon: Archive, exact: true }, // Nuevo enlace de Inventario
   { href: "/profile", label: "Perfil", icon: User, exact: true },
   { href: "/admin/users", label: "Gestión de Usuarios", icon: Users, allowedRoles: ["Admin"], exact: true },
   { href: "/admin/reports", label: "Reportes", icon: BarChart3, allowedRoles: ["Admin"], exact: true },
@@ -56,7 +58,7 @@ const navItems: NavItem[] = [
 export function AppSidebarNav() {
   const pathname = usePathname();
   const { state: sidebarState } = useSidebar();
-  const { user } = useAuth(); // Use user object to get role
+  const { user } = useAuth(); 
 
   const isItemActive = (item: NavItem) => {
     if (item.exact) return pathname === item.href;

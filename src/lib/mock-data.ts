@@ -1,26 +1,34 @@
 
-import type { Ticket, Comment, TicketPriority, TicketStatus } from '@/lib/types';
+import type { Ticket, InventoryItem } from '@/lib/types'; // Añadido InventoryItem
 
-// Augment the NodeJS global type to include our custom store
+// --- Almacén de Tickets ---
 declare global {
   // eslint-disable-next-line no-var
   var __mock_tickets_store__: Ticket[] | undefined;
+  // eslint-disable-next-line no-var
+  var __mock_inventory_store__: InventoryItem[] | undefined; // Nuevo almacén para inventario
 }
 
 let ticketsStore_internal: Ticket[];
+let inventoryStore_internal: InventoryItem[]; // Variable para el almacén de inventario
 
 if (process.env.NODE_ENV === 'production') {
   ticketsStore_internal = [];
+  inventoryStore_internal = []; // Inicializar en producción
 } else {
   if (!global.__mock_tickets_store__) {
     global.__mock_tickets_store__ = [];
   }
   ticketsStore_internal = global.__mock_tickets_store__;
+
+  if (!global.__mock_inventory_store__) {
+    global.__mock_inventory_store__ = []; // Inicializar si no existe en global
+  }
+  inventoryStore_internal = global.__mock_inventory_store__;
 }
 
+// --- Funciones para Tickets ---
 export function getAllTicketsFromMock(): Ticket[] {
-  // Return a new sorted array to prevent external mutations of the sort order
-  // and ensure freshness from the store
   return [...ticketsStore_internal].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
@@ -29,21 +37,41 @@ export function getTicketByIdFromMock(id: string): Ticket | null {
 }
 
 export function addTicketToMock(ticket: Ticket): void {
-  // Ensure no duplicate IDs (though current ID gen should be fine for mock)
   const existingIndex = ticketsStore_internal.findIndex(t => t.id === ticket.id);
   if (existingIndex !== -1) {
-    // If somehow an ID collision happens, replace the existing one
     ticketsStore_internal[existingIndex] = ticket;
   } else {
-    ticketsStore_internal.unshift(ticket); // Add to the beginning for chronological reverse order display
+    ticketsStore_internal.unshift(ticket);
   }
 }
 
-// Used by getDashboardStats to ensure it gets the current state of the store
 export function getRawTicketsStoreForStats(): Ticket[] {
   return ticketsStore_internal;
 }
 
-// For legacy compatibility if any part of the code still uses mockTickets directly
-// (should be refactored away)
+// --- Funciones para Inventario ---
+export function getAllInventoryItemsFromMock(): InventoryItem[] {
+  // Ordenar por fecha de creación descendente, por ejemplo
+  return [...inventoryStore_internal].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+export function getInventoryItemByIdFromMock(id: string): InventoryItem | null {
+  return inventoryStore_internal.find(item => item.id === id) || null;
+}
+
+export function addInventoryItemToMock(item: InventoryItem): void {
+  const existingIndex = inventoryStore_internal.findIndex(i => i.id === item.id);
+  if (existingIndex !== -1) {
+    inventoryStore_internal[existingIndex] = item;
+  } else {
+    inventoryStore_internal.unshift(item); // Añadir al principio
+  }
+}
+
+export function getRawInventoryStore(): InventoryItem[] {
+  return inventoryStore_internal;
+}
+
+// Para compatibilidad con código antiguo (debería refactorizarse)
 export const mockTickets: Ticket[] = ticketsStore_internal;
+export const mockInventory: InventoryItem[] = inventoryStore_internal; // Exportar si es necesario para pruebas

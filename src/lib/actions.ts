@@ -2,15 +2,15 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User } from "./types";
-// Import new mock data functions
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem } from "./types"; // Añadido InventoryItem
 import { 
   addTicketToMock, 
   getAllTicketsFromMock, 
   getTicketByIdFromMock,
-  getRawTicketsStoreForStats
+  getRawTicketsStoreForStats,
+  getAllInventoryItemsFromMock, // Nueva importación
+  addInventoryItemToMock // Nueva importación
 } from "./mock-data"; 
-// Removed: import { suggestSolution as genAiSuggestSolution } from "@/ai/flows/suggest-solution";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
 
@@ -37,10 +37,9 @@ export async function createTicketAction(
 
   const { subject, description, priority } = validatedFields.data;
   
-  // Use current length of the store for ID generation
-  const currentTickets = getRawTicketsStoreForStats(); // Get current state for length
+  const currentTickets = getRawTicketsStoreForStats();
   const newTicket: Ticket = {
-    id: (currentTickets.length + 1).toString(),
+    id: (currentTickets.length + 1).toString() + Date.now().toString(), // ID más único
     subject,
     description,
     priority: priority as TicketPriority,
@@ -53,7 +52,7 @@ export async function createTicketAction(
     comments: [],
   };
   
-  addTicketToMock(newTicket); // Use the new function to add to the store
+  addTicketToMock(newTicket);
 
   revalidatePath("/tickets");
   revalidatePath(`/tickets/${newTicket.id}`);
@@ -86,13 +85,13 @@ export async function addCommentAction(
     };
   }
 
-  const ticket = getTicketByIdFromMock(ticketId); // Use new function
+  const ticket = getTicketByIdFromMock(ticketId);
   if (!ticket) {
     return { success: false, message: "Ticket no encontrado." };
   }
 
   const newComment: Comment = {
-    id: `comment-${ticketId}-${ticket.comments.length + 1}-${Date.now()}`, // Added Date.now() for more unique ID
+    id: `comment-${ticketId}-${ticket.comments.length + 1}-${Date.now()}`,
     text: validatedFields.data.text,
     userId: commenter.id,
     userName: commenter.name,
@@ -100,8 +99,6 @@ export async function addCommentAction(
     createdAt: new Date(),
   };
 
-  // Direct mutation is okay here because getTicketByIdFromMock returns a reference
-  // to the object within the persistent store (for dev).
   ticket.comments.push(newComment);
   ticket.updatedAt = new Date();
   
@@ -136,12 +133,11 @@ export async function updateTicketStatusAction(
     };
   }
   
-  const ticket = getTicketByIdFromMock(ticketId); // Use new function
+  const ticket = getTicketByIdFromMock(ticketId);
   if (!ticket) {
     return { success: false, message: "Ticket no encontrado." };
   }
 
-  // Direct mutation is okay here
   ticket.status = validatedFields.data.status as TicketStatus;
   ticket.updatedAt = new Date();
 
@@ -163,24 +159,19 @@ export async function updateTicketStatusAction(
   };
 }
 
-
-// --- AI Solution Suggestion Function (Removed) ---
-// export async function getAISolutionSuggestion(ticketDescription: string) { ... }
-
-
 // --- Fetch Ticket by ID ---
 export async function getTicketById(ticketId: string): Promise<Ticket | null> {
-  return getTicketByIdFromMock(ticketId); // Use new function
+  return getTicketByIdFromMock(ticketId);
 }
 
 // --- Fetch All Tickets ---
 export async function getAllTickets(): Promise<Ticket[]> {
-  return getAllTicketsFromMock(); // Use new function
+  return getAllTicketsFromMock();
 }
 
 // --- Fetch Dashboard Stats ---
 export async function getDashboardStats() {
-  const currentTickets = getRawTicketsStoreForStats(); // Use new function to get raw data
+  const currentTickets = getRawTicketsStoreForStats();
   
   const total = currentTickets.length;
   const open = currentTickets.filter(t => t.status === "Open").length;
@@ -206,3 +197,15 @@ export async function getDashboardStats() {
     stats: { byPriority, byStatus },
   };
 }
+
+// --- Inventory Actions ---
+
+// Fetch All Inventory Items
+export async function getAllInventoryItems(): Promise<InventoryItem[]> {
+  // Simular un pequeño retraso como si fuera una API real
+  await new Promise(resolve => setTimeout(resolve, 200)); 
+  return getAllInventoryItemsFromMock();
+}
+
+// (El esquema para añadir artículos del inventario se definirá cuando creemos el formulario)
+// export async function addInventoryItemAction(...) { ... }
