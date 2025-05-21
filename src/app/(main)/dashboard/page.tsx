@@ -1,49 +1,146 @@
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Ticket, CheckCircle, AlertTriangle, Clock } from "lucide-react";
-import { getDashboardStats } from "@/lib/actions";
-import { TicketStatsCharts } from "@/components/dashboard/ticket-stats-charts";
-import type { TicketSummary, TicketStats } from "@/lib/types";
+"use client";
 
-export const dynamic = 'force-dynamic'; // Ensure fresh data on every request
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/lib/auth-context';
+import { getAllTickets } from '@/lib/actions';
+import type { Ticket, TicketPriority } from '@/lib/types';
+import { TicketListItem } from '@/components/tickets/ticket-list-item';
+import { Loader2, Ticket as TicketIcon, ListChecks, AlertCircle } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
-function StatCard({ title, value, icon, description, colorClass = "text-primary" }: { title: string, value: string | number, icon: React.ElementType, description: string, colorClass?: string }) {
-  const IconComponent = icon;
-  return (
-    <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <IconComponent className={`h-5 w-5 ${colorClass}`} />
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
-  );
-}
+export default function DashboardPage() {
+  const { user, role } = useAuth();
+  const [allTickets, setAllTickets] = useState<Ticket[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-export default async function DashboardPage() {
-  const { summary, stats } = await getDashboardStats();
+  useEffect(() => {
+    async function fetchTickets() {
+      if (user) {
+        setIsLoading(true);
+        try {
+          const tickets = await getAllTickets();
+          setAllTickets(tickets);
+        } catch (error) {
+          console.error("Error fetching tickets:", error);
+          // Optionally, set an error state here to display to the user
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    }
+    fetchTickets();
+  }, [user]);
+
+  const priorityOrder: Record<TicketPriority, number> = { High: 0, Medium: 1, Low: 2 };
+
+  const adminOpenTickets = role === 'Admin'
+    ? allTickets
+        .filter(ticket => ticket.status === "Open")
+        .sort((a, b) => {
+          if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+            return priorityOrder[a.priority] - priorityOrder[b.priority];
+          }
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); // Newest first
+        })
+    : [];
+
+  const userCreatedTickets = role === 'User'
+    ? allTickets
+        .filter(ticket => ticket.userId === user?.id)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) // Newest first
+    : [];
+  
+  if (isLoading && !user) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (!user) {
+    // This case should ideally be handled by the layout redirecting to login
+    return <div className="p-8 text-center">Por favor, inicia sesión para ver el dashboard.</div>;
+  }
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Bienvenido/a, {user.name}!
+        </h1>
         <p className="text-muted-foreground">
-          ¡Bienvenido! Aquí tienes un resumen de tus tickets de soporte.
+          {role === 'Admin'
+            ? "Aquí tienes un resumen de los tickets abiertos que requieren tu atención."
+            : "Aquí puedes ver el estado de los tickets que has creado."}
         </p>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Tickets Totales" value={summary.total} icon={Ticket} description="Todos los tickets creados" />
-        <StatCard title="Tickets Abiertos" value={summary.open} icon={AlertTriangle} description="Tickets que necesitan atención" colorClass="text-destructive" />
-        <StatCard title="En Progreso" value={summary.inProgress} icon={Clock} description="Tickets en los que se está trabajando" colorClass="text-yellow-500" />
-        <StatCard title="Tickets Resueltos" value={summary.resolved + summary.closed} icon={CheckCircle} description="Tickets resueltos o cerrados exitosamente" colorClass="text-green-500" />
-      </div>
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center p-8">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="mt-2 text-muted-foreground">Cargando tickets...</p>
+        </div>
+      )}
 
-      <TicketStatsCharts stats={stats} />
-      
+      {!isLoading && role === 'Admin' && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <AlertCircle className="mr-2 h-6 w-6 text-destructive" />
+              Tickets Abiertos (Prioridad Alta Primero)
+            </CardTitle>
+            <CardDescription>
+              Estos son todos los tickets actualmente abiertos, ordenados por urgencia.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {adminOpenTickets.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">
+                <ListChecks className="mx-auto h-12 w-12 mb-3" />
+                <p className="font-semibold">¡Todo al día!</p>
+                <p>No hay tickets abiertos actualmente.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {adminOpenTickets.map(ticket => (
+                  <TicketListItem key={ticket.id} ticket={ticket} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && role === 'User' && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <TicketIcon className="mr-2 h-6 w-6 text-primary" />
+              Mis Tickets Creados
+            </CardTitle>
+            <CardDescription>
+              Aquí puedes ver el estado de todos los tickets que has enviado.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {userCreatedTickets.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">
+                <TicketIcon className="mx-auto h-12 w-12 mb-3" />
+                 <p className="font-semibold">No has creado tickets aún.</p>
+                 <p>Puedes crear uno desde la sección de "Tickets".</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {userCreatedTickets.map(ticket => (
+                  <TicketListItem key={ticket.id} ticket={ticket} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
