@@ -22,7 +22,7 @@ import {
   Settings,
   BarChart3,
   HelpCircle,
-  Archive // Icono para Inventario
+  Archive
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { Role } from "@/lib/types";
@@ -47,7 +47,7 @@ const navItems: NavItem[] = [
       { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true },
     ]
   },
-  { href: "/inventory", label: "Inventario", icon: Archive, exact: true }, // Nuevo enlace de Inventario
+  { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] }, // Restringido a Admin
   { href: "/profile", label: "Perfil", icon: User, exact: true },
   { href: "/admin/users", label: "Gestión de Usuarios", icon: Users, allowedRoles: ["Admin"], exact: true },
   { href: "/admin/reports", label: "Reportes", icon: BarChart3, allowedRoles: ["Admin"], exact: true },

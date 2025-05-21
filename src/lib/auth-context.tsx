@@ -8,11 +8,7 @@ import { useRouter } from "next/navigation";
 // Mock users - in a real app, this would come from a database
 // This list is now also used for the User Management page.
 export const mockUsers: User[] = [
-  { id: "1", name: "Admin User", email: "admin@example.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=AU", department: "Administracion" },
-  { id: "2", name: "Regular User", email: "user@example.com", role: "User", avatarUrl: "https://placehold.co/100x100.png?text=RU", department: "Laboratorio" },
   { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC", department: "Gerencia" },
-  { id: '4', name: 'Alice Wonderland', email: 'alice@example.com', role: 'User', avatarUrl: 'https://placehold.co/40x40.png?text=AW', department: "Radiologia" },
-  { id: '5', name: 'Bob The Builder', email: 'bob@example.com', role: 'User', avatarUrl: 'https://placehold.co/40x40.png?text=BB' }, // No department initially
 ];
 
 interface AuthContextType {
@@ -40,10 +36,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUser = localStorage.getItem("ticketflow_user");
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser) as User;
+        // Find user from the potentially updated mockUsers array
         const existingUser = mockUsers.find(u => u.id === parsedUser.id);
         if (existingUser) {
-          setUser(existingUser);
+          setUser(existingUser); // Use the current version from mockUsers
         } else {
+           // If user from localStorage is not in mockUsers (e.g., after cleanup), clear it
           localStorage.removeItem("ticketflow_user"); 
         }
       }
@@ -132,10 +130,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     const updatedUserData = { ...mockUsers[userIndex], ...data };
-    // If "Sin Departamento" was chosen (represented by an empty string from the form), store it as undefined.
-    if (data.department === "") {
+    
+    // Correctly handle "Sin Departamento" which is stored as undefined
+    if (data.department === "_NO_DEPARTMENT_") { // Check against the special value from the form
         updatedUserData.department = undefined;
+    } else if (data.department !== undefined) { // Explicitly set department if provided
+        updatedUserData.department = data.department;
     }
+
 
     mockUsers[userIndex] = updatedUserData;
 

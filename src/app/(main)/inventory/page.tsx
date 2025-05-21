@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Archive, PlusCircle, Loader2, Pencil, Trash2, Eye } from "lucide-react"; // Added Eye
+import { Archive, PlusCircle, Loader2, Pencil, Trash2, Eye, ShieldAlert } from "lucide-react";
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAllInventoryItems, deleteInventoryItemAction } from "@/lib/actions";
 import type { InventoryItem } from "@/lib/types";
@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import { AddItemDialog } from '@/components/inventory/add-item-dialog';
 import { EditItemDialog } from '@/components/inventory/edit-item-dialog';
 import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
-import { ViewItemDetailsDialog } from '@/components/inventory/view-item-details-dialog'; // Import ViewItemDetailsDialog
+import { ViewItemDetailsDialog } from '@/components/inventory/view-item-details-dialog';
 import { InventoryFilters } from '@/components/inventory/inventory-filters';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
 
 const getInitialsForItem = (name: string) => {
   if (!name) return '??';
@@ -39,7 +40,7 @@ const statusColors: Record<InventoryItem["status"], string> = {
 
 
 export default function InventoryPage() {
-  const { user } = useAuth();
+  const { user, role, isLoading: authIsLoading } = useAuth();
   const { toast } = useToast();
   const [allItems, setAllItems] = useState<InventoryItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<InventoryItem[]>([]);
@@ -66,8 +67,10 @@ export default function InventoryPage() {
   }, []);
 
   useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+    if (role === "Admin") {
+      fetchItems();
+    }
+  }, [fetchItems, role]);
 
   useEffect(() => {
     let itemsToFilter = [...allItems];
@@ -125,6 +128,29 @@ export default function InventoryPage() {
     setSelectedItemForView(null);
     setIsViewDetailsDialogVisible(false);
   };
+
+  if (authIsLoading) {
+    return (
+      <div className="flex items-center justify-center p-8 min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-3 text-muted-foreground">Verificando acceso...</p>
+      </div>
+    );
+  }
+
+  if (role !== "Admin") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4">
+        <Alert variant="destructive" className="max-w-md text-center shadow-lg">
+          <ShieldAlert className="h-8 w-8 mx-auto mb-3 text-destructive" />
+          <RadixAlertTitle className="text-xl font-bold">Acceso Denegado</RadixAlertTitle>
+          <AlertDescription className="mb-4">
+            No tienes permiso para acceder al Inventario. Esta área está restringida a administradores.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
