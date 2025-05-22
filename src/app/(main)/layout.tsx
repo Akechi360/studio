@@ -43,10 +43,8 @@ export default function MainAppLayout({
             <AppHeader />
             <div className="flex flex-1">
                 <AppSidebar />
-                <SidebarInset>
-                <main className="flex-1 p-4 md:p-6 lg:p-8 bg-background">
+                <SidebarInset className="p-4 md:p-6 lg:p-8">
                     {children}
-                </main>
                 </SidebarInset>
             </div>
             </div>
