@@ -21,43 +21,49 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import { APP_NAME } from '@/lib/constants';
-import { LogIn, Loader2, Hospital } from 'lucide-react';
+import { KeyRound, Loader2, Hospital, ShieldQuestion } from 'lucide-react';
 
-const loginFormSchema = z.object({
+const forgotPasswordFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
-  password: z.string().min(1, { message: "La contraseña es obligatoria." }), 
+  newPassword: z.string().min(6, { message: "La nueva contraseña debe tener al menos 6 caracteres." }),
+  confirmPassword: z.string().min(6, { message: "La confirmación de contraseña debe tener al menos 6 caracteres." }),
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: "Las contraseñas no coinciden.",
+  path: ["confirmPassword"],
 });
 
-type LoginFormValues = z.infer<typeof loginFormSchema>;
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordFormSchema>;
 
-export default function LoginPage() {
-  const { login } = useAuth();
+export default function ForgotPasswordPage() {
+  const { resetPasswordByEmail } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginFormSchema),
+  const form = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordFormSchema),
     defaultValues: {
       email: "",
-      password: "",
+      newPassword: "",
+      confirmPassword: "",
     },
   });
 
-  async function onSubmit(data: LoginFormValues) {
+  async function onSubmit(data: ForgotPasswordFormValues) {
     setIsLoading(true);
-    const success = await login(data.email, data.password);
+    const result = await resetPasswordByEmail(data.email, data.newPassword);
     setIsLoading(false);
-    if (success) {
+    if (result.success) {
       toast({
-        title: "Inicio de Sesión Exitoso",
-        description: "¡Bienvenido de nuevo!",
+        title: "Contraseña Restablecida",
+        description: result.message || "Tu contraseña ha sido actualizada exitosamente. Por favor, inicia sesión.",
       });
-      router.push("/dashboard");
+      form.reset();
+      router.push("/login");
     } else {
       toast({
-        title: "Fallo en el Inicio de Sesión",
-        description: "Correo electrónico o contraseña no válidos. Por favor, inténtalo de nuevo.",
+        title: "Fallo al Restablecer Contraseña",
+        description: result.message || "No se pudo restablecer la contraseña. Verifica el correo e inténtalo de nuevo.",
         variant: "destructive",
       });
     }
@@ -68,10 +74,10 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-             <Hospital className="h-8 w-8" />
+             <ShieldQuestion className="h-8 w-8" />
           </div>
-          <CardTitle className="text-3xl font-bold">{APP_NAME}</CardTitle>
-          <CardDescription>Inicia sesión para acceder a tus tickets y panel de control.</CardDescription>
+          <CardTitle className="text-3xl font-bold">Restablecer Contraseña</CardTitle>
+          <CardDescription>Ingresa tu correo y tu nueva contraseña.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -81,7 +87,7 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Correo Electrónico</FormLabel>
+                    <FormLabel>Correo Electrónico Registrado</FormLabel>
                     <FormControl>
                       <Input placeholder="tu@ejemplo.com" {...field} />
                     </FormControl>
@@ -91,18 +97,23 @@ export default function LoginPage() {
               />
               <FormField
                 control={form.control}
-                name="password"
+                name="newPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <div className="flex items-center justify-between">
-                        <FormLabel>Contraseña</FormLabel>
-                        <Link
-                            href="/forgot-password"
-                            className="text-sm font-medium text-primary hover:underline"
-                        >
-                            ¿Olvidó su contraseña?
-                        </Link>
-                    </div>
+                    <FormLabel>Nueva Contraseña</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar Nueva Contraseña</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
@@ -114,18 +125,18 @@ export default function LoginPage() {
                 {isLoading ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <LogIn className="mr-2 h-4 w-4" />
+                  <KeyRound className="mr-2 h-4 w-4" />
                 )}
-                Iniciar Sesión
+                Restablecer Contraseña
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2">
             <p className="text-sm text-muted-foreground">
-                ¿No tienes una cuenta?{" "}
-                <Link href="/register" className="font-medium text-primary hover:underline">
-                    Regístrate
+                ¿Recordaste tu contraseña?{" "}
+                <Link href="/login" className="font-medium text-primary hover:underline">
+                    Iniciar Sesión
                 </Link>
             </p>
         </CardFooter>

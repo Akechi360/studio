@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { logAuditEvent } from "@/lib/actions"; // Import the server action
 
 export const mockUsers: User[] = [
-  { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC", department: "Gerencia", password: "adminpassword" },
+  { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC", department: "Sistemas", password: "adminpassword" },
 ];
 
 interface AuthContextType {
@@ -19,6 +19,7 @@ interface AuthContextType {
   register: (name: string, email: string, pass: string) => Promise<boolean>; 
   updateProfile: (name: string, email: string) => Promise<boolean>;
   updateSelfPassword: (newPassword: string) => Promise<boolean>;
+  resetPasswordByEmail: (email: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   getAllUsers: () => User[];
   updateUserByAdmin: (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>) => Promise<{ success: boolean; message?: string }>;
   deleteUserByAdmin: (userId: string) => Promise<{ success: boolean; message: string }>;
@@ -69,9 +70,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    // if (user?.email) { // Log before clearing user
-    //   logAuditEvent(user.email, "Cierre de Sesión");
-    // }
+    if (user?.email) { // Log before clearing user
+       logAuditEvent(user.email, "Cierre de Sesión");
+    }
     setUser(null);
     localStorage.removeItem("ticketflow_user");
     router.push("/login");
@@ -142,6 +143,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
+  const resetPasswordByEmail = async (email: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const userIndex = mockUsers.findIndex(u => u.email === email);
+    if (userIndex !== -1) {
+      mockUsers[userIndex].password = newPassword;
+      setIsLoading(false);
+      await logAuditEvent(email, "Restablecimiento de Contraseña (Olvidó Contraseña)", `Contraseña actualizada para ${email}`);
+      return { success: true, message: "Contraseña actualizada exitosamente." };
+    }
+    setIsLoading(false);
+    await logAuditEvent(email, "Intento Fallido de Restablecimiento de Contraseña", `Correo no encontrado: ${email}`);
+    return { success: false, message: "Correo electrónico no encontrado." };
+  };
+
   const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>): Promise<{ success: boolean; message?: string }> => {
     if (!user || user.role !== "Admin") {
       return { success: false, message: "Acción no permitida." };
@@ -171,6 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (data.password && data.password.trim() !== "") {
       updatedUserData.password = data.password;
     } else {
+      // If password field is empty, keep the existing password
       updatedUserData.password = mockUsers[userIndex].password; 
     }
 
@@ -182,11 +199,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (data.name && data.name !== targetUserOriginal.name) changes.push(`Nombre de '${targetUserOriginal.name}' a '${data.name}'`);
     if (data.email && data.email !== targetUserOriginal.email) changes.push(`Email de '${targetUserOriginal.email}' a '${data.email}'`);
     if (data.role && data.role !== targetUserOriginal.role) changes.push(`Rol de '${targetUserOriginal.role}' a '${data.role}'`);
-    if (data.department !== targetUserOriginal.department) changes.push(`Departamento de '${targetUserOriginal.department || "N/A"}' a '${data.department || "N/A"}'`);
+    if (data.department !== targetUserOriginal.department) changes.push(`Departamento de '${targetUserOriginal.department || "N/A"}' a '${updatedUserData.department || "N/A"}'`); // Use updatedUserData here
     if (data.password && data.password.trim() !== "" && data.password !== targetUserOriginal.password) changes.push(`Contraseña actualizada.`);
     details += changes.join(', ') || "Sin cambios detectables en campos principales.";
 
-    await logAuditEvent(user.email, "Actualización de Usuario por Administrador", details);
+
+    if (user.email) { // Ensure admin email exists before logging
+        await logAuditEvent(user.email, "Actualización de Usuario por Administrador", details);
+    }
     
     // If admin updates their own info through this, update context user
     if (user && user.id === userId) { 
@@ -210,7 +230,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const deletedUserName = mockUsers[userIndex].name;
       const deletedUserEmail = mockUsers[userIndex].email;
       mockUsers.splice(userIndex, 1);
-      await logAuditEvent(user.email, "Eliminación de Usuario por Administrador", `Usuario: ${deletedUserName} (${deletedUserEmail}), ID: ${userId}`);
+      if (user.email) { // Ensure admin email exists before logging
+        await logAuditEvent(user.email, "Eliminación de Usuario por Administrador", `Usuario: ${deletedUserName} (${deletedUserEmail}), ID: ${userId}`);
+      }
       return { success: true, message: "Usuario eliminado exitosamente." };
     }
     return { success: false, message: "Usuario no encontrado." };
@@ -221,7 +243,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, role: user?.role || null, isLoading, login, logout, register, updateProfile, updateSelfPassword, getAllUsers, updateUserByAdmin, deleteUserByAdmin }}>
+    <AuthContext.Provider value={{ user, role: user?.role || null, isLoading, login, logout, register, updateProfile, updateSelfPassword, resetPasswordByEmail, getAllUsers, updateUserByAdmin, deleteUserByAdmin }}>
       {children}
     </AuthContext.Provider>
   );
@@ -234,4 +256,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
