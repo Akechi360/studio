@@ -121,7 +121,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-8 w-full">
+    <div className="space-y-8"> {/* Removed w-full */}
       <div className="flex flex-col items-start">
         <h1 className="text-3xl font-bold tracking-tight flex items-center"><UserCircle2 className="mr-3 h-8 w-8 text-primary" />Tu Perfil</h1>
         <p className="text-muted-foreground">
@@ -129,7 +129,7 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      <Card className="w-full shadow-xl">
+      <Card className="shadow-xl"> {/* Removed w-full */}
         <CardHeader className="items-center text-center">
           <Avatar className="h-24 w-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
             <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} data-ai-hint="foto perfil"/>
@@ -167,7 +167,7 @@ export default function ProfilePage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full sm:w-auto" disabled={isSubmittingProfile || authLoading}>
+              <Button type="submit" className="sm:w-auto" disabled={isSubmittingProfile || authLoading}>
                 {isSubmittingProfile ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -180,7 +180,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="w-full shadow-xl">
+      <Card className="shadow-xl"> {/* Removed w-full */}
         <CardHeader>
           <CardTitle className="text-xl flex items-center">
             <Lock className="mr-2 h-5 w-5 text-primary" />
@@ -219,7 +219,7 @@ export default function ProfilePage() {
                   </FormItem>
                 )}
               />
-               <Button type="submit" className="w-full sm:w-auto" disabled={isSubmittingPassword || authLoading}>
+               <Button type="submit" className="sm:w-auto" disabled={isSubmittingPassword || authLoading}>
                 {isSubmittingPassword ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (

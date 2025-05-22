@@ -100,8 +100,8 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
   };
 
   return (
-    <div className="space-y-8 w-full">
-      <Card className="w-full shadow-xl">
+    <div className="space-y-8"> {/* Removed w-full */}
+      <Card className="shadow-xl"> {/* Removed w-full */}
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -181,7 +181,7 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
         </CardContent>
       </Card>
 
-      <Card className="w-full shadow-xl">
+      <Card className="shadow-xl"> {/* Removed w-full */}
         <CardHeader>
           <CardTitle className="text-2xl flex items-center"><MessageSquare className="h-6 w-6 mr-2 text-primary"/>Comentarios ({ticket.comments.length})</CardTitle>
         </CardHeader>

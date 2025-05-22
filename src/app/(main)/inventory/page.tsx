@@ -157,7 +157,7 @@ export default function InventoryPage() {
 
   return (
     <TooltipProvider>
-    <div className="space-y-8 w-full">
+    <div className="space-y-8"> {/* Removed w-full */}
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center">
@@ -178,7 +178,7 @@ export default function InventoryPage() {
 
       <InventoryFilters allItems={allItems} onFilterChange={handleFilterChange} />
 
-      <Card className="w-full shadow-lg">
+      <Card className="shadow-lg"> {/* Removed w-full */}
         <CardHeader>
           <CardTitle>Lista de Artículos</CardTitle>
           <CardDescription>Visualiza los artículos del inventario según los filtros aplicados. Haz clic en el nombre para ver detalles.</CardDescription>

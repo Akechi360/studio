@@ -71,7 +71,7 @@ export function TicketForm({
 
 
   return (
-    <Card className="w-full shadow-xl">
+    <Card className="shadow-xl"> {/* Removed w-full */}
       <CardHeader>
         <CardTitle className="text-2xl">Crear un Nuevo Ticket de Soporte</CardTitle>
         <CardDescription>Por favor, completa el siguiente formulario para enviar tu solicitud de soporte. Proporciona tantos detalles como sea posible.</CardDescription>
@@ -143,7 +143,7 @@ export function TicketForm({
               )}
             />
             
-            <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
+            <Button type="submit" className="sm:w-auto" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (

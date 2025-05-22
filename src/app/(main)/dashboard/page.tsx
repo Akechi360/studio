@@ -63,7 +63,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8 w-full">
+    <div className="space-y-8"> {/* Removed w-full */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
           Bienvenido/a, {user.name}!
@@ -83,7 +83,7 @@ export default function DashboardPage() {
       )}
 
       {!isLoading && role === 'Admin' && (
-        <Card className="w-full shadow-lg">
+        <Card className="shadow-lg"> {/* Removed w-full */}
           <CardHeader>
             <CardTitle className="flex items-center">
               <AlertCircle className="mr-2 h-6 w-6 text-destructive" />
@@ -112,7 +112,7 @@ export default function DashboardPage() {
       )}
 
       {!isLoading && role === 'User' && (
-        <Card className="w-full shadow-lg">
+        <Card className="shadow-lg"> {/* Removed w-full */}
           <CardHeader>
             <CardTitle className="flex items-center">
               <TicketIcon className="mr-2 h-6 w-6 text-primary" />

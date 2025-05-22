@@ -109,7 +109,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-8 w-full">
+    <div className="space-y-8"> {/* Removed w-full */}
       <div className="flex flex-col space-y-2 items-start">
         <h1 className="text-3xl font-bold tracking-tight flex items-center"><SettingsIcon className="mr-3 h-8 w-8 text-primary" />Configuración General</h1>
         <p className="text-muted-foreground">
@@ -117,7 +117,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Card className="w-full shadow-lg">
+      <Card className="shadow-lg"> {/* Removed w-full */}
         <CardHeader>
           <CardTitle className="flex items-center"><BellRing className="mr-2 h-5 w-5 text-primary"/>Preferencias de Notificación</CardTitle>
           <CardDescription>Gestiona cómo recibes las notificaciones por correo electrónico (simuladas).</CardDescription>
@@ -155,7 +155,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
       
-      <Card className="w-full shadow-lg">
+      <Card className="shadow-lg"> {/* Removed w-full */}
         <CardHeader>
           <CardTitle className="flex items-center"><Paintbrush className="mr-2 h-5 w-5 text-primary"/>Personalización de la Aplicación</CardTitle>
           <CardDescription>Ajusta la apariencia y el nombre de la aplicación.</CardDescription>
