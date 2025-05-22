@@ -178,7 +178,7 @@ export default function InventoryPage() {
 
       <InventoryFilters allItems={allItems} onFilterChange={handleFilterChange} />
 
-      <Card className="shadow-lg">
+      <Card className="w-full shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Artículos</CardTitle>
           <CardDescription>Visualiza los artículos del inventario según los filtros aplicados. Haz clic en el nombre para ver detalles.</CardDescription>

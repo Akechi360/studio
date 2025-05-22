@@ -49,7 +49,7 @@ export function InventoryFilters({ allItems, onFilterChange }: InventoryFiltersP
   const departmentOptions = uniqueLocations; 
 
   return (
-    <Card className="mb-6 shadow-md border-border/50">
+    <Card className="w-full mb-6 shadow-md border-border/50">
         <CardHeader className="pb-4">
             <CardTitle className="text-xl">Filtrar Inventario</CardTitle>
         </CardHeader>

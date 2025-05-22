@@ -117,7 +117,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Card className="shadow-lg">
+      <Card className="w-full shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center"><BellRing className="mr-2 h-5 w-5 text-primary"/>Preferencias de Notificación</CardTitle>
           <CardDescription>Gestiona cómo recibes las notificaciones por correo electrónico (simuladas).</CardDescription>
@@ -155,7 +155,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
       
-      <Card className="shadow-lg">
+      <Card className="w-full shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center"><Paintbrush className="mr-2 h-5 w-5 text-primary"/>Personalización de la Aplicación</CardTitle>
           <CardDescription>Ajusta la apariencia y el nombre de la aplicación.</CardDescription>
