@@ -44,7 +44,7 @@ const navItems: NavItem[] = [
     label: "Tickets", 
     icon: Ticket,
     subItems: [
-      { href: "/tickets", label: "Todos los Tickets", icon: Ticket, exact: true }, // Cambiado icono para diferenciar
+      { href: "/tickets", label: "Todos los Tickets", icon: Ticket, exact: true },
       { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true },
     ]
   },
@@ -101,7 +101,7 @@ export function AppSidebarNav() {
                 isActive={isActive}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-current={isActive ? "page" : undefined}
-                className={item.subItems && item.href === "#" ? "cursor-default hover:bg-transparent dark:hover:bg-transparent hover:text-sidebar-foreground dark:hover:text-sidebar-foreground" : ""}
+                className={item.subItems && item.href === "#" ? "cursor-default" : ""}
               >
                 <Icon className="shrink-0" />
                 <span className={sidebarState === "collapsed" ? "sr-only" : ""}>
