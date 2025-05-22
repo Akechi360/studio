@@ -8,78 +8,99 @@ body {
 
 @layer base {
   :root {
-    --background: 210 20% 95%; /* Light blue-gray (#F0F4F8 is closer to HSL(210,20%,95%)) */
-    --foreground: 210 15% 25%; /* Darker blue-gray for text on background */
-    --card: 0 0% 100%;
-    --card-foreground: 210 15% 25%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 210 15% 25%;
-    --primary: 210 70% 50%; /* Vibrant blue */
-    --primary-foreground: 0 0% 100%; /* White */
-    --secondary: 210 20% 90%;
-    --secondary-foreground: 210 15% 25%;
-    --muted: 210 20% 85%;
-    --muted-foreground: 210 15% 45%;
-    --accent: 180 60% 40%; /* Turquoise */
-    --accent-foreground: 0 0% 100%; /* White */
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 210 20% 80%;
-    --input: 210 20% 92%; /* Slightly lighter than background for input fields */
-    --ring: 210 70% 50%; /* Primary color for rings */
-    --chart-1: 210 70% 50%;
-    --chart-2: 180 60% 40%;
-    --chart-3: 25 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* Minimalist Teal Theme - Light Mode */
+    --background: 180 30% 97%; /* Very light, almost white, cool cyan tint */
+    --foreground: 190 40% 22%; /* Dark teal (Casal), slightly darker for text */
+    
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 190 40% 22%; /* Dark teal text on cards */
+    
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 190 40% 22%; /* Dark teal text on popovers */
+    
+    --primary: 175 48% 50%; /* Lighter teal (Java) for primary actions */
+    --primary-foreground: 0 0% 100%; /* White text on primary for high contrast */
+    
+    --secondary: 180 20% 92%; /* Light cool gray for secondary backgrounds */
+    --secondary-foreground: 190 35% 35%; /* Muted dark teal for text on secondary */
+    
+    --muted: 180 15% 94%; /* Very light cool gray, for subtle elements */
+    --muted-foreground: 190 30% 50%; /* Medium dark teal for muted text */
+    
+    --accent: 175 48% 50%; /* Lighter teal (Java), same as primary for minimalism */
+    --accent-foreground: 0 0% 100%; /* White text on accent */
+    
+    --destructive: 0 70% 50%; /* Standard red for destructive actions */
+    --destructive-foreground: 0 0% 100%; /* White text on destructive */
+    
+    --border: 180 20% 88%; /* Light cool gray border */
+    --input: 180 25% 95%; /* Input background, slightly off-white with cyan tint */
+    --ring: 175 48% 50%; /* Lighter teal (Java) for focus rings */
+
+    --chart-1: 175 48% 50%; /* Primary teal */
+    --chart-2: 190 40% 35%; /* Darker teal */
+    --chart-3: 175 48% 65%; /* Lighter primary teal */
+    --chart-4: 190 30% 50%; /* Mid-tone dark teal */
+    --chart-5: 180 10% 70%; /* Cool gray */
+    
     --radius: 0.5rem;
 
     /* Sidebar specific colors - Light Mode */
-    --sidebar-background: 210 20% 92%;
-    --sidebar-foreground: 210 15% 25%;
-    --sidebar-primary: 210 70% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 180 60% 40%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 210 20% 75%;
-    --sidebar-ring: 210 70% 50%;
+    --sidebar-background: 180 25% 94%; /* Slightly darker than main background */
+    --sidebar-foreground: 190 40% 22%; /* Dark teal text */
+    --sidebar-primary: 175 48% 50%; /* Lighter teal (Java) */
+    --sidebar-primary-foreground: 0 0% 100%; /* White */
+    --sidebar-accent: 175 48% 50%; /* Lighter teal (Java) */
+    --sidebar-accent-foreground: 0 0% 100%; /* White */
+    --sidebar-border: 180 20% 85%; /* Border for sidebar */
+    --sidebar-ring: 175 48% 50%; /* Lighter teal (Java) for rings */
   }
 
   .dark {
-    --background: 210 15% 10%; /* Dark blue-gray */
-    --foreground: 210 15% 90%; /* Light blue-gray text */
-    --card: 210 15% 12%;
-    --card-foreground: 210 15% 90%;
-    --popover: 210 15% 10%;
-    --popover-foreground: 210 15% 90%;
-    --primary: 210 70% 55%; /* Vibrant blue, slightly lighter for dark mode */
-    --primary-foreground: 210 70% 10%; /* Dark blue for text on primary */
-    --secondary: 210 15% 20%;
-    --secondary-foreground: 210 15% 90%;
-    --muted: 210 15% 25%;
-    --muted-foreground: 210 15% 60%;
-    --accent: 180 60% 45%; /* Turquoise, slightly lighter for dark mode */
-    --accent-foreground: 180 60% 10%; /* Dark turquoise for text on accent */
-    --destructive: 0 60% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 210 15% 25%;
-    --input: 210 15% 18%; /* Darker input fields */
-    --ring: 210 70% 55%; /* Primary color for rings in dark mode */
-    --chart-1: 210 70% 55%;
-    --chart-2: 180 60% 45%;
-    --chart-3: 25 70% 60%;
-    --chart-4: 280 60% 65%;
-    --chart-5: 340 70% 60%;
+    /* Minimalist Teal Theme - Dark Mode */
+    --background: 190 30% 12%; /* Very dark teal (based on Casal) */
+    --foreground: 180 20% 90%; /* Light cool gray for text */
+
+    --card: 190 28% 15%; /* Slightly lighter dark teal for cards */
+    --card-foreground: 180 20% 90%; /* Light cool gray text on cards */
+
+    --popover: 190 28% 15%; /* Popover background */
+    --popover-foreground: 180 20% 90%; /* Popover text */
+
+    --primary: 175 48% 55%; /* Lighter teal (Java), slightly brightened for dark mode */
+    --primary-foreground: 190 40% 10%; /* Very dark teal for text on primary buttons */
+
+    --secondary: 190 25% 20%; /* Muted dark teal for secondary elements */
+    --secondary-foreground: 180 15% 80%; /* Lighter cool gray text on secondary */
+
+    --muted: 190 25% 22%; /* Slightly different muted dark teal */
+    --muted-foreground: 180 15% 65%; /* Medium cool gray text for muted */
+
+    --accent: 175 48% 55%; /* Lighter teal (Java), same as primary */
+    --accent-foreground: 190 40% 10%; /* Very dark teal for text on accent */
+
+    --destructive: 0 60% 50%; /* Standard red for destructive actions */
+    --destructive-foreground: 0 0% 100%; /* White text on destructive */
+
+    --border: 190 25% 25%; /* Border color in dark mode */
+    --input: 190 28% 18%; /* Input background, slightly distinct from card */
+    --ring: 175 48% 55%; /* Lighter teal (Java) for focus rings */
+    
+    --chart-1: 175 48% 55%;
+    --chart-2: 190 40% 70%; /* Lighter shade of dark teal for dark mode chart */
+    --chart-3: 175 48% 40%; /* Darker shade of primary teal for dark mode */
+    --chart-4: 190 30% 60%;
+    --chart-5: 180 10% 50%;
 
     /* Sidebar specific colors - Dark Mode */
-    --sidebar-background: 210 15% 8%;
-    --sidebar-foreground: 210 15% 85%;
-    --sidebar-primary: 210 70% 55%;
-    --sidebar-primary-foreground: 210 70% 10%;
-    --sidebar-accent: 180 60% 45%;
-    --sidebar-accent-foreground: 180 60% 10%;
-    --sidebar-border: 210 15% 20%;
-    --sidebar-ring: 210 70% 55%;
+    --sidebar-background: 190 30% 10%; /* Slightly darker than main dark background */
+    --sidebar-foreground: 180 20% 90%; /* Light cool gray text */
+    --sidebar-primary: 175 48% 55%; /* Lighter teal (Java) */
+    --sidebar-primary-foreground: 190 40% 10%; /* Very dark teal text */
+    --sidebar-accent: 175 48% 55%; /* Lighter teal (Java) */
+    --sidebar-accent-foreground: 190 40% 10%; /* Very dark teal text */
+    --sidebar-border: 190 25% 20%; /* Sidebar border in dark mode */
+    --sidebar-ring: 175 48% 55%; /* Ring color for sidebar */
   }
 }
 
