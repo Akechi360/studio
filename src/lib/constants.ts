@@ -7,5 +7,4 @@ export const TICKET_STATUSES_ENGLISH: TicketStatus[] = ["Open", "In Progress", "
 export const TICKET_PRIORITIES: string[] = ["Baja", "Media", "Alta"];
 export const TICKET_STATUSES: string[] = ["Abierto", "En Progreso", "Resuelto", "Cerrado"];
 
-export const APP_NAME = "Ticket De Soporte IEQ";
-
+export const APP_NAME = "IEQ Nexo";

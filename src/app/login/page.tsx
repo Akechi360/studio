@@ -71,7 +71,7 @@ export default function LoginPage() {
              <Hospital className="h-8 w-8" />
           </div>
           <CardTitle className="text-3xl font-bold">{APP_NAME}</CardTitle>
-          <CardDescription>Inicia sesión para acceder a tus tickets y panel de control.</CardDescription>
+          <CardDescription>Tu Centro de Soluciones Administrativas.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>

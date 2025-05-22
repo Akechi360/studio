@@ -51,19 +51,21 @@ export default function SettingsPage() {
         setSettings(prev => ({
           ...defaultSettings,
           ...savedSettings,
+          customizationPrefs: { // Ensure appName from constants is the default if not saved
+            ...defaultSettings.customizationPrefs,
+            appName: savedSettings.customizationPrefs?.appName || APP_NAME,
+          },
           notificationPrefs: {
             ...defaultSettings.notificationPrefs,
             ...(savedSettings.notificationPrefs || {}),
           },
-          customizationPrefs: {
-            ...defaultSettings.customizationPrefs,
-            ...(savedSettings.customizationPrefs || {}),
-          },
         }));
       } catch (error) {
         console.error("Error al cargar configuración de admin:", error);
-        setSettings(defaultSettings); 
+        setSettings({...defaultSettings, customizationPrefs: {...defaultSettings.customizationPrefs, appName: APP_NAME }}); 
       }
+    } else {
+         setSettings({...defaultSettings, customizationPrefs: {...defaultSettings.customizationPrefs, appName: APP_NAME }});
     }
   }, []);
 
@@ -85,12 +87,22 @@ export default function SettingsPage() {
   const handleSaveSettings = () => {
     setIsSaving(true);
     localStorage.setItem('adminSettings', JSON.stringify(settings));
+    // Optionally, update the APP_NAME dynamically if needed for immediate effect (more complex)
+    // For now, a page refresh or re-login would show the new name from constants if it's used directly.
     setTimeout(() => {
       setIsSaving(false);
       toast({
         title: "Configuración Guardada",
         description: "Tus preferencias han sido actualizadas.",
       });
+       // If you want the app header to update immediately, you might need to trigger a state update
+       // in a shared context or force a re-render. This is a simple save for now.
+       // For instance, if APP_NAME in constants were a reactive state, this could update it.
+       // Or, if APP_NAME is read from localStorage directly in the header.
+       // As it is, the saved name 'settings.customizationPrefs.appName' is stored,
+       // but APP_NAME constant in src/lib/constants.ts is what is mostly used.
+       // To reflect the change immediately in the header, the header would need to read from settings.
+       // Or, one could update a global state / context variable.
     }, 700);
   };
 
@@ -109,7 +121,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-8"> {/* Removed w-full */}
+    <div className="space-y-8"> 
       <div className="flex flex-col space-y-2 items-start">
         <h1 className="text-3xl font-bold tracking-tight flex items-center"><SettingsIcon className="mr-3 h-8 w-8 text-primary" />Configuración General</h1>
         <p className="text-muted-foreground">
@@ -117,7 +129,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Card className="shadow-lg"> {/* Removed w-full */}
+      <Card className="shadow-lg"> 
         <CardHeader>
           <CardTitle className="flex items-center"><BellRing className="mr-2 h-5 w-5 text-primary"/>Preferencias de Notificación</CardTitle>
           <CardDescription>Gestiona cómo recibes las notificaciones por correo electrónico (simuladas).</CardDescription>
@@ -155,7 +167,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
       
-      <Card className="shadow-lg"> {/* Removed w-full */}
+      <Card className="shadow-lg"> 
         <CardHeader>
           <CardTitle className="flex items-center"><Paintbrush className="mr-2 h-5 w-5 text-primary"/>Personalización de la Aplicación</CardTitle>
           <CardDescription>Ajusta la apariencia y el nombre de la aplicación.</CardDescription>
@@ -171,7 +183,7 @@ export default function SettingsPage() {
               placeholder="Ej: Mi Sistema de Tickets"
             />
             <p className="text-xs text-muted-foreground pt-1">
-              Este nombre se mostrará en la cabecera y páginas de inicio de sesión/registro. (Cambiarlo dinámicamente en toda la app requiere integración adicional).
+              Este nombre se mostrará en la cabecera y páginas de inicio de sesión/registro. (Para que el cambio sea inmediato en la cabecera actual, se requeriría un manejo de estado global).
             </p>
           </div>
         </CardContent>

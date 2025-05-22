@@ -4,6 +4,7 @@ import { Inter, Roboto_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import { Toaster } from '@/components/ui/toaster';
+import { APP_NAME } from '@/lib/constants';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -18,8 +19,8 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Ticket De Soporte IEQ',
-  description: 'Gestión Eficiente de Tickets de Soporte',
+  title: APP_NAME,
+  description: 'Gestión Eficiente de Tickets de Soporte y Soluciones Administrativas',
 };
 
 export default function RootLayout({
@@ -38,4 +39,3 @@ export default function RootLayout({
     </html>
   );
 }
-
