@@ -121,7 +121,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-8"> {/* Removed w-full */}
+    <div className="space-y-8">
       <div className="flex flex-col items-start">
         <h1 className="text-3xl font-bold tracking-tight flex items-center"><UserCircle2 className="mr-3 h-8 w-8 text-primary" />Tu Perfil</h1>
         <p className="text-muted-foreground">
@@ -129,108 +129,110 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      <Card className="shadow-xl"> {/* Removed w-full */}
-        <CardHeader className="items-center text-center">
-          <Avatar className="h-24 w-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
-            <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} data-ai-hint="foto perfil"/>
-            <AvatarFallback className="text-3xl">{getInitials(user.name)}</AvatarFallback>
-          </Avatar>
-          <CardTitle className="text-2xl">{user.name}</CardTitle>
-          <CardDescription>{user.role === "Admin" ? "Administrador" : "Usuario"}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...profileForm}>
-            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
-              <FormField
-                control={profileForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Tu nombre completo" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={profileForm.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Dirección de Correo Electrónico</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="tu.email@ejemplo.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="sm:w-auto" disabled={isSubmittingProfile || authLoading}>
-                {isSubmittingProfile ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                Guardar Cambios de Perfil
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+      <div className="max-w-3xl mx-auto space-y-8"> {/* Centering container */}
+        <Card className="shadow-xl">
+          <CardHeader className="items-center text-center">
+            <Avatar className="h-24 w-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
+              <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} data-ai-hint="foto perfil"/>
+              <AvatarFallback className="text-3xl">{getInitials(user.name)}</AvatarFallback>
+            </Avatar>
+            <CardTitle className="text-2xl">{user.name}</CardTitle>
+            <CardDescription>{user.role === "Admin" ? "Administrador" : "Usuario"}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...profileForm}>
+              <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
+                <FormField
+                  control={profileForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Tu nombre completo" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={profileForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dirección de Correo Electrónico</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="tu.email@ejemplo.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="sm:w-auto" disabled={isSubmittingProfile || authLoading}>
+                  {isSubmittingProfile ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Guardar Cambios de Perfil
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
 
-      <Card className="shadow-xl"> {/* Removed w-full */}
-        <CardHeader>
-          <CardTitle className="text-xl flex items-center">
-            <Lock className="mr-2 h-5 w-5 text-primary" />
-            Cambiar Contraseña
-          </CardTitle>
-          <CardDescription>
-            Actualiza tu contraseña de acceso.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...passwordForm}>
-            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6">
-              <FormField
-                control={passwordForm.control}
-                name="newPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nueva Contraseña</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={passwordForm.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirmar Nueva Contraseña</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <Button type="submit" className="sm:w-auto" disabled={isSubmittingPassword || authLoading}>
-                {isSubmittingPassword ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                Actualizar Contraseña
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+        <Card className="shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center">
+              <Lock className="mr-2 h-5 w-5 text-primary" />
+              Cambiar Contraseña
+            </CardTitle>
+            <CardDescription>
+              Actualiza tu contraseña de acceso.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...passwordForm}>
+              <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6">
+                <FormField
+                  control={passwordForm.control}
+                  name="newPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nueva Contraseña</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={passwordForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirmar Nueva Contraseña</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <Button type="submit" className="sm:w-auto" disabled={isSubmittingPassword || authLoading}>
+                  {isSubmittingPassword ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  Actualizar Contraseña
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div> {/* End of centering container */}
     </div>
   );
 }
