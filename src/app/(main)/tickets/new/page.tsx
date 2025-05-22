@@ -15,7 +15,7 @@ export default function NewTicketPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (data: TicketFormValues) => {
-    if (!user || !user.email) { // Ensure user and user.email exist
+    if (!user || !user.email) { 
       toast({
         title: "Error de Autenticación",
         description: "Debes iniciar sesión y tener un correo electrónico configurado para crear un ticket.",
@@ -27,7 +27,6 @@ export default function NewTicketPage() {
 
     setIsSubmitting(true);
     try {
-      // Pass user.email to the action
       const result = await createTicketAction(user.id, user.name, { ...data, userEmail: user.email });
       if (result.success && result.ticketId) {
         toast({

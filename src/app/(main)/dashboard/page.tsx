@@ -23,7 +23,6 @@ export default function DashboardPage() {
           setAllTickets(tickets);
         } catch (error) {
           console.error("Error fetching tickets:", error);
-          // Optionally, set an error state here to display to the user
         } finally {
           setIsLoading(false);
         }
@@ -41,14 +40,14 @@ export default function DashboardPage() {
           if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
             return priorityOrder[a.priority] - priorityOrder[b.priority];
           }
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); // Newest first
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); 
         })
     : [];
 
   const userCreatedTickets = role === 'User'
     ? allTickets
         .filter(ticket => ticket.userId === user?.id)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) // Newest first
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) 
     : [];
   
   if (isLoading && !user) {
@@ -60,7 +59,6 @@ export default function DashboardPage() {
   }
   
   if (!user) {
-    // This case should ideally be handled by the layout redirecting to login
     return <div className="p-8 text-center">Por favor, inicia sesión para ver el dashboard.</div>;
   }
 

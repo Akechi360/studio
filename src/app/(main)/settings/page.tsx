@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, Settings as SettingsIcon, Save, BellRing, Mail, MessageCircle, Paintbrush } from 'lucide-react'; // Lightbulb removed
+import { ShieldAlert, Settings as SettingsIcon, Save, BellRing, Mail, MessageCircle, Paintbrush } from 'lucide-react'; 
 import { APP_NAME } from '@/lib/constants';
 
 interface NotificationPreferences {
@@ -18,15 +18,12 @@ interface NotificationPreferences {
   emailOnNewComment: boolean;
 }
 
-// AIPreferences interface removed
-
 interface CustomizationPreferences {
   appName: string;
 }
 
 interface AdminSettings {
   notificationPrefs: NotificationPreferences;
-  // aiPrefs removed
   customizationPrefs: CustomizationPreferences;
 }
 
@@ -35,9 +32,8 @@ const defaultSettings: AdminSettings = {
     emailOnNewTicket: true,
     emailOnNewComment: true,
   },
-  // aiPrefs removed
   customizationPrefs: {
-    appName: APP_NAME, // Default from constants
+    appName: APP_NAME, 
   },
 };
 
@@ -52,7 +48,6 @@ export default function SettingsPage() {
     if (savedSettingsRaw) {
       try {
         const savedSettings = JSON.parse(savedSettingsRaw);
-        // Merge with defaults to ensure all keys are present if structure changed
         setSettings(prev => ({
           ...defaultSettings,
           ...savedSettings,
@@ -60,7 +55,6 @@ export default function SettingsPage() {
             ...defaultSettings.notificationPrefs,
             ...(savedSettings.notificationPrefs || {}),
           },
-          // aiPrefs merging removed
           customizationPrefs: {
             ...defaultSettings.customizationPrefs,
             ...(savedSettings.customizationPrefs || {}),
@@ -68,7 +62,7 @@ export default function SettingsPage() {
         }));
       } catch (error) {
         console.error("Error al cargar configuración de admin:", error);
-        setSettings(defaultSettings); // Reset to defaults on error
+        setSettings(defaultSettings); 
       }
     }
   }, []);
@@ -79,8 +73,6 @@ export default function SettingsPage() {
       notificationPrefs: { ...prev.notificationPrefs, [key]: value },
     }));
   };
-
-  // handleAIPrefChange function removed
   
   const handleCustomizationPrefChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -93,7 +85,6 @@ export default function SettingsPage() {
   const handleSaveSettings = () => {
     setIsSaving(true);
     localStorage.setItem('adminSettings', JSON.stringify(settings));
-    // Simulate API call
     setTimeout(() => {
       setIsSaving(false);
       toast({
@@ -126,7 +117,6 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Notification Preferences Card */}
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center"><BellRing className="mr-2 h-5 w-5 text-primary"/>Preferencias de Notificación</CardTitle>
@@ -164,10 +154,7 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* AI Preferences Card Removed */}
       
-      {/* Customization Preferences Card */}
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center"><Paintbrush className="mr-2 h-5 w-5 text-primary"/>Personalización de la Aplicación</CardTitle>

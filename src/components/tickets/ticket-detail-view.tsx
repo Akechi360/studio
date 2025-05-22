@@ -11,7 +11,7 @@ import { CommentCard } from "./comment-card";
 import { AddCommentForm } from "./add-comment-form";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
-import { Paperclip, UserCircle, CalendarDays, Tag, Info, MessageSquare, ExternalLink, Loader2 } from "lucide-react"; // Added Loader2
+import { Paperclip, UserCircle, CalendarDays, Tag, Info, MessageSquare, ExternalLink, Loader2 } from "lucide-react"; 
 import { TICKET_STATUSES, TICKET_PRIORITIES_ENGLISH, TICKET_PRIORITIES as TICKET_PRIORITIES_SPANISH } from "@/lib/constants";
 import {
   Select,
@@ -29,7 +29,6 @@ interface TicketDetailViewProps {
   ticket: Ticket;
 }
 
-// Map English priority names to Spanish for display if needed, or ensure constants are consistent
 const priorityDisplayMap: Record<TicketPriorityType, string> = {
   High: "Alta",
   Medium: "Media",
@@ -42,7 +41,6 @@ const priorityColors: Record<TicketPriorityType, string> = {
   Low: "bg-green-100 text-green-700 border-green-300",
 };
 
-// Map English status names to Spanish for display
 const statusDisplayMap: Record<TicketStatus, string> = {
   Open: "Abierto",
   "In Progress": "En Progreso",
@@ -65,7 +63,6 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
 
   const handleStatusChange = async (newStatusValue: string) => {
-    // Find the English status corresponding to the selected Spanish status
     const statusEntry = Object.entries(statusDisplayMap).find(([_, spanish]) => spanish === newStatusValue);
     const newStatus = statusEntry ? statusEntry[0] as TicketStatus : null;
 
@@ -125,7 +122,7 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
                     <SelectValue placeholder="Cambiar estado" />
                   </SelectTrigger>
                   <SelectContent>
-                    {TICKET_STATUSES.map((status) => ( // Using Spanish statuses for display in SelectItem
+                    {TICKET_STATUSES.map((status) => ( 
                       <SelectItem key={status} value={status}> 
                         {status}
                       </SelectItem>

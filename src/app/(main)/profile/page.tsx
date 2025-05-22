@@ -132,7 +132,7 @@ export default function ProfilePage() {
       <Card className="shadow-xl">
         <CardHeader className="items-center text-center">
           <Avatar className="h-24 w-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
-            <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} data-ai-hint="foto perfil" />
+            <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} data-ai-hint="foto perfil"/>
             <AvatarFallback className="text-3xl">{getInitials(user.name)}</AvatarFallback>
           </Avatar>
           <CardTitle className="text-2xl">{user.name}</CardTitle>
