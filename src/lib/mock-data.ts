@@ -1,5 +1,14 @@
 
-import type { Ticket, InventoryItem } from '@/lib/types';
+import type { Ticket, InventoryItem, User } from '@/lib/types'; // Added User for potential future use here
+
+// --- Audit Log Entry (consistent with audit/page.tsx) ---
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string; // ISO string
+  user: string; // email of the user performing the action
+  action: string;
+  details?: string;
+}
 
 // --- Almacén de Tickets ---
 declare global {
@@ -7,14 +16,18 @@ declare global {
   var __mock_tickets_store__: Ticket[] | undefined;
   // eslint-disable-next-line no-var
   var __mock_inventory_store__: InventoryItem[] | undefined;
+  // eslint-disable-next-line no-var
+  var __mock_audit_logs_store__: AuditLogEntry[] | undefined;
 }
 
 let ticketsStore_internal: Ticket[];
 let inventoryStore_internal: InventoryItem[];
+let auditLogsStore_internal: AuditLogEntry[];
 
 if (process.env.NODE_ENV === 'production') {
   ticketsStore_internal = [];
   inventoryStore_internal = [];
+  auditLogsStore_internal = [];
 } else {
   if (!global.__mock_tickets_store__) {
     global.__mock_tickets_store__ = [];
@@ -25,6 +38,11 @@ if (process.env.NODE_ENV === 'production') {
     global.__mock_inventory_store__ = [];
   }
   inventoryStore_internal = global.__mock_inventory_store__;
+
+  if (!global.__mock_audit_logs_store__) {
+    global.__mock_audit_logs_store__ = [];
+  }
+  auditLogsStore_internal = global.__mock_audit_logs_store__;
 }
 
 // --- Funciones para Tickets ---
@@ -87,7 +105,24 @@ export function getRawInventoryStore(): InventoryItem[] {
   return inventoryStore_internal;
 }
 
+// --- Funciones para Logs de Auditoría ---
+export function getAllAuditLogsFromMock(): AuditLogEntry[] {
+  // Return a copy, sorted with newest first
+  return [...auditLogsStore_internal].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+}
+
+export function addAuditLogEntryToMock(entryData: Omit<AuditLogEntry, 'id' | 'timestamp'>): AuditLogEntry {
+  const newLogEntry: AuditLogEntry = {
+    id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    timestamp: new Date().toISOString(),
+    ...entryData,
+  };
+  auditLogsStore_internal.unshift(newLogEntry); // Add to the beginning for newest first
+  return newLogEntry;
+}
+
+
 // Para compatibilidad con código antiguo (debería refactorizarse)
 export const mockTickets: Ticket[] = ticketsStore_internal;
 export const mockInventory: InventoryItem[] = inventoryStore_internal;
-
+export const mockAuditLogs: AuditLogEntry[] = auditLogsStore_internal;

@@ -49,7 +49,7 @@ const inventoryItemFormSchema = z.object({
   brand: z.string().max(50, { message: "Máximo 50 caracteres."}).optional(),
   model: z.string().max(50, { message: "Máximo 50 caracteres."}).optional(),
   serialNumber: z.string().max(100, { message: "Máximo 100 caracteres."}).optional(),
-  processor: z.string().max(100, { message: "Máximo 100 caracteres."}).optional(), // Nuevo campo
+  processor: z.string().max(100, { message: "Máximo 100 caracteres."}).optional(),
   ram: z.enum(RAM_OPTIONS).optional(),
   storageType: z.enum(STORAGE_TYPES_ZOD_ENUM).optional(),
   storage: z.string().max(50, { message: "Máximo 50 caracteres."}).optional(),
@@ -80,7 +80,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
       brand: "",
       model: "",
       serialNumber: "",
-      processor: "", // Nuevo campo
+      processor: "",
       ram: "No Especificado",
       storageType: undefined,
       storage: "",
@@ -98,13 +98,13 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
       form.setValue("ram", "No Especificado");
       form.setValue("storageType", undefined);
       form.setValue("storage", "");
-      form.setValue("processor", ""); // Limpiar procesador
+      form.setValue("processor", ""); 
     }
   }, [watchedCategory, form]);
 
   const onSubmit = async (data: InventoryItemFormValues) => {
-    if (!currentUser) {
-      toast({ title: "Error de Autenticación", description: "Debes iniciar sesión.", variant: "destructive" });
+    if (!currentUser || !currentUser.email) {
+      toast({ title: "Error de Autenticación", description: "Debes iniciar sesión y tener un email configurado.", variant: "destructive" });
       return;
     }
     setIsSubmitting(true);
@@ -123,8 +123,11 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
         dataToSend.processor = undefined;
     }
 
-
-    const result = await addInventoryItemAction({ id: currentUser.id, name: currentUser.name }, dataToSend as InventoryItemFormValues);
+    // Pass the currentUser object with id, name, and email
+    const result = await addInventoryItemAction(
+      { id: currentUser.id, name: currentUser.name, email: currentUser.email }, 
+      dataToSend as InventoryItemFormValues
+    );
     setIsSubmitting(false);
 
     if (result.success) {

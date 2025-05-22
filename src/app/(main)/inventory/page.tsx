@@ -104,9 +104,12 @@ export default function InventoryPage() {
   };
 
   const confirmDeleteItem = async () => {
-    if (!selectedItemForDelete) return;
+    if (!selectedItemForDelete || !user?.email) {
+      toast({ title: "Error", description: "No se puede eliminar el artículo o falta información del usuario.", variant: "destructive" });
+      return;
+    }
     setIsDeletingItem(true);
-    const result = await deleteInventoryItemAction(selectedItemForDelete.id);
+    const result = await deleteInventoryItemAction(selectedItemForDelete.id, user.email);
     setIsDeletingItem(false);
     setIsConfirmDeleteDialogVisible(false);
 

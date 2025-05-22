@@ -11,7 +11,7 @@ import { CommentCard } from "./comment-card";
 import { AddCommentForm } from "./add-comment-form";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
-import { Paperclip, UserCircle, CalendarDays, Tag, Info, MessageSquare, ExternalLink } from "lucide-react";
+import { Paperclip, UserCircle, CalendarDays, Tag, Info, MessageSquare, ExternalLink, Loader2 } from "lucide-react"; // Added Loader2
 import { TICKET_STATUSES, TICKET_PRIORITIES_ENGLISH, TICKET_PRIORITIES as TICKET_PRIORITIES_SPANISH } from "@/lib/constants";
 import {
   Select,
@@ -74,12 +74,12 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
         return;
     }
     
-    if (role !== 'Admin') {
-      toast({ title: "Permiso Denegado", description: "Solo los administradores pueden cambiar el estado del ticket.", variant: "destructive" });
+    if (role !== 'Admin' || !user?.email) {
+      toast({ title: "Permiso Denegado", description: "Solo los administradores pueden cambiar el estado del ticket y se requiere un correo electrónico.", variant: "destructive" });
       return;
     }
     setIsStatusUpdating(true);
-    const result = await updateTicketStatusAction(ticket.id, { status: newStatus });
+    const result = await updateTicketStatusAction(ticket.id, { status: newStatus, actingUserEmail: user.email });
     if (result.success) {
       setTicket(prev => ({ ...prev!, status: newStatus, updatedAt: new Date() }));
       toast({ title: "Estado Actualizado", description: result.message });
@@ -114,18 +114,25 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
               </CardDescription>
             </div>
             {role === 'Admin' ? (
-              <Select onValueChange={(value) => handleStatusChange(value as string)} defaultValue={statusDisplayMap[ticket.status]} disabled={isStatusUpdating}>
-                <SelectTrigger className="w-full md:w-[180px] mt-2 md:mt-0">
-                  <SelectValue placeholder="Cambiar estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TICKET_STATUSES.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                {isStatusUpdating && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+                <Select 
+                  onValueChange={(value) => handleStatusChange(value as string)} 
+                  defaultValue={statusDisplayMap[ticket.status]} 
+                  disabled={isStatusUpdating}
+                >
+                  <SelectTrigger className="w-full md:w-[180px] mt-2 md:mt-0">
+                    <SelectValue placeholder="Cambiar estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TICKET_STATUSES.map((status) => ( // Using Spanish statuses for display in SelectItem
+                      <SelectItem key={status} value={status}> 
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             ) : (
               <Badge className={cn("text-sm px-3 py-1", statusColors[ticket.status])}>{statusDisplayMap[ticket.status]}</Badge>
             )}
@@ -136,7 +143,7 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
               <UserCircle className="h-5 w-5 text-primary" />
               <div>
-                <span className="font-medium">Reportado por:</span> {ticket.userName}
+                <span className="font-medium">Reportado por:</span> {ticket.userName} ({ticket.userEmail || 'N/A'})
               </div>
             </div>
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
@@ -176,8 +183,6 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
           )}
         </CardContent>
       </Card>
-
-      {/* AI Suggestion component removed from here */}
 
       <Card className="shadow-xl">
         <CardHeader>

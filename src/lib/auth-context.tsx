@@ -4,6 +4,7 @@
 import type { User, Role } from "@/lib/types";
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { logAuditEvent } from "@/lib/actions"; // Import the server action
 
 export const mockUsers: User[] = [
   { id: "3", name: "Sistemas ClinicaIEQ", email: "sistemas@clinicaieq.com", role: "Admin", avatarUrl: "https://placehold.co/100x100.png?text=SC", department: "Gerencia", password: "adminpassword" },
@@ -49,21 +50,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, pass: string): Promise<boolean> => { // pass parameter is kept for signature consistency, but not used
+  const login = async (email: string, pass: string): Promise<boolean> => {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 500));
-    const foundUser = mockUsers.find(u => u.email === email); // In mock, we don't check password
+    const foundUser = mockUsers.find(u => u.email === email && u.password === pass); // Check password for login
     if (foundUser) {
       setUser(foundUser);
       localStorage.setItem("ticketflow_user", JSON.stringify(foundUser));
       setIsLoading(false);
+      // Consider logging successful login attempt if required, though might be noisy
+      // await logAuditEvent(foundUser.email, "Inicio de Sesión Exitoso");
       return true;
     }
     setIsLoading(false);
+    // Consider logging failed login attempt if required
+    // await logAuditEvent(email, "Intento de Inicio de Sesión Fallido");
     return false;
   };
 
   const logout = () => {
+    // if (user?.email) { // Log before clearing user
+    //   logAuditEvent(user.email, "Cierre de Sesión");
+    // }
     setUser(null);
     localStorage.removeItem("ticketflow_user");
     router.push("/login");
@@ -82,12 +90,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       role: "User", 
       avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,2).toUpperCase()}`,
-      password: pass, // Store password
+      password: pass, 
     };
     mockUsers.push(newUser); 
     setUser(newUser);
     localStorage.setItem("ticketflow_user", JSON.stringify(newUser));
     setIsLoading(false);
+    await logAuditEvent(email, "Registro de Nuevo Usuario", `Usuario: ${name} (${email})`);
     return true;
   };
   
@@ -99,14 +108,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (userIndex !== -1) {
       if (email !== mockUsers[userIndex].email && mockUsers.some(u => u.email === email && u.id !== user.id)) {
         setIsLoading(false);
-        // alert("El correo electrónico ya está en uso por otro usuario."); // Using toast instead
-        return false; // Indicate failure for toast handling in component
+        return false;
       }
+      const oldEmail = mockUsers[userIndex].email;
+      const oldName = mockUsers[userIndex].name;
       const updatedUser = { ...mockUsers[userIndex], name, email };
       mockUsers[userIndex] = updatedUser;
       setUser(updatedUser);
       localStorage.setItem("ticketflow_user", JSON.stringify(updatedUser));
       setIsLoading(false);
+      await logAuditEvent(user.email, "Actualización de Perfil Propio", `De: ${oldName} (${oldEmail}) a ${name} (${email})`);
       return true;
     }
     setIsLoading(false);
@@ -121,9 +132,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (userIndex !== -1) {
       const updatedUser = { ...mockUsers[userIndex], password: newPassword };
       mockUsers[userIndex] = updatedUser;
-      setUser(updatedUser); // Update current user state
-      localStorage.setItem("ticketflow_user", JSON.stringify(updatedUser)); // Update localStorage
+      setUser(updatedUser); 
+      localStorage.setItem("ticketflow_user", JSON.stringify(updatedUser)); 
       setIsLoading(false);
+      await logAuditEvent(user.email, "Actualización de Contraseña Propia");
       return true;
     }
     setIsLoading(false);
@@ -131,11 +143,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>): Promise<{ success: boolean; message?: string }> => {
+    if (!user || user.role !== "Admin") {
+      return { success: false, message: "Acción no permitida." };
+    }
     await new Promise(resolve => setTimeout(resolve, 300)); 
     const userIndex = mockUsers.findIndex(u => u.id === userId);
     if (userIndex === -1) {
       return { success: false, message: "Usuario no encontrado." };
     }
+
+    const targetUserOriginal = { ...mockUsers[userIndex] }; // For logging changes
 
     if (data.email && data.email !== mockUsers[userIndex].email) {
       if (mockUsers.some(u => u.email === data.email && u.id !== userId)) {
@@ -151,16 +168,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updatedUserData.department = data.department;
     }
 
-    // If password is provided and not empty, update it. Otherwise, keep the old one.
     if (data.password && data.password.trim() !== "") {
       updatedUserData.password = data.password;
     } else {
-      updatedUserData.password = mockUsers[userIndex].password; // Keep existing if not provided or empty
+      updatedUserData.password = mockUsers[userIndex].password; 
     }
-
 
     mockUsers[userIndex] = updatedUserData;
 
+    // Construct details for audit log
+    let details = `Usuario ID: ${userId}, Nombre: ${targetUserOriginal.name} (${targetUserOriginal.email}). Cambios: `;
+    const changes = [];
+    if (data.name && data.name !== targetUserOriginal.name) changes.push(`Nombre de '${targetUserOriginal.name}' a '${data.name}'`);
+    if (data.email && data.email !== targetUserOriginal.email) changes.push(`Email de '${targetUserOriginal.email}' a '${data.email}'`);
+    if (data.role && data.role !== targetUserOriginal.role) changes.push(`Rol de '${targetUserOriginal.role}' a '${data.role}'`);
+    if (data.department !== targetUserOriginal.department) changes.push(`Departamento de '${targetUserOriginal.department || "N/A"}' a '${data.department || "N/A"}'`);
+    if (data.password && data.password.trim() !== "" && data.password !== targetUserOriginal.password) changes.push(`Contraseña actualizada.`);
+    details += changes.join(', ') || "Sin cambios detectables en campos principales.";
+
+    await logAuditEvent(user.email, "Actualización de Usuario por Administrador", details);
+    
+    // If admin updates their own info through this, update context user
     if (user && user.id === userId) { 
       const updatedSelf = { ...user, ...mockUsers[userIndex] };
       setUser(updatedSelf);
@@ -170,13 +198,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteUserByAdmin = async (userId: string): Promise<{ success: boolean; message: string }> => {
+    if (!user || user.role !== "Admin") {
+      return { success: false, message: "Acción no permitida." };
+    }
     await new Promise(resolve => setTimeout(resolve, 300));
     if (user && user.id === userId) {
       return { success: false, message: "No puedes eliminar tu propia cuenta de administrador." };
     }
     const userIndex = mockUsers.findIndex(u => u.id === userId);
     if (userIndex !== -1) {
+      const deletedUserName = mockUsers[userIndex].name;
+      const deletedUserEmail = mockUsers[userIndex].email;
       mockUsers.splice(userIndex, 1);
+      await logAuditEvent(user.email, "Eliminación de Usuario por Administrador", `Usuario: ${deletedUserName} (${deletedUserEmail}), ID: ${userId}`);
       return { success: true, message: "Usuario eliminado exitosamente." };
     }
     return { success: false, message: "Usuario no encontrado." };
@@ -200,3 +234,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

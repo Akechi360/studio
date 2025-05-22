@@ -8,7 +8,7 @@ export interface User {
   role: Role;
   avatarUrl?: string;
   department?: string;
-  password?: string; // Added password field
+  password?: string; 
 }
 
 export type TicketPriority = "Low" | "Medium" | "High";
@@ -39,6 +39,7 @@ export interface Ticket {
   attachments: Attachment[];
   userId: string;
   userName: string;
+  userEmail?: string; // Added for easier audit logging
   createdAt: Date;
   updatedAt: Date;
   comments: Comment[];

@@ -15,10 +15,10 @@ export default function NewTicketPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (data: TicketFormValues) => {
-    if (!user) {
+    if (!user || !user.email) { // Ensure user and user.email exist
       toast({
         title: "Error de Autenticación",
-        description: "Debes iniciar sesión para crear un ticket.",
+        description: "Debes iniciar sesión y tener un correo electrónico configurado para crear un ticket.",
         variant: "destructive",
       });
       router.push('/login');
@@ -27,9 +27,8 @@ export default function NewTicketPage() {
 
     setIsSubmitting(true);
     try {
-      // Convert priority back to English if necessary for the backend, or handle in backend
-      // For now, assuming backend handles Spanish priority strings if constants are Spanish
-      const result = await createTicketAction(user.id, user.name, data);
+      // Pass user.email to the action
+      const result = await createTicketAction(user.id, user.name, { ...data, userEmail: user.email });
       if (result.success && result.ticketId) {
         toast({
           title: "¡Ticket Creado!",

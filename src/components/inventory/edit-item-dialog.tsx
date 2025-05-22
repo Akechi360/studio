@@ -34,9 +34,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { updateInventoryItemAction } from '@/lib/actions';
-import type { InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType } from '@/lib/types';
+import type { InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, User } from '@/lib/types'; // Added User
 import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from '@/lib/types';
 import { Loader2, Save, Edit3 } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context'; // Import useAuth
 
 const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
 const STORAGE_TYPES_WITH_NONE = ["No Especificado", "HDD", "SSD"] as const;
@@ -69,6 +70,7 @@ interface EditItemDialogProps {
 
 export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: EditItemDialogProps) {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth(); // Get current user for auditing
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<InventoryItemEditFormValues>({
@@ -119,11 +121,15 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
       form.setValue("storage", "");
       form.setValue("processor", "");
     }
-  }, [watchedCategory, form, itemToEdit]); // Added itemToEdit to ensure initial setup for non-computer items is correct
+  }, [watchedCategory, form, itemToEdit]);
 
   if (!itemToEdit) return null;
 
   const onSubmit = async (data: InventoryItemEditFormValues) => {
+    if (!currentUser || !currentUser.email) {
+      toast({ title: "Error de Autenticación", description: "Debes iniciar sesión y tener un email configurado para actualizar.", variant: "destructive" });
+      return;
+    }
     setIsSubmitting(true);
     
     let dataToSend: Partial<InventoryItemEditFormValues> = { ...data };
@@ -140,7 +146,7 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
         dataToSend.processor = undefined;
     }
 
-    const result = await updateInventoryItemAction(itemToEdit.id, dataToSend as InventoryItemEditFormValues);
+    const result = await updateInventoryItemAction(itemToEdit.id, currentUser.email, dataToSend as InventoryItemEditFormValues);
     setIsSubmitting(false);
 
     if (result.success) {

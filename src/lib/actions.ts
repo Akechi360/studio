@@ -3,6 +3,7 @@
 
 import { z } from "zod";
 import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType } from "./types";
+import type { AuditLogEntry as AuditLogEntryType } from "./mock-data"; // Import type for clarity
 import {
   addTicketToMock,
   getAllTicketsFromMock,
@@ -13,22 +14,45 @@ import {
   getRawInventoryStore,
   updateInventoryItemInMock,
   deleteInventoryItemFromMock,
-  getInventoryItemByIdFromMock
+  getInventoryItemByIdFromMock,
+  addAuditLogEntryToMock, // Import new function
+  getAllAuditLogsFromMock // Import new function
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
 import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from "./types";
+
+// --- Audit Log Actions ---
+export async function logAuditEvent(performingUserEmail: string, actionDescription: string, details?: string): Promise<void> {
+  try {
+    addAuditLogEntryToMock({
+      user: performingUserEmail,
+      action: actionDescription,
+      details: details || undefined,
+    });
+    revalidatePath("/admin/audit"); // Revalidate audit log page after adding new entry
+  } catch (error) {
+    console.error("Failed to log audit event:", error);
+    // Depending on requirements, you might want to throw the error or handle it silently
+  }
+}
+
+export async function getAuditLogs(): Promise<AuditLogEntryType[]> {
+  return getAllAuditLogsFromMock();
+}
+
 
 // --- Ticket Creation ---
 const CreateTicketSchema = z.object({
   subject: z.string().min(5, "El asunto debe tener al menos 5 caracteres."),
   description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
   priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]),
+  userEmail: z.string().email("Debe ser un correo electrónico válido para el usuario que crea el ticket.")
 });
 
 export async function createTicketAction(
-  userId: string,
-  userName: string,
+  userId: string, // Kept for compatibility, but userEmail is preferred for logging
+  userName: string, // Kept for compatibility
   values: z.infer<typeof CreateTicketSchema>
 ) {
   const validatedFields = CreateTicketSchema.safeParse(values);
@@ -41,7 +65,7 @@ export async function createTicketAction(
     };
   }
 
-  const { subject, description, priority } = validatedFields.data;
+  const { subject, description, priority, userEmail } = validatedFields.data;
 
   const currentTickets = getRawTicketsStoreForStats();
   const newTicket: Ticket = {
@@ -51,8 +75,9 @@ export async function createTicketAction(
     priority: priority as TicketPriority,
     status: "Open",
     attachments: [],
-    userId,
-    userName,
+    userId, // Keep existing userId
+    userName, // Keep existing userName
+    userEmail, // Store userEmail on ticket
     createdAt: new Date(),
     updatedAt: new Date(),
     comments: [],
@@ -60,10 +85,14 @@ export async function createTicketAction(
 
   addTicketToMock(newTicket);
 
+  // Log audit event
+  await logAuditEvent(userEmail, "Creación de Ticket", `Ticket ID: ${newTicket.id}, Asunto: ${subject}`);
+
   revalidatePath("/tickets");
   revalidatePath(`/tickets/${newTicket.id}`);
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
+  revalidatePath("/admin/analytics");
 
 
   return {
@@ -80,7 +109,7 @@ const AddCommentSchema = z.object({
 
 export async function addCommentAction(
   ticketId: string,
-  commenter: User,
+  commenter: User, // User object which includes email
   values: z.infer<typeof AddCommentSchema>
 ) {
   const validatedFields = AddCommentSchema.safeParse(values);
@@ -109,11 +138,19 @@ export async function addCommentAction(
 
   ticket.comments.push(newComment);
   ticket.updatedAt = new Date();
+  
+  // Log audit event
+  if (commenter.email) {
+    await logAuditEvent(commenter.email, "Adición de Comentario", `Ticket ID: ${ticketId}, Usuario: ${commenter.name}`);
+  }
+
 
   revalidatePath(`/tickets/${ticketId}`);
   revalidatePath("/tickets");
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
+  revalidatePath("/admin/analytics");
+
 
   return {
     success: true,
@@ -125,6 +162,7 @@ export async function addCommentAction(
 // --- Update Ticket Status ---
 const UpdateTicketStatusSchema = z.object({
   status: z.enum(TICKET_STATUSES_ENGLISH as [TicketStatus, ...TicketStatus[]]),
+  actingUserEmail: z.string().email("Debe proporcionar el correo del usuario que realiza la acción.")
 });
 
 export async function updateTicketStatusAction(
@@ -145,14 +183,23 @@ export async function updateTicketStatusAction(
   if (!ticket) {
     return { success: false, message: "Ticket no encontrado." };
   }
+  
+  const { status, actingUserEmail } = validatedFields.data;
 
-  ticket.status = validatedFields.data.status as TicketStatus;
+  const oldStatus = ticket.status;
+  ticket.status = status as TicketStatus;
   ticket.updatedAt = new Date();
+
+  // Log audit event
+  await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatus}, A: ${ticket.status}`);
+
 
   revalidatePath(`/tickets/${ticketId}`);
   revalidatePath("/tickets");
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
+  revalidatePath("/admin/analytics");
+
 
   const statusDisplayMap: Record<TicketStatus, string> = {
     Open: "Abierto",
@@ -232,6 +279,11 @@ const BaseInventoryItemSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+const AddInventoryItemSchema = BaseInventoryItemSchema.extend({
+  currentUserEmail: z.string().email("Debe proporcionar el correo del usuario que crea el artículo.")
+});
+
+
 const categoryPrefixMap: Record<InventoryItemCategory, string> = {
   Computadora: "PC",
   Monitor: "MON",
@@ -253,8 +305,8 @@ const categoryPrefixMap: Record<InventoryItemCategory, string> = {
 };
 
 export async function addInventoryItemAction(
-  currentUser: Pick<User, 'id' | 'name'>,
-  values: z.infer<typeof BaseInventoryItemSchema>
+  currentUser: Pick<User, 'id' | 'name' | 'email'>, // Now expects email too
+  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "currentUserEmail"> // Values from form
 ) {
   const validatedFields = BaseInventoryItemSchema.safeParse(values);
 
@@ -301,6 +353,9 @@ export async function addInventoryItemAction(
   };
 
   addInventoryItemToMock(newItem);
+  // Log audit event
+  await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo ID: ${newItem.id}, Nombre: ${newItem.name}`);
+
   revalidatePath("/inventory");
 
   return {
@@ -310,9 +365,15 @@ export async function addInventoryItemAction(
   };
 }
 
+const UpdateInventoryItemSchema = BaseInventoryItemSchema.extend({
+  actingUserEmail: z.string().email("Debe proporcionar el correo del usuario que realiza la acción.")
+});
+
+
 export async function updateInventoryItemAction(
   itemId: string,
-  values: z.infer<typeof BaseInventoryItemSchema>
+  actingUserEmail: string, // Added for auditing
+  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "actingUserEmail"> // Values from form
 ) {
   const validatedFields = BaseInventoryItemSchema.safeParse(values);
 
@@ -341,6 +402,8 @@ export async function updateInventoryItemAction(
   const success = updateInventoryItemInMock(updatedItem);
 
   if (success) {
+    // Log audit event
+    await logAuditEvent(actingUserEmail, "Actualización de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${updatedItem.name}`);
     revalidatePath("/inventory");
     return { success: true, message: `Artículo "${updatedItem.name}" actualizado exitosamente.` };
   } else {
@@ -348,9 +411,16 @@ export async function updateInventoryItemAction(
   }
 }
 
-export async function deleteInventoryItemAction(itemId: string) {
+export async function deleteInventoryItemAction(itemId: string, actingUserEmail: string) { // Added actingUserEmail
+  const itemToDelete = getInventoryItemByIdFromMock(itemId);
+  if (!itemToDelete) {
+    return { success: false, message: "Artículo no encontrado para eliminar." };
+  }
+
   const success = deleteInventoryItemFromMock(itemId);
   if (success) {
+    // Log audit event
+    await logAuditEvent(actingUserEmail, "Eliminación de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${itemToDelete.name}`);
     revalidatePath("/inventory");
     return { success: true, message: "Artículo eliminado exitosamente." };
   } else {
@@ -358,4 +428,17 @@ export async function deleteInventoryItemAction(itemId: string) {
   }
 }
 
+// This action is for getting AI suggestions, which has been removed.
+// export async function getAISolutionSuggestion(ticketDescription: string): Promise<{ suggestion?: string | null; error?: string | null }> {
+//   try {
+//     const { output } = await suggestSolution({ ticketDescription });
+//     if (output && output.suggestedSolution) {
+//       return { suggestion: output.suggestedSolution };
+//     }
+//     return { error: "No se pudo generar una sugerencia en este momento." };
+//   } catch (error) {
+//     console.error("Error fetching AI suggestion:", error);
+//     return { error: "Error al contactar el servicio de IA." };
+//   }
+// }
     
