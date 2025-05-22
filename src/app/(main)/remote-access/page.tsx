@@ -21,12 +21,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Send, ScreenShare, HelpCircle } from "lucide-react";
-import { logAuditEvent } from '@/lib/actions'; // Para registrar la solicitud
+import { logAuditEvent, createTicketAction } from '@/lib/actions'; // Importar createTicketAction
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-// El ID de AnyDesk al que el personal de soporte se conectaría.
-// En una aplicación real, esto podría ser dinámico o gestionado de otra forma.
-const ANYDESK_SUPPORT_ID_EXAMPLE = "123456789"; // Ejemplo, reemplazar con un ID real si es necesario para la URL de guía.
+const ANYDESK_SUPPORT_ID_EXAMPLE = "123456789";
 
 const remoteAccessFormSchema = z.object({
   userAnyDeskId: z.string().min(9, { message: "El ID de AnyDesk debe tener al menos 9 dígitos." }).regex(/^\d+$/, { message: "El ID de AnyDesk solo debe contener números."}),
@@ -40,6 +38,7 @@ export default function RemoteAccessPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
+  const [submittedAnyDeskId, setSubmittedAnyDeskId] = useState("");
 
   const form = useForm<RemoteAccessFormValues>({
     resolver: zodResolver(remoteAccessFormSchema),
@@ -50,7 +49,7 @@ export default function RemoteAccessPage() {
   });
 
   async function onSubmit(data: RemoteAccessFormValues) {
-    if (!user || !user.email) {
+    if (!user || !user.email || !user.name) {
       toast({
         title: "Error de Autenticación",
         description: "Debes iniciar sesión para solicitar acceso remoto.",
@@ -61,31 +60,50 @@ export default function RemoteAccessPage() {
 
     setIsSubmitting(true);
     
-    // Simular envío de solicitud (en una app real, esto iría a un backend)
-    console.log("Solicitud de Acceso Remoto:", {
-      solicitante: user.email,
-      anyDeskIdUsuario: data.userAnyDeskId,
-      motivo: data.reason,
-      fecha: new Date().toISOString(),
-    });
-
     try {
-      await logAuditEvent(user.email, "Solicitud de Acceso Remoto", `ID AnyDesk: ${data.userAnyDeskId}, Motivo: ${data.reason}`);
+      // 1. Registrar evento de auditoría
+      await logAuditEvent(user.email, "Solicitud de Acceso Remoto Iniciada", `ID AnyDesk: ${data.userAnyDeskId}, Motivo: ${data.reason}`);
       
-      // Simulación de retraso de red
-      await new Promise(resolve => setTimeout(resolve, 700));
+      // 2. Crear el ticket de soporte
+      const ticketSubject = `Solicitud de Acceso Remoto - ${user.name}`;
+      const ticketDescription = `
+Usuario: ${user.name} (${user.email})
+ID de AnyDesk del Usuario: ${data.userAnyDeskId}
+Motivo de la Solicitud:
+${data.reason}
 
-      toast({
-        title: "Solicitud Enviada",
-        description: "Tu solicitud de acceso remoto ha sido registrada. Un técnico se pondrá en contacto contigo.",
+Por favor, contactar al usuario para establecer la conexión remota.
+      `.trim();
+
+      const ticketResult = await createTicketAction(user.id, user.name, {
+        subject: ticketSubject,
+        description: ticketDescription,
+        priority: "Medium", // O la prioridad que consideres adecuada
+        userEmail: user.email,
       });
-      setRequestSent(true);
-      form.reset();
+
+      if (ticketResult.success && ticketResult.ticketId) {
+        toast({
+          title: "Solicitud Enviada y Ticket Creado",
+          description: `Tu solicitud de acceso remoto ha sido registrada (Ticket #${ticketResult.ticketId}). Un técnico se pondrá en contacto.`,
+        });
+        setSubmittedAnyDeskId(data.userAnyDeskId);
+        setRequestSent(true);
+        form.reset();
+      } else {
+        toast({
+          title: "Error al Crear Ticket",
+          description: ticketResult.message || "No se pudo crear el ticket para tu solicitud de acceso remoto.",
+          variant: "destructive",
+        });
+        // Opcional: revertir auditoría si la creación del ticket falla, o loguear el fallo.
+        await logAuditEvent(user.email, "Fallo en Solicitud de Acceso Remoto", `No se pudo crear el ticket. ID AnyDesk: ${data.userAnyDeskId}`);
+      }
     } catch (error) {
-      console.error("Error al registrar auditoría para acceso remoto:", error);
+      console.error("Error al procesar solicitud de acceso remoto:", error);
       toast({
-        title: "Error",
-        description: "No se pudo registrar tu solicitud. Intenta de nuevo.",
+        title: "Error Inesperado",
+        description: "No se pudo procesar tu solicitud. Intenta de nuevo.",
         variant: "destructive",
       });
     } finally {
@@ -108,9 +126,10 @@ export default function RemoteAccessPage() {
               <HelpCircle className="h-5 w-5 text-green-600" />
               <AlertTitle className="text-green-700 dark:text-green-400">¡Solicitud Recibida!</AlertTitle>
               <AlertDescription className="text-green-600 dark:text-green-300">
-                Hemos recibido tu solicitud de acceso remoto. Un técnico se pondrá en contacto contigo pronto a través de AnyDesk usando el ID que proporcionaste.
+                Hemos recibido tu solicitud de acceso remoto y se ha creado un ticket de soporte.
+                Un técnico se pondrá en contacto contigo pronto.
                 <br /><br />
-                <strong>Por favor, asegúrate de tener AnyDesk abierto y estar atento a las solicitudes de conexión.</strong>
+                <strong>Por favor, asegúrate de tener AnyDesk abierto con el ID <span className="font-semibold">{submittedAnyDeskId}</span> y estar atento a las solicitudes de conexión.</strong>
                 <br />
                 Si necesitas iniciar una conexión a un ID de soporte específico (ej: {ANYDESK_SUPPORT_ID_EXAMPLE}), puedes hacerlo directamente desde tu aplicación AnyDesk.
               </AlertDescription>
@@ -134,7 +153,7 @@ export default function RemoteAccessPage() {
             Solicitar Acceso Remoto
           </CardTitle>
           <CardDescription>
-            Completa el siguiente formulario para solicitar asistencia remota. Un técnico se conectará a tu equipo utilizando el ID de AnyDesk que proporciones.
+            Completa el siguiente formulario para solicitar asistencia remota. Un técnico se conectará a tu equipo utilizando el ID de AnyDesk que proporciones. Al enviar, se creará un ticket de soporte.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -146,7 +165,7 @@ export default function RemoteAccessPage() {
               <br />
               2. Describe brevemente el motivo de tu solicitud.
               <br />
-              3. Envía la solicitud y mantén AnyDesk abierto. Un técnico aceptará la conexión.
+              3. Envía la solicitud. Se creará un ticket y un técnico revisará tu caso para conectarse. Mantén AnyDesk abierto.
             </AlertDescription>
           </Alert>
           <Form {...form}>
@@ -190,17 +209,18 @@ export default function RemoteAccessPage() {
                 ) : (
                   <Send className="mr-2 h-4 w-4" />
                 )}
-                Enviar Solicitud de Soporte
+                Enviar Solicitud y Crear Ticket
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter>
             <p className="text-xs text-muted-foreground">
-                Al enviar esta solicitud, aceptas que un técnico de soporte se conecte remotamente a tu equipo.
+                Al enviar esta solicitud, se creará un ticket de soporte y aceptas que un técnico se conecte remotamente a tu equipo para asistirte.
             </p>
         </CardFooter>
       </Card>
     </div>
   );
 }
+
