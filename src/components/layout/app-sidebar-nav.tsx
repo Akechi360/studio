@@ -17,14 +17,13 @@ import {
   Ticket,
   PlusCircle,
   User,
-  FileText,
   Users,
   Settings,
-  BarChart3, // Kept for potential future use or if user changes mind
   HelpCircle,
   Archive,
-  BarChartBig, // New icon for Analytics
-  ClipboardList, // New icon for Audit
+  BarChartBig, 
+  ClipboardList, 
+  ScreenShare, // Icono para Acceso Remoto
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { Role } from "@/lib/types";
@@ -45,16 +44,25 @@ const navItems: NavItem[] = [
     label: "Tickets", 
     icon: Ticket,
     subItems: [
-      { href: "/tickets", label: "Todos los Tickets", icon: FileText, exact: true },
+      { href: "/tickets", label: "Todos los Tickets", icon: Ticket, exact: true }, // Cambiado icono para diferenciar
       { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true },
     ]
   },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
+  { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true }, // Nueva sección
   { href: "/profile", label: "Perfil", icon: User, exact: true },
-  { href: "/admin/users", label: "Gestión de Usuarios", icon: Users, allowedRoles: ["Admin"], exact: true },
-  { href: "/admin/analytics", label: "Analíticas", icon: BarChartBig, allowedRoles: ["Admin"], exact: true },
-  { href: "/admin/audit", label: "Auditoría", icon: ClipboardList, allowedRoles: ["Admin"], exact: true },
-  { href: "/settings", label: "Configuración", icon: Settings, allowedRoles: ["Admin"], exact: true },
+  { 
+    href: "#", // Placeholder, ya que las subsecciones son las importantes
+    label: "Administración", 
+    icon: Settings, 
+    allowedRoles: ["Admin"],
+    subItems: [
+      { href: "/admin/users", label: "Usuarios", icon: Users, allowedRoles: ["Admin"], exact: true },
+      { href: "/admin/analytics", label: "Analíticas", icon: BarChartBig, allowedRoles: ["Admin"], exact: true },
+      { href: "/admin/audit", label: "Auditoría", icon: ClipboardList, allowedRoles: ["Admin"], exact: true },
+      { href: "/settings", label: "Configuración App", icon: Settings, allowedRoles: ["Admin"], exact: true }, // Renombrado para claridad
+    ]
+  },
   { href: "/help", label: "Ayuda y FAQ", icon: HelpCircle, exact: true },
 ];
 
@@ -65,6 +73,10 @@ export function AppSidebarNav() {
 
   const isItemActive = (item: NavItem) => {
     if (item.exact) return pathname === item.href;
+    // Para el item "Administración", consideramos activo si alguna de sus subrutas está activa
+    if (item.subItems) {
+      return item.subItems.some(sub => pathname.startsWith(sub.href));
+    }
     return pathname.startsWith(item.href);
   };
 
@@ -78,30 +90,37 @@ export function AppSidebarNav() {
         const Icon = item.icon;
         const isActive = isItemActive(item);
 
+        // Si el item tiene subItems y es "Administración", el Link principal no necesita href si es solo un agrupador
+        const WrapperComponent = item.subItems && item.href === "#" ? 'div' : Link;
+        const wrapperProps = item.subItems && item.href === "#" ? {} : { href: item.href, passHref: true, legacyBehavior: true };
+
+
         return (
-          <SidebarMenuItem key={item.href}>
-            <Link href={item.href} passHref legacyBehavior>
+          <SidebarMenuItem key={item.label}>
+            <WrapperComponent {...wrapperProps}>
               <SidebarMenuButton
                 isActive={isActive}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-current={isActive ? "page" : undefined}
+                className={item.subItems && item.href === "#" ? "cursor-default hover:bg-transparent dark:hover:bg-transparent" : ""}
               >
                 <Icon className="shrink-0" />
                 <span className={sidebarState === "collapsed" ? "sr-only" : ""}>
                   {item.label}
                 </span>
               </SidebarMenuButton>
-            </Link>
+            </WrapperComponent>
             {item.subItems && item.subItems.length > 0 && (
               <SidebarMenuSub
                 className={sidebarState === "collapsed" ? "hidden" : ""}
+                // defaultOpen={isActive} // Considerar si se quiere abrir por defecto si una subruta está activa
               >
                 {item.subItems.map((subItem) => {
                   if (subItem.allowedRoles && user?.role && !subItem.allowedRoles.includes(user.role)) {
                     return null;
                   }
                   const SubIcon = subItem.icon;
-                  const isSubItemActive = isItemActive(subItem);
+                  const isSubItemActive = pathname === subItem.href; // Exact match para subitems
                   return (
                     <SidebarMenuSubItem key={subItem.href}>
                       <Link href={subItem.href} passHref legacyBehavior>
