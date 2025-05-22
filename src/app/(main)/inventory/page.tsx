@@ -157,7 +157,7 @@ export default function InventoryPage() {
 
   return (
     <TooltipProvider>
-    <div className="space-y-8">
+    <div className="space-y-8 w-full">
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center">
