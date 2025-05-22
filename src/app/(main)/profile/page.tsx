@@ -129,7 +129,7 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      <Card className="shadow-xl">
+      <Card className="w-full shadow-xl">
         <CardHeader className="items-center text-center">
           <Avatar className="h-24 w-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
             <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} data-ai-hint="foto perfil"/>
@@ -180,7 +180,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className="shadow-xl">
+      <Card className="w-full shadow-xl">
         <CardHeader>
           <CardTitle className="text-xl flex items-center">
             <Lock className="mr-2 h-5 w-5 text-primary" />

@@ -83,7 +83,7 @@ export default function DashboardPage() {
       )}
 
       {!isLoading && role === 'Admin' && (
-        <Card className="shadow-lg">
+        <Card className="w-full shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center">
               <AlertCircle className="mr-2 h-6 w-6 text-destructive" />
@@ -112,7 +112,7 @@ export default function DashboardPage() {
       )}
 
       {!isLoading && role === 'User' && (
-        <Card className="shadow-lg">
+        <Card className="w-full shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center">
               <TicketIcon className="mr-2 h-6 w-6 text-primary" />
