@@ -23,7 +23,8 @@ import {
   Archive,
   BarChartBig, 
   ClipboardList, 
-  ScreenShare, // Icono para Acceso Remoto
+  ScreenShare,
+  CalendarDays, // Added for Agenda IT
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { Role } from "@/lib/types";
@@ -49,6 +50,7 @@ const navItems: NavItem[] = [
     ]
   },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
+  { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true },
   { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true }, 
   { href: "/profile", label: "Perfil", icon: User, exact: true },
   { 
