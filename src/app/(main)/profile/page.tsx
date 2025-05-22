@@ -121,16 +121,17 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col items-start">
+    <div className="space-y-8"> {/* Root div of the page - should take full width */}
+      <div className="flex flex-col items-start"> {/* Title block */}
         <h1 className="text-3xl font-bold tracking-tight flex items-center"><UserCircle2 className="mr-3 h-8 w-8 text-primary" />Tu Perfil</h1>
         <p className="text-muted-foreground">
           Gestiona la configuración de tu cuenta e información personal.
         </p>
       </div>
 
-      <div className="max-w-3xl mx-auto space-y-8"> {/* Centering container */}
-        <Card className="shadow-xl">
+      {/* This div centers the cards within the full-width page div */}
+      <div className="max-w-3xl mx-auto space-y-8"> 
+        <Card className="shadow-xl"> {/* Card 1: Profile Info - no w-full needed here */}
           <CardHeader className="items-center text-center">
             <Avatar className="h-24 w-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
               <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} data-ai-hint="foto perfil"/>
@@ -181,7 +182,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xl">
+        <Card className="shadow-xl"> {/* Card 2: Password Change - no w-full needed here */}
           <CardHeader>
             <CardTitle className="text-xl flex items-center">
               <Lock className="mr-2 h-5 w-5 text-primary" />
