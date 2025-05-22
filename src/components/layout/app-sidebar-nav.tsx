@@ -49,10 +49,10 @@ const navItems: NavItem[] = [
     ]
   },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
-  { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true }, // Nueva sección
+  { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true }, 
   { href: "/profile", label: "Perfil", icon: User, exact: true },
   { 
-    href: "#", // Placeholder, ya que las subsecciones son las importantes
+    href: "#", 
     label: "Administración", 
     icon: Settings, 
     allowedRoles: ["Admin"],
@@ -60,7 +60,7 @@ const navItems: NavItem[] = [
       { href: "/admin/users", label: "Usuarios", icon: Users, allowedRoles: ["Admin"], exact: true },
       { href: "/admin/analytics", label: "Analíticas", icon: BarChartBig, allowedRoles: ["Admin"], exact: true },
       { href: "/admin/audit", label: "Auditoría", icon: ClipboardList, allowedRoles: ["Admin"], exact: true },
-      { href: "/settings", label: "Configuración App", icon: Settings, allowedRoles: ["Admin"], exact: true }, // Renombrado para claridad
+      { href: "/settings", label: "Configuración App", icon: Settings, allowedRoles: ["Admin"], exact: true }, 
     ]
   },
   { href: "/help", label: "Ayuda y FAQ", icon: HelpCircle, exact: true },
@@ -90,7 +90,6 @@ export function AppSidebarNav() {
         const Icon = item.icon;
         const isActive = isItemActive(item);
 
-        // Si el item tiene subItems y es "Administración", el Link principal no necesita href si es solo un agrupador
         const WrapperComponent = item.subItems && item.href === "#" ? 'div' : Link;
         const wrapperProps = item.subItems && item.href === "#" ? {} : { href: item.href, passHref: true, legacyBehavior: true };
 
@@ -102,7 +101,7 @@ export function AppSidebarNav() {
                 isActive={isActive}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-current={isActive ? "page" : undefined}
-                className={item.subItems && item.href === "#" ? "cursor-default hover:bg-transparent dark:hover:bg-transparent" : ""}
+                className={item.subItems && item.href === "#" ? "cursor-default hover:bg-transparent dark:hover:bg-transparent hover:text-sidebar-foreground dark:hover:text-sidebar-foreground" : ""}
               >
                 <Icon className="shrink-0" />
                 <span className={sidebarState === "collapsed" ? "sr-only" : ""}>
@@ -113,14 +112,13 @@ export function AppSidebarNav() {
             {item.subItems && item.subItems.length > 0 && (
               <SidebarMenuSub
                 className={sidebarState === "collapsed" ? "hidden" : ""}
-                // defaultOpen={isActive} // Considerar si se quiere abrir por defecto si una subruta está activa
               >
                 {item.subItems.map((subItem) => {
                   if (subItem.allowedRoles && user?.role && !subItem.allowedRoles.includes(user.role)) {
                     return null;
                   }
                   const SubIcon = subItem.icon;
-                  const isSubItemActive = pathname === subItem.href; // Exact match para subitems
+                  const isSubItemActive = pathname === subItem.href; 
                   return (
                     <SidebarMenuSubItem key={subItem.href}>
                       <Link href={subItem.href} passHref legacyBehavior>
