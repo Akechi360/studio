@@ -58,7 +58,7 @@ export default function NewTicketPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="space-y-8">
       <TicketForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
     </div>
   );
