@@ -8,7 +8,7 @@ export interface User {
   role: Role;
   avatarUrl?: string;
   department?: string;
-  password?: string; 
+  password?: string;
 }
 
 export type TicketPriority = "Low" | "Medium" | "High";
@@ -17,8 +17,9 @@ export type TicketStatus = "Open" | "In Progress" | "Resolved" | "Closed";
 export interface Attachment {
   id: string;
   fileName: string;
-  url: string;
-  size: number;
+  url: string; // For mock, this could be a placeholder or data URL
+  size: number; // in bytes
+  type?: string; // MIME type
 }
 
 export interface Comment {
@@ -39,7 +40,7 @@ export interface Ticket {
   attachments: Attachment[];
   userId: string;
   userName: string;
-  userEmail?: string; // Added for easier audit logging
+  userEmail?: string;
   createdAt: Date;
   updatedAt: Date;
   comments: Comment[];
@@ -58,37 +59,16 @@ export interface TicketStats {
   byStatus: { name: string; value: number }[];
 }
 
-// --- Tipos de Inventario ---
 export const INVENTORY_ITEM_CATEGORIES = [
-  "Computadora",
-  "Monitor",
-  "Teclado",
-  "Mouse",
-  "Impresora",
-  "Escaner",
-  "Router",
-  "Switch",
-  "Servidor",
-  "Laptop",
-  "Tablet",
-  "Proyector",
-  "Telefono IP",
-  "Otro Periferico",
-  "Software",
-  "Licencia",
-  "Otro"
+  "Computadora", "Monitor", "Teclado", "Mouse", "Impresora", "Escaner",
+  "Router", "Switch", "Servidor", "Laptop", "Tablet", "Proyector",
+  "Telefono IP", "Otro Periferico", "Software", "Licencia", "Otro"
 ] as const;
-
 export type InventoryItemCategory = typeof INVENTORY_ITEM_CATEGORIES[number];
 
 export const INVENTORY_ITEM_STATUSES = [
-  "En Uso",
-  "En Almacen",
-  "En Reparacion",
-  "De Baja",
-  "Perdido"
+  "En Uso", "En Almacen", "En Reparacion", "De Baja", "Perdido"
 ] as const;
-
 export type InventoryItemStatus = typeof INVENTORY_ITEM_STATUSES[number];
 
 export const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
@@ -96,7 +76,6 @@ export type RamOption = typeof RAM_OPTIONS[number];
 
 export const STORAGE_TYPES_ZOD_ENUM = ["HDD", "SSD"] as const;
 export type StorageType = typeof STORAGE_TYPES_ZOD_ENUM[number];
-
 
 export interface InventoryItem {
   id: string;
@@ -107,8 +86,8 @@ export interface InventoryItem {
   serialNumber?: string;
   ram?: RamOption;
   storageType?: StorageType;
-  storage?: string; // For capacity like "500GB", "1TB"
-  processor?: string; 
+  storage?: string;
+  processor?: string;
   screenSize?: string;
   ipAddress?: string;
   quantity: number;
@@ -125,7 +104,6 @@ export interface InventoryItem {
   lastSeen?: Date;
 }
 
-// Type for data expected from Excel for import
 export type ExcelInventoryItemData = {
   Nombre?: string;
   Categoría?: string;
@@ -140,6 +118,59 @@ export type ExcelInventoryItemData = {
   Ubicación?: string;
   Estado?: string;
   'Notas Adicionales'?: string;
-  [key: string]: any; // Allows other columns to be present but ignored
+  [key: string]: any;
 };
 
+// --- Approval Module Types ---
+export type ApprovalRequestType = "Compra" | "PagoProveedor";
+export type ApprovalStatus = "Pendiente" | "Aprobado" | "Rechazado" | "InformacionSolicitada";
+
+export interface ApprovalActivityLogEntry {
+  id: string;
+  action: string; // e.g., "Solicitud Enviada", "Aprobado", "Rechazado"
+  userId: string;
+  userName: string;
+  timestamp: Date;
+  comment?: string;
+}
+
+export interface PaymentInstallment {
+  id: string; // Unique ID for the installment
+  amount: number;
+  paymentDate: Date;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  type: ApprovalRequestType;
+  subject: string;
+  description?: string; // Justification or full explanation
+  status: ApprovalStatus;
+  requesterId: string;
+  requesterName: string;
+  requesterEmail?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  attachments: Attachment[];
+  activityLog: ApprovalActivityLogEntry[];
+  amount?: number; // General amount, might be used by both or specifically by one
+
+  // Fields for "Presidente IEQ" action
+  approverId?: string; // User ID of the approver
+  approverName?: string;
+  approverComment?: string;
+  approvedAt?: Date;
+  rejectedAt?: Date;
+  infoRequestedAt?: Date;
+
+  // Compra Specific Fields
+  itemDescription?: string; // Specific item being bought for "Compra"
+  estimatedPrice?: number; // For "Compra"
+  supplierCompra?: string; // Supplier for "Compra"
+
+  // PagoProveedor Specific Fields
+  supplierPago?: string; // Supplier for "PagoProveedor"
+  paymentDueDate?: Date; // Requested by submitter for "PagoProveedor"
+  totalAmountToPay?: number; // Original amount for "PagoProveedor", set by submitter
+  paymentInstallments?: PaymentInstallment[]; // Defined by approver for "PagoProveedor"
+}
