@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType } from "./types";
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData } from "./types";
 import type { AuditLogEntry as AuditLogEntryType } from "./mock-data"; // Import type for clarity
 import {
   addTicketToMock,
@@ -21,6 +21,8 @@ import {
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
 import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM } from "./types";
+import * as XLSX from 'xlsx';
+
 
 // --- Audit Log Actions ---
 export async function logAuditEvent(performingUserEmail: string, actionDescription: string, details?: string): Promise<void> {
@@ -33,7 +35,7 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     // Depending on requirements, you might want to throw the error or handle it silently
-    // console.error("Error logging audit event:", error); // Optional: log the error
+    console.error("Error logging audit event:", error); // Optional: log the error
   }
 }
 
@@ -110,7 +112,7 @@ const AddCommentSchema = z.object({
 
 export async function addCommentAction(
   ticketId: string,
-  commenter: User,
+  commenter: User, // commenter should include email
   values: z.infer<typeof AddCommentSchema>
 ) {
   const validatedFields = AddCommentSchema.safeParse(values);
@@ -420,33 +422,14 @@ export async function deleteInventoryItemAction(itemId: string, actingUserEmail:
 }
 
 
-// Type for data expected from Excel (can be more lenient initially)
-export type ExcelInventoryItemData = {
-  // All fields are optional as they might be missing in Excel
-  // Using string for most to handle varied Excel inputs, conversion/validation happens later
-  Nombre?: string;
-  Categoría?: string;
-  Marca?: string;
-  Modelo?: string;
-  'Número de Serie'?: string; // Excel header might have spaces
-  Procesador?: string;
-  RAM?: string;
-  'Tipo de Almacenamiento'?: string;
-  'Capacidad de Almacenamiento'?: string;
-  Cantidad?: string | number;
-  Ubicación?: string;
-  Estado?: string;
-  'Notas Adicionales'?: string;
-  [key: string]: any; // Allow other columns
-};
 
-const excelToInternalFieldMap: Record<string, keyof InventoryItem> = {
+const excelToInternalFieldMap: Record<string, keyof InventoryItem | keyof Omit<z.infer<typeof BaseInventoryItemSchema>, 'name'>> = {
   'nombre': 'name',
   'nombre del articulo': 'name',
   'nombre del artículo': 'name',
   'articulo': 'name',
   'artículo': 'name',
-  'equipo': 'name', // Added
+  'equipo': 'name',
   'categoría': 'category',
   'categoria': 'category',
   'marca': 'brand',
@@ -454,8 +437,8 @@ const excelToInternalFieldMap: Record<string, keyof InventoryItem> = {
   'número de serie': 'serialNumber',
   'numero de serie': 'serialNumber',
   'n/s': 'serialNumber',
-  'serial': 'serialNumber', // Added
-  'serie': 'serialNumber', // Added
+  'serial': 'serialNumber',
+  'serie': 'serialNumber',
   'procesador': 'processor',
   'ram': 'ram',
   'memoria ram': 'ram',
@@ -468,8 +451,8 @@ const excelToInternalFieldMap: Record<string, keyof InventoryItem> = {
   'ubicación': 'location',
   'ubicacion': 'location',
   'departamento': 'location',
-  'asignacion': 'location', // Added
-  'asignación': 'location', // Added
+  'asignacion': 'location',
+  'asignación': 'location',
   'estado': 'status',
   'notas adicionales': 'notes',
   'notas': 'notes',
@@ -479,8 +462,8 @@ const excelToInternalFieldMap: Record<string, keyof InventoryItem> = {
 const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Partial<z.infer<typeof BaseInventoryItemSchema>> => {
   const mapped: Partial<z.infer<typeof BaseInventoryItemSchema>> = {};
   for (const excelHeader in row) {
-    const lowerExcelHeader = excelHeader.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Normalize and remove accents
-    const internalField = excelToInternalFieldMap[lowerExcelHeader];
+    const lowerExcelHeader = excelHeader.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const internalField = excelToInternalFieldMap[lowerExcelHeader] as keyof z.infer<typeof BaseInventoryItemSchema>; // Type assertion
     if (internalField) {
       let value = row[excelHeader];
       if (internalField === 'quantity' && typeof value === 'string') {
@@ -489,41 +472,31 @@ const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Part
       } else if (internalField === 'category') {
         const normalizedValue = String(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const foundCategory = INVENTORY_ITEM_CATEGORIES.find(cat => cat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
-        (mapped as any)[internalField] = foundCategory || undefined;
+        mapped[internalField] = foundCategory || undefined;
       } else if (internalField === 'status') {
          const normalizedValue = String(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
          const foundStatus = INVENTORY_ITEM_STATUSES.find(stat => stat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
-        (mapped as any)[internalField] = foundStatus || undefined;
+        mapped[internalField] = foundStatus || undefined;
       } else if (internalField === 'ram') {
         const normalizedValue = String(value).toLowerCase().replace(/\s/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const foundRam = RAM_OPTIONS.find(r => r.toLowerCase().replace(/\s/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
-        (mapped as any)[internalField] = foundRam || undefined;
+        mapped[internalField] = foundRam || undefined;
       } else if (internalField === 'storageType') {
         const normalizedValue = String(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const foundStorageType = STORAGE_TYPES_ZOD_ENUM.find(st => st.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
-         (mapped as any)[internalField] = foundStorageType || undefined;
+         mapped[internalField] = foundStorageType || undefined;
       }
       else {
-        (mapped as any)[internalField] = value === null || value === undefined ? undefined : String(value).trim();
+         (mapped as any)[internalField] = value === null || value === undefined ? undefined : String(value).trim();
       }
     }
   }
-    // Ensure defaults for required fields if they couldn't be mapped or were empty
     if (mapped.quantity === undefined || isNaN(Number(mapped.quantity))) {
-        mapped.quantity = 1; // Default quantity
+        mapped.quantity = 1;
     }
     if (mapped.status === undefined) {
-        mapped.status = "En Uso"; // Default status
+        mapped.status = "En Uso";
     }
-    if (mapped.category === undefined) {
-        // If category is critical and not mapped, this row will fail Zod validation.
-        // Could set a default like "Otro" but it's better to ensure it's in Excel.
-    }
-    if (mapped.name === undefined || String(mapped.name).trim() === "") {
-        // If name is critical and not mapped, this row will fail Zod validation.
-    }
-
-
   return mapped;
 };
 
@@ -534,88 +507,128 @@ export async function importInventoryItemsAction(
   currentUserId: string,
   currentUserName: string
 ) {
-  let successCount = 0;
-  let errorCount = 0;
-  const errors: { row: number; message: string; data: ExcelInventoryItemData }[] = [];
-  const importedItems: InventoryItem[] = [];
+  try {
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: { row: number; message: string; data: ExcelInventoryItemData }[] = [];
+    const importedItems: InventoryItem[] = [];
 
-  for (let i = 0; i < itemDataArray.length; i++) {
-    const rawRow = itemDataArray[i];
-    const mappedData = mapExcelRowToInventoryItemFormValues(rawRow);
-
-    const validatedFields = BaseInventoryItemSchema.safeParse(mappedData);
-
-    if (!validatedFields.success) {
-      errorCount++;
-      errors.push({
-        row: i + 2, // Assuming Excel row numbers start from 1 and row 1 is header
-        message: Object.entries(validatedFields.error.flatten().fieldErrors).map(([field, msgs]) => `${field}: ${msgs.join(', ')}`).join('; ') || "Error de validación desconocido.",
-        data: rawRow,
-      });
-      continue;
+    if (!itemDataArray || itemDataArray.length === 0) {
+        return {
+            success: false,
+            message: "No se proporcionaron datos para importar o el archivo está vacío.",
+            successCount,
+            errorCount: itemDataArray?.length || 0,
+            errors: [{ row: 0, message: "Archivo vacío o sin datos.", data: {} }],
+            importedItems
+        };
     }
 
-    const data = validatedFields.data;
-    const prefix = categoryPrefixMap[data.category as InventoryItemCategory]; // Zod ensures category is valid
-    const allItems = getRawInventoryStore();
-    let maxNum = 0;
-    allItems.forEach(item => {
-      if (item.id.startsWith(`${prefix}-IEQ-`)) {
-        try {
-          const numPart = parseInt(item.id.substring(item.id.lastIndexOf('-') + 1), 10);
-          if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
-        } catch (e) { /* ignore */ }
+    for (let i = 0; i < itemDataArray.length; i++) {
+      try {
+        const rawRow = itemDataArray[i];
+        const mappedData = mapExcelRowToInventoryItemFormValues(rawRow);
+
+        const validatedFields = BaseInventoryItemSchema.safeParse(mappedData);
+
+        if (!validatedFields.success) {
+          errorCount++;
+          errors.push({
+            row: i + 2, 
+            message: Object.entries(validatedFields.error.flatten().fieldErrors)
+              .map(([field, fieldMessages]) => `${field}: ${(fieldMessages || ['Error desconocido']).join(', ')}`)
+              .join('; ') || "Error de validación desconocido.",
+            data: rawRow,
+          });
+          continue;
+        }
+
+        const data = validatedFields.data;
+        const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
+        if (!prefix) {
+            throw new Error(`Categoría '${data.category}' no tiene un prefijo definido o no es válida.`);
+        }
+        
+        const allItems = getRawInventoryStore();
+        let maxNum = 0;
+        allItems.forEach(item => {
+          if (item.id.startsWith(`${prefix}-IEQ-`)) {
+            try {
+              const numPart = parseInt(item.id.substring(item.id.lastIndexOf('-') + 1), 10);
+              if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
+            } catch (e) { /* ignore parsing errors for non-standard IDs */ }
+          }
+        });
+        const newNum = maxNum + 1;
+        const formattedNum = String(newNum).padStart(3, '0');
+        const newId = `${prefix}-IEQ-${formattedNum}`;
+
+        const newItem: InventoryItem = {
+          id: newId,
+          ...data,
+          category: data.category as InventoryItemCategory, 
+          status: data.status as InventoryItemStatus, 
+          addedByUserId: currentUserId,
+          addedByUserName: currentUserName,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        if (newItem.category === "Computadora") {
+            newItem.ram = data.ram === "No Especificado" ? undefined : data.ram;
+            newItem.storageType = data.storageType;
+            newItem.storage = data.storage;
+            newItem.processor = data.processor;
+        } else {
+            newItem.ram = undefined;
+            newItem.storageType = undefined;
+            newItem.storage = undefined;
+            newItem.processor = undefined;
+        }
+
+        addInventoryItemToMock(newItem);
+        importedItems.push(newItem);
+        successCount++;
+      } catch (e: any) {
+        errorCount++;
+        errors.push({
+          row: i + 2,
+          message: `Error procesando fila: ${e.message || String(e)}`,
+          data: itemDataArray[i],
+        });
+        console.error(`Error procesando fila ${i + 2} del Excel:`, e, "Datos de la fila:", itemDataArray[i]);
       }
-    });
-    const newNum = maxNum + 1;
-    const formattedNum = String(newNum).padStart(3, '0');
-    const newId = `${prefix}-IEQ-${formattedNum}`;
-
-    const newItem: InventoryItem = {
-      id: newId,
-      ...data,
-      category: data.category as InventoryItemCategory, // Already validated by Zod
-      status: data.status as InventoryItemStatus, // Already validated by Zod
-      addedByUserId: currentUserId,
-      addedByUserName: currentUserName,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    if (newItem.category === "Computadora") {
-        newItem.ram = data.ram === "No Especificado" ? undefined : data.ram;
-        newItem.storageType = data.storageType;
-        newItem.storage = data.storage;
-        newItem.processor = data.processor;
-    } else {
-        newItem.ram = undefined;
-        newItem.storageType = undefined;
-        newItem.storage = undefined;
-        newItem.processor = undefined;
     }
 
+    if (successCount > 0) {
+      await logAuditEvent(currentUserEmail, "Importación Masiva de Inventario", `Se importaron ${successCount} artículos. Errores: ${errorCount}.`);
+    } else if (errorCount > 0 && itemDataArray.length > 0) {
+      await logAuditEvent(currentUserEmail, "Intento Fallido de Importación Masiva de Inventario", `No se importaron artículos. Errores: ${errorCount} de ${itemDataArray.length} filas.`);
+    }
 
-    addInventoryItemToMock(newItem);
-    importedItems.push(newItem);
-    successCount++;
+    revalidatePath("/inventory");
+
+    return {
+      success: successCount > 0 && errorCount === 0,
+      message: `Importación completada. ${successCount} artículos importados, ${errorCount} filas con errores.`,
+      successCount,
+      errorCount,
+      errors,
+      importedItems
+    };
+  } catch (e: any) {
+    console.error("Error catastrófico durante la importación de inventario:", e);
+    return {
+      success: false,
+      message: `Error general del servidor durante la importación: ${e.message || 'Error desconocido'}. Revise los logs del servidor.`,
+      successCount: 0,
+      errorCount: itemDataArray?.length || 0,
+      errors: itemDataArray?.map((row, index) => ({
+          row: index + 2,
+          message: `Error general del servidor al procesar esta fila: ${e.message || 'Error desconocido'}`,
+          data: row,
+      })) || [{ row: 0, message: `Error general del servidor: ${e.message || 'Error desconocido'}`, data: {} }],
+      importedItems: []
+    };
   }
-
-  if (successCount > 0) {
-    await logAuditEvent(currentUserEmail, "Importación Masiva de Inventario", `Se importaron ${successCount} artículos. Errores: ${errorCount}.`);
-  } else if (errorCount > 0) {
-     await logAuditEvent(currentUserEmail, "Intento Fallido de Importación Masiva de Inventario", `No se importaron artículos. Errores: ${errorCount}.`);
-  }
-
-
-  revalidatePath("/inventory");
-
-  return {
-    success: successCount > 0 && errorCount === 0, // Success only if all rows are imported without errors
-    message: `Importación completada. ${successCount} artículos importados, ${errorCount} filas con errores.`,
-    successCount,
-    errorCount,
-    errors, // This contains detailed errors per row
-    importedItems
-  };
 }
-
