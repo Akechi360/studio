@@ -135,10 +135,10 @@ export function AppSidebarNav() {
                 isActive={isAnySubItemActive && isSectionOpen}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-expanded={isSectionOpen}
-                className="justify-between w-full"
+                className="justify-between w-full" // Removed cursor-default and specific hover:text
               >
                 <div className="flex items-center gap-2 overflow-hidden">
-                  <Icon className="shrink-0 text-muted-foreground" /> {/* Changed for minimalist parent icon */}
+                  <Icon className="shrink-0" /> {/* Icon will use default styling from SidebarMenuButton */}
                   <span className={cn("truncate", sidebarState === "collapsed" ? "sr-only" : "")}>
                     {item.label}
                   </span>
@@ -211,3 +211,4 @@ export function AppSidebarNav() {
     </SidebarMenu>
   );
 }
+
