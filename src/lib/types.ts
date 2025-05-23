@@ -143,7 +143,7 @@ export interface PaymentInstallment {
 export interface ApprovalRequest {
   id: string;
   type: ApprovalRequestType;
-  subject: string;
+  subject: string; // Asunto/Concepto
   description?: string; // Justification or full explanation
   status: ApprovalStatus;
   requesterId: string;
@@ -151,10 +151,9 @@ export interface ApprovalRequest {
   requesterEmail?: string;
   createdAt: Date;
   updatedAt: Date;
-  attachments: Attachment[];
+  attachments: Attachment[]; // Will remain empty for now in mock data
   activityLog: ApprovalActivityLogEntry[];
-  amount?: number; // General amount, might be used by both or specifically by one
-
+  
   // Fields for "Presidente IEQ" action
   approverId?: string; // User ID of the approver
   approverName?: string;
@@ -164,9 +163,9 @@ export interface ApprovalRequest {
   infoRequestedAt?: Date;
 
   // Compra Specific Fields
-  itemDescription?: string; // Specific item being bought for "Compra"
-  estimatedPrice?: number; // For "Compra"
-  supplierCompra?: string; // Supplier for "Compra"
+  itemDescription?: string; // Specific item being bought for "Compra" (Field "Item" in form)
+  estimatedPrice?: number; // For "Compra" (Field "Precio Est. Completo" in form)
+  supplierCompra?: string; // Supplier for "Compra" (Field "Proveedor" in form)
 
   // PagoProveedor Specific Fields
   supplierPago?: string; // Supplier for "PagoProveedor"

@@ -17,10 +17,10 @@ import {
   getInventoryItemByIdFromMock,
   addAuditLogEntryToMock,
   getAllAuditLogsFromMock,
-  addApprovalRequestToMock, // Added for approvals
-  getAllApprovalRequestsFromMock, // Added for approvals
-  getApprovalRequestByIdFromMock, // Added for approvals
-  updateApprovalRequestInMock // Added for approvals
+  addApprovalRequestToMock, 
+  getAllApprovalRequestsFromMock, 
+  getApprovalRequestByIdFromMock, 
+  updateApprovalRequestInMock 
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
@@ -88,12 +88,15 @@ export async function createTicketAction(
   };
 
   addTicketToMock(newTicket);
-  await logAuditEvent(userEmail, "Creación de Ticket", `Ticket ID: ${newTicket.id}, Asunto: ${subject}`);
+  if (userEmail) {
+    await logAuditEvent(userEmail, "Creación de Ticket", `Ticket ID: ${newTicket.id}, Asunto: ${subject}`);
+  }
   revalidatePath("/tickets");
   revalidatePath(`/tickets/${newTicket.id}`);
   revalidatePath("/dashboard");
-  revalidatePath("/admin/reports");
+  revalidatePath("/admin/reports"); // Though removed from sidebar, revalidate if used elsewhere
   revalidatePath("/admin/analytics");
+
 
   return {
     success: true,
@@ -109,7 +112,7 @@ const AddCommentSchema = z.object({
 
 export async function addCommentAction(
   ticketId: string,
-  commenter: User,
+  commenter: Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>,
   values: z.infer<typeof AddCommentSchema>
 ) {
   const validatedFields = AddCommentSchema.safeParse(values);
@@ -148,6 +151,7 @@ export async function addCommentAction(
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
   revalidatePath("/admin/analytics");
+
 
   return {
     success: true,
@@ -192,6 +196,7 @@ export async function updateTicketStatusAction(
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
   revalidatePath("/admin/analytics");
+
 
   const statusDisplayMap: Record<TicketStatus, string> = {
     Open: "Abierto", "In Progress": "En Progreso", Resolved: "Resuelto", Closed: "Cerrado",
@@ -281,7 +286,9 @@ export async function addInventoryItemAction(
     addedByUserId: currentUser.id, addedByUserName: currentUser.name, createdAt: new Date(), updatedAt: new Date(),
   };
   addInventoryItemToMock(newItem);
-  await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo ID: ${newItem.id}, Nombre: ${newItem.name}`);
+  if(currentUser.email){
+    await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo ID: ${newItem.id}, Nombre: ${newItem.name}`);
+  }
   revalidatePath("/inventory");
   return { success: true, message: `Artículo "${newItem.name}" con ID "${newId}" añadido exitosamente.`, item: newItem };
 }
@@ -368,14 +375,13 @@ export async function importInventoryItemsAction(
   currentUserName: string
 ) {
   try {
+    if (!itemDataArray || itemDataArray.length === 0) {
+      return { success: false, message: "No se proporcionaron datos para importar o el archivo está vacío.", successCount: 0, errorCount: itemDataArray?.length || 0, errors: [{ row: 0, message: "Archivo vacío o sin datos.", data: {} }], importedItems: [] };
+    }
     let successCount = 0;
     let errorCount = 0;
     const errors: { row: number; message: string; data: ExcelInventoryItemData }[] = [];
     const importedItems: InventoryItem[] = [];
-
-    if (!itemDataArray || itemDataArray.length === 0) {
-      return { success: false, message: "No se proporcionaron datos para importar o el archivo está vacío.", successCount, errorCount: itemDataArray?.length || 0, errors: [{ row: 0, message: "Archivo vacío o sin datos.", data: {} }], importedItems };
-    }
 
     for (let i = 0; i < itemDataArray.length; i++) {
       try {
@@ -385,7 +391,7 @@ export async function importInventoryItemsAction(
 
         if (!validatedFields.success) {
           errorCount++;
-          const fieldErrors = validatedFields.error.flatten().fieldErrors;
+          const fieldErrors = validatedFields.error.flatten().fieldErrors as Record<string, string[] | undefined>;
           const errorMessage = Object.entries(fieldErrors)
             .map(([field, messages]) => `${field}: ${(messages || ['Error desconocido']).join(', ')}`)
             .join('; ') || "Error de validación desconocido.";
@@ -395,7 +401,9 @@ export async function importInventoryItemsAction(
 
         const data = validatedFields.data;
         const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
-        if (!prefix) throw new Error(`Categoría '${data.category}' no tiene un prefijo definido o no es válida.`);
+        if (!prefix) {
+            throw new Error(`Categoría '${data.category}' no tiene un prefijo definido o no es válida. Fila: ${i + 2}`);
+        }
         
         const allItems = getRawInventoryStore();
         let maxNum = 0;
@@ -442,79 +450,95 @@ export async function importInventoryItemsAction(
 }
 
 
-// --- Approval Actions (Placeholders for now) ---
+// --- Approval Actions ---
 
-const CreateApprovalRequestSchema = z.object({
+const CreateApprovalRequestBaseSchema = z.object({
   type: z.enum(["Compra", "PagoProveedor"] as [ApprovalRequestType, ...ApprovalRequestType[]]),
   subject: z.string().min(5, "El asunto debe tener al menos 5 caracteres.").max(100),
   description: z.string().max(2000).optional(),
-  // Add more fields based on type later, like amount, itemDescription etc.
   requesterId: z.string(),
   requesterName: z.string(),
   requesterEmail: z.string().email().optional(),
 });
 
+const PurchaseRequestSchema = CreateApprovalRequestBaseSchema.extend({
+  type: z.literal("Compra"),
+  itemDescription: z.string().min(3, "El ítem es obligatorio.").max(200),
+  estimatedPrice: z.coerce.number().positive("El precio debe ser positivo.").optional(),
+  supplierCompra: z.string().max(100).optional(),
+});
+
+const PaymentRequestSchema = CreateApprovalRequestBaseSchema.extend({
+  type: z.literal("PagoProveedor"),
+  // Add fields specific to PaymentRequest if needed in future iterations
+});
+
+// Union schema for validation in the action
+const CreateApprovalRequestActionSchema = z.union([PurchaseRequestSchema, PaymentRequestSchema]);
+
 export async function createApprovalRequestAction(
-  values: z.infer<typeof CreateApprovalRequestSchema>
+  values: z.infer<typeof PurchaseRequestSchema> | z.infer<typeof PaymentRequestSchema> // Adjust based on which form calls it
 ): Promise<{ success: boolean; message: string; approvalId?: string; errors?: any }> {
-  const validatedFields = CreateApprovalRequestSchema.safeParse(values);
+  const validatedFields = CreateApprovalRequestActionSchema.safeParse(values);
   if (!validatedFields.success) {
     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
   }
 
-  const { type, subject, description, requesterId, requesterName, requesterEmail } = validatedFields.data;
+  const data = validatedFields.data;
   
   const newApproval: ApprovalRequest = {
     id: `APR-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    type,
-    subject,
-    description,
+    type: data.type,
+    subject: data.subject,
+    description: data.description,
     status: "Pendiente",
-    requesterId,
-    requesterName,
-    requesterEmail,
+    requesterId: data.requesterId,
+    requesterName: data.requesterName,
+    requesterEmail: data.requesterEmail,
     createdAt: new Date(),
     updatedAt: new Date(),
-    attachments: [], // Placeholder
+    attachments: [], // Placeholder for now
     activityLog: [
       {
         id: `ACT-${Date.now()}`,
         action: "Solicitud Enviada",
-        userId: requesterId,
-        userName: requesterName,
+        userId: data.requesterId,
+        userName: data.requesterName,
         timestamp: new Date(),
       }
     ],
-    // Add other type-specific fields with default or undefined values
   };
+
+  if (data.type === "Compra") {
+    newApproval.itemDescription = data.itemDescription;
+    newApproval.estimatedPrice = data.estimatedPrice;
+    newApproval.supplierCompra = data.supplierCompra;
+  } else if (data.type === "PagoProveedor") {
+    // Populate PagoProveedor specific fields if they exist in 'data'
+  }
 
   addApprovalRequestToMock(newApproval);
 
-  if (requesterEmail) {
-    await logAuditEvent(requesterEmail, `Creación de Solicitud de Aprobación (${type})`, `ID: ${newApproval.id}, Asunto: ${subject}`);
+  if (data.requesterEmail) {
+    await logAuditEvent(data.requesterEmail, `Creación de Solicitud de Aprobación (${data.type})`, `ID: ${newApproval.id}, Asunto: ${data.subject}`);
   }
   
   revalidatePath("/approvals");
-  // Potentially revalidate dashboard for President if they see pending approvals there
-  revalidatePath("/dashboard"); 
+  revalidatePath("/dashboard"); // For President's dashboard
 
   return {
     success: true,
-    message: `Solicitud de ${type === "Compra" ? "Compra" : "Pago a Proveedores"} enviada exitosamente.`,
+    message: `Solicitud de ${data.type === "Compra" ? "Compra" : "Pago a Proveedores"} enviada exitosamente.`,
     approvalId: newApproval.id,
   };
 }
 
 
-// Placeholder - to be expanded
 export async function getApprovalRequestsForUser(userId: string, userRole: Role): Promise<ApprovalRequest[]> {
   const allRequests = getAllApprovalRequestsFromMock();
   if (userRole === "Presidente IEQ") {
-    // President sees all pending requests
     return allRequests.filter(req => req.status === "Pendiente");
   }
-  // Other users (including Admin for now, or specific approvers) might see requests they created
-  // or requests assigned to them if we add that logic
   return allRequests.filter(req => req.requesterId === userId);
 }
 

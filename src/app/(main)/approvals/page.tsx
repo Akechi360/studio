@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/compon
 import { useToast } from "@/hooks/use-toast"; 
 import { useEffect, useState } from "react";
 import type { ApprovalRequest } from "@/lib/types"; 
+import { CreatePurchaseRequestDialog } from "@/components/approvals/CreatePurchaseRequestDialog"; // Import the new dialog
 // import { getApprovalRequestsForUser } from "@/lib/actions"; // Placeholder
 
 function AccessDeniedMessage() {
@@ -30,6 +31,7 @@ export default function ApprovalsPage() {
   const { toast } = useToast();
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]); 
   const [isLoading, setIsLoading] = useState(false); 
+  const [isCreatePurchaseDialogOpen, setIsCreatePurchaseDialogOpen] = useState(false);
 
   const canAccessApprovals =
     user?.role === "Admin" ||
@@ -46,7 +48,7 @@ export default function ApprovalsPage() {
       // };
       // fetchRequests();
       setTimeout(() => {
-        setPendingApprovals([]);
+        setPendingApprovals([]); // Mock: no pending approvals for now
         setIsLoading(false);
       }, 500);
     }
@@ -58,17 +60,19 @@ export default function ApprovalsPage() {
   }
 
   const handleNewPurchaseRequest = () => {
-    toast({
-      title: "Formulario de Compras",
-      description: "El formulario para crear solicitudes de compra aún no está implementado.",
-    });
+    setIsCreatePurchaseDialogOpen(true);
   };
 
   const handleNewPaymentRequest = () => {
     toast({
       title: "Formulario de Pago a Proveedores",
-      description: "El formulario para crear solicitudes de pago aún no está implementado.",
+      description: "El formulario para crear solicitudes de pago a proveedores aún no está implementado.",
     });
+  };
+  
+  const handlePurchaseRequestSuccess = (approvalId: string) => {
+    // Potentially refresh a list of "my sent requests" if we implement that view
+    console.log("Purchase request created successfully with ID:", approvalId);
   };
 
   return (
@@ -144,6 +148,11 @@ export default function ApprovalsPage() {
            </CardContent>
          </Card>
        )}
+      <CreatePurchaseRequestDialog 
+        isOpen={isCreatePurchaseDialogOpen}
+        onClose={() => setIsCreatePurchaseDialogOpen(false)}
+        onSuccess={handlePurchaseRequestSuccess}
+      />
     </div>
   );
 }
