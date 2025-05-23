@@ -442,6 +442,11 @@ export type ExcelInventoryItemData = {
 
 const excelToInternalFieldMap: Record<string, keyof InventoryItem> = {
   'nombre': 'name',
+  'nombre del articulo': 'name',
+  'nombre del artículo': 'name',
+  'articulo': 'name',
+  'artículo': 'name',
+  'equipo': 'name', // Added
   'categoría': 'category',
   'categoria': 'category',
   'marca': 'brand',
@@ -449,25 +454,32 @@ const excelToInternalFieldMap: Record<string, keyof InventoryItem> = {
   'número de serie': 'serialNumber',
   'numero de serie': 'serialNumber',
   'n/s': 'serialNumber',
+  'serial': 'serialNumber', // Added
+  'serie': 'serialNumber', // Added
   'procesador': 'processor',
   'ram': 'ram',
+  'memoria ram': 'ram',
   'tipo de almacenamiento': 'storageType',
   'tipo de disco': 'storageType',
   'capacidad de almacenamiento': 'storage',
   'almacenamiento': 'storage',
   'cantidad': 'quantity',
+  'cant': 'quantity',
   'ubicación': 'location',
   'ubicacion': 'location',
   'departamento': 'location',
+  'asignacion': 'location', // Added
+  'asignación': 'location', // Added
   'estado': 'status',
   'notas adicionales': 'notes',
   'notas': 'notes',
+  'observaciones': 'notes',
 };
 
 const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Partial<z.infer<typeof BaseInventoryItemSchema>> => {
   const mapped: Partial<z.infer<typeof BaseInventoryItemSchema>> = {};
   for (const excelHeader in row) {
-    const lowerExcelHeader = excelHeader.toLowerCase().trim();
+    const lowerExcelHeader = excelHeader.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Normalize and remove accents
     const internalField = excelToInternalFieldMap[lowerExcelHeader];
     if (internalField) {
       let value = row[excelHeader];
@@ -475,16 +487,20 @@ const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Part
         const parsedQuantity = parseInt(value, 10);
         (mapped as any)[internalField] = isNaN(parsedQuantity) ? undefined : parsedQuantity;
       } else if (internalField === 'category') {
-        const foundCategory = INVENTORY_ITEM_CATEGORIES.find(cat => cat.toLowerCase() === String(value).toLowerCase());
+        const normalizedValue = String(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const foundCategory = INVENTORY_ITEM_CATEGORIES.find(cat => cat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
         (mapped as any)[internalField] = foundCategory || undefined;
       } else if (internalField === 'status') {
-         const foundStatus = INVENTORY_ITEM_STATUSES.find(stat => stat.toLowerCase() === String(value).toLowerCase());
+         const normalizedValue = String(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+         const foundStatus = INVENTORY_ITEM_STATUSES.find(stat => stat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
         (mapped as any)[internalField] = foundStatus || undefined;
       } else if (internalField === 'ram') {
-        const foundRam = RAM_OPTIONS.find(r => String(value).toLowerCase().replace(/\s/g, '') === r.toLowerCase().replace(/\s/g, ''));
+        const normalizedValue = String(value).toLowerCase().replace(/\s/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const foundRam = RAM_OPTIONS.find(r => r.toLowerCase().replace(/\s/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
         (mapped as any)[internalField] = foundRam || undefined;
       } else if (internalField === 'storageType') {
-        const foundStorageType = STORAGE_TYPES_ZOD_ENUM.find(st => String(value).toLowerCase() === st.toLowerCase());
+        const normalizedValue = String(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const foundStorageType = STORAGE_TYPES_ZOD_ENUM.find(st => st.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
          (mapped as any)[internalField] = foundStorageType || undefined;
       }
       else {
@@ -492,6 +508,22 @@ const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Part
       }
     }
   }
+    // Ensure defaults for required fields if they couldn't be mapped or were empty
+    if (mapped.quantity === undefined || isNaN(Number(mapped.quantity))) {
+        mapped.quantity = 1; // Default quantity
+    }
+    if (mapped.status === undefined) {
+        mapped.status = "En Uso"; // Default status
+    }
+    if (mapped.category === undefined) {
+        // If category is critical and not mapped, this row will fail Zod validation.
+        // Could set a default like "Otro" but it's better to ensure it's in Excel.
+    }
+    if (mapped.name === undefined || String(mapped.name).trim() === "") {
+        // If name is critical and not mapped, this row will fail Zod validation.
+    }
+
+
   return mapped;
 };
 
@@ -511,32 +543,27 @@ export async function importInventoryItemsAction(
     const rawRow = itemDataArray[i];
     const mappedData = mapExcelRowToInventoryItemFormValues(rawRow);
 
-    // Set defaults if not present, especially for required fields not perfectly mapped
-    if (!mappedData.quantity) mappedData.quantity = 1;
-    if (!mappedData.status) mappedData.status = "En Uso"; // Default status if not in Excel
-
-
     const validatedFields = BaseInventoryItemSchema.safeParse(mappedData);
 
     if (!validatedFields.success) {
       errorCount++;
       errors.push({
         row: i + 2, // Assuming Excel row numbers start from 1 and row 1 is header
-        message: Object.values(validatedFields.error.flatten().fieldErrors).flat().join('; ') || "Error de validación desconocido.",
+        message: Object.entries(validatedFields.error.flatten().fieldErrors).map(([field, msgs]) => `${field}: ${msgs.join(', ')}`).join('; ') || "Error de validación desconocido.",
         data: rawRow,
       });
       continue;
     }
 
     const data = validatedFields.data;
-    const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
+    const prefix = categoryPrefixMap[data.category as InventoryItemCategory]; // Zod ensures category is valid
     const allItems = getRawInventoryStore();
     let maxNum = 0;
     allItems.forEach(item => {
       if (item.id.startsWith(`${prefix}-IEQ-`)) {
         try {
           const numPart = parseInt(item.id.substring(item.id.lastIndexOf('-') + 1), 10);
-          if (numPart > maxNum) maxNum = numPart;
+          if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
         } catch (e) { /* ignore */ }
       }
     });
@@ -547,8 +574,8 @@ export async function importInventoryItemsAction(
     const newItem: InventoryItem = {
       id: newId,
       ...data,
-      category: data.category as InventoryItemCategory,
-      status: data.status as InventoryItemStatus,
+      category: data.category as InventoryItemCategory, // Already validated by Zod
+      status: data.status as InventoryItemStatus, // Already validated by Zod
       addedByUserId: currentUserId,
       addedByUserName: currentUserName,
       createdAt: new Date(),
@@ -583,11 +610,12 @@ export async function importInventoryItemsAction(
   revalidatePath("/inventory");
 
   return {
-    success: successCount > 0,
+    success: successCount > 0 && errorCount === 0, // Success only if all rows are imported without errors
     message: `Importación completada. ${successCount} artículos importados, ${errorCount} filas con errores.`,
     successCount,
     errorCount,
-    errors,
+    errors, // This contains detailed errors per row
     importedItems
   };
 }
+

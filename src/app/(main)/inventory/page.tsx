@@ -142,7 +142,7 @@ export default function InventoryPage() {
       toast({ title: "Sin Archivo", description: "No se seleccionó ningún archivo.", variant: "destructive" });
       return;
     }
-    if (!user || !user.email || !user.id || !user.name) { // Added user.id and user.name check
+    if (!user || !user.email || !user.id || !user.name) { 
       toast({ title: "Error de Autenticación", description: "Debes iniciar sesión para importar.", variant: "destructive"});
       return;
     }
@@ -168,7 +168,6 @@ export default function InventoryPage() {
             return;
         }
         
-        // Ensure jsonData is an array of plain objects
         const plainJsonData = jsonDataFromExcel.map(item => ({ ...item }));
 
         const result = await importInventoryItemsAction(plainJsonData, user.email, user.id, user.name);
@@ -178,18 +177,27 @@ export default function InventoryPage() {
             title: "Importación Exitosa",
             description: `${result.successCount} artículos importados. ${result.errorCount > 0 ? `${result.errorCount} filas con errores.` : ''}`,
           });
-          if (result.errorCount > 0 && result.errors) { // Check if result.errors exists
-             console.error("Errores de importación:", result.errors);
-             // Potentially display these errors in a more user-friendly way
-          }
           fetchItems();
         } else {
+          // This means overall import had issues, potentially all rows failed or partial success with many errors
+          let description = result.message || "Ocurrió un error durante la importación.";
+          if (result.errorCount > 0) {
+            description += ` Se encontraron ${result.errorCount} filas con errores. Por favor, revisa la consola del navegador para más detalles.`;
+          }
           toast({
             title: "Fallo en la Importación",
-            description: result.message || "Ocurrió un error durante la importación.",
+            description: description,
             variant: "destructive",
+            duration: 10000, // Longer duration for error messages
           });
         }
+        
+        if (result.errors && result.errors.length > 0) {
+           console.error("Detalles de errores de importación:", result.errors);
+           // For more user-friendly error display, you could format result.errors here
+           // and show them in a dialog or an expandable section.
+        }
+
       } catch (error) {
         console.error("Error al procesar el archivo Excel:", error);
         toast({ title: "Error de Importación", description: `No se pudo procesar el archivo. Asegúrate de que el formato es correcto. Error: ${error instanceof Error ? error.message : String(error)}`, variant: "destructive" });
@@ -425,3 +433,4 @@ export default function InventoryPage() {
     </TooltipProvider>
   );
 }
+
