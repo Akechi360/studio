@@ -161,6 +161,7 @@ export default function InventoryPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonDataFromExcel = XLSX.utils.sheet_to_json<ExcelInventoryItemData>(worksheet);
         
+        // Convert to plain objects
         const plainJsonData = jsonDataFromExcel.map(item => ({ ...item }));
 
 
@@ -180,23 +181,25 @@ export default function InventoryPage() {
           });
           fetchItems();
         } else {
-          // This means overall import had issues, potentially all rows failed or partial success with many errors
           let description = result.message || "Ocurrió un error durante la importación.";
-          if (result.errorCount > 0) {
-            description += ` Se encontraron ${result.errorCount} filas con errores. Por favor, revisa la consola del navegador para más detalles.`;
+          if (result.errorCount > 0 && result.successCount > 0) {
+            description = `Importación parcial: ${result.successCount} artículos importados. ${result.errorCount} filas con errores.`;
+          } else if (result.errorCount > 0) {
+             description += ` Se encontraron ${result.errorCount} filas con errores.`;
           }
+           if (result.errorCount > 0) {
+             description += " Por favor, revisa la consola del navegador para más detalles sobre las filas con errores.";
+           }
           toast({
-            title: "Fallo en la Importación",
+            title: result.successCount > 0 ? "Importación Parcial con Errores" : "Fallo en la Importación",
             description: description,
             variant: "destructive",
-            duration: 10000, // Longer duration for error messages
+            duration: 10000, 
           });
         }
         
         if (result.errors && result.errors.length > 0) {
-           console.warn("Detalles de errores de importación de Excel (filas que no pudieron procesarse):", result.errors);
-           // For more user-friendly error display, you could format result.errors here
-           // and show them in a dialog or an expandable section.
+           console.warn("Detalles de errores de importación (filas que no pudieron procesarse):", result.errors);
         }
 
       } catch (error) {
@@ -279,7 +282,7 @@ export default function InventoryPage() {
         <RadixAlertTitle className="font-semibold text-primary">Importación de Excel</RadixAlertTitle>
         <AlertDescription className="text-sm text-primary/80">
           Para importar desde Excel, asegúrate de que tu archivo tenga encabezados como: Nombre, Categoría, Marca, Modelo, Número de Serie, Procesador, RAM, Tipo de Almacenamiento, Capacidad de Almacenamiento, Cantidad, Ubicación, Estado, Notas Adicionales.
-          La primera hoja del libro será procesada. <a href="/plantilla_inventario_ieq.xlsx" download className="underline font-medium hover:text-primary/90">Descargar plantilla de ejemplo</a>.
+          La primera hoja del libro será procesada. <a href="/plantilla_inventario_ieq.xlsx" download className="underline font-medium hover:text-primary/90">Descargar plantilla de ejemplo</a> (Debes crear este archivo en tu carpeta `public`).
         </AlertDescription>
       </Alert>
 
@@ -434,6 +437,3 @@ export default function InventoryPage() {
     </TooltipProvider>
   );
 }
-
-
-    
