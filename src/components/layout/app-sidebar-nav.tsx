@@ -135,10 +135,10 @@ export function AppSidebarNav() {
                 isActive={isAnySubItemActive && isSectionOpen}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-expanded={isSectionOpen}
-                className="justify-between w-full" // Removed cursor-default and specific hover:text
+                className="justify-between w-full cursor-default"
               >
                 <div className="flex items-center gap-2 overflow-hidden">
-                  <Icon className="shrink-0" /> {/* Icon will use default styling from SidebarMenuButton */}
+                  <Icon className="shrink-0" />
                   <span className={cn("truncate", sidebarState === "collapsed" ? "sr-only" : "")}>
                     {item.label}
                   </span>
@@ -172,7 +172,7 @@ export function AppSidebarNav() {
                             isActive={isSubItemActive}
                             aria-current={isSubItemActive ? "page" : undefined}
                           >
-                            <SubIcon className="shrink-0 text-sidebar-accent" />
+                            <SubIcon className="shrink-0" />
                             {subItem.label}
                           </SidebarMenuSubButton>
                         </Link>
@@ -197,7 +197,7 @@ export function AppSidebarNav() {
                   className="w-full"
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <Icon className="shrink-0" /> {/* Default icon rendering for direct links */}
+                    <Icon className="shrink-0" />
                     <span className={cn("truncate", sidebarState === "collapsed" ? "sr-only" : "")}>
                       {item.label}
                     </span>
