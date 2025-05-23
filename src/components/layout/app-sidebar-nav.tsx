@@ -21,15 +21,15 @@ import {
   Settings,
   HelpCircle,
   Archive,
-  BarChartBig, 
-  ClipboardList, 
+  BarChartBig,
+  ClipboardList,
   ScreenShare,
   CalendarDays,
   ChevronRight,
   FileCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import type { Role, User as UserType } from "@/lib/types"; // Import UserType
+import type { Role, User as UserType } from "@/lib/types";
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -40,51 +40,52 @@ interface NavItem {
   allowedRoles?: Role[];
   subItems?: NavItem[];
   exact?: boolean;
-  specialAccessCheck?: (user: UserType | null) => boolean; 
+  specialAccessCheck?: (user: UserType | null) => boolean;
 }
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { 
-    href: "#tickets-toggle", 
-    label: "Tickets", 
+  {
+    href: "#tickets-toggle",
+    label: "Tickets",
     icon: Ticket,
     subItems: [
-      { href: "/tickets", label: "Todos los Tickets", icon: Ticket, exact: true },
-      { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true },
-    ]
+      { href: "/tickets", label: "Todos los Tickets", icon: Ticket, exact: true, allowedRoles: ["User", "Admin"] },
+      { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true, allowedRoles: ["User", "Admin"] },
+    ],
+    allowedRoles: ["User", "Admin"], // Only "User" and "Admin" can see "Tickets"
   },
-  { 
-    href: "/approvals", 
-    label: "Aprobaciones", 
-    icon: FileCheck, 
+  {
+    href: "/approvals",
+    label: "Aprobaciones",
+    icon: FileCheck,
     exact: true,
-    specialAccessCheck: (currentUser) => 
+    specialAccessCheck: (currentUser) =>
       currentUser?.role === "Admin" || currentUser?.role === "Presidente IEQ",
   },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
-  { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true },
-  { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true }, 
+  { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["User", "Admin"] }, // Only "User" and "Admin"
+  { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true, allowedRoles: ["User", "Admin"] }, // Only "User" and "Admin"
   { href: "/profile", label: "Perfil", icon: User, exact: true },
-  { 
-    href: "#admin-toggle", 
-    label: "Administración", 
-    icon: Settings, 
+  {
+    href: "#admin-toggle",
+    label: "Administración",
+    icon: Settings,
     allowedRoles: ["Admin"],
     subItems: [
       { href: "/admin/users", label: "Usuarios", icon: Users, allowedRoles: ["Admin"], exact: true },
       { href: "/admin/analytics", label: "Analíticas", icon: BarChartBig, allowedRoles: ["Admin"], exact: true },
       { href: "/admin/audit", label: "Auditoría", icon: ClipboardList, allowedRoles: ["Admin"], exact: true },
-      { href: "/settings", label: "Configuración App", icon: Settings, allowedRoles: ["Admin"], exact: true }, 
+      { href: "/settings", label: "Configuración App", icon: Settings, allowedRoles: ["Admin"], exact: true },
     ]
   },
-  { href: "/help", label: "Ayuda y FAQ", icon: HelpCircle, exact: true },
+  { href: "/help", label: "Ayuda y FAQ", icon: HelpCircle, exact: true, allowedRoles: ["User", "Admin"] }, // Only "User" and "Admin"
 ];
 
 export function AppSidebarNav() {
   const pathname = usePathname();
   const { state: sidebarState } = useSidebar();
-  const { user } = useAuth(); 
+  const { user } = useAuth();
   const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -103,8 +104,6 @@ export function AppSidebarNav() {
         if (isParentActiveDueToChild && !currentOpenState) {
           newOpenStates[item.label] = true;
           pathChanged = true;
-        } else if (!isParentActiveDueToChild && currentOpenState && !openStates[item.label]) {
-          // This case might not be strictly necessary if we only open on child active
         } else {
           newOpenStates[item.label] = currentOpenState;
         }
@@ -123,25 +122,39 @@ export function AppSidebarNav() {
   return (
     <SidebarMenu>
       {navItems.map((item) => {
-        
+        if (item.allowedRoles && user?.role && !item.allowedRoles.includes(user.role)) {
+          return null;
+        }
         if (item.specialAccessCheck && !item.specialAccessCheck(user)) {
           return null;
         }
-        if (item.allowedRoles && user?.role && !item.allowedRoles.includes(user.role) && item.label !== "Aprobaciones") { // Keep approvals logic separate
-             return null;
-        }
-
 
         const Icon = item.icon;
         const isSectionOpen = !!openStates[item.label];
 
         if (item.subItems && item.subItems.length > 0) {
-          const isAnySubItemActive = item.subItems.some(subItem => {
+          // Check if any sub-item should be visible for the current user role
+          const visibleSubItems = item.subItems.filter(subItem => {
+            if (subItem.allowedRoles && user?.role && !subItem.allowedRoles.includes(user.role)) {
+              return false;
+            }
+            if (subItem.specialAccessCheck && !subItem.specialAccessCheck(user)) {
+              return false;
+            }
+            return true;
+          });
+
+          if (visibleSubItems.length === 0) {
+            return null; // Don't render the parent if no sub-items are visible
+          }
+
+
+          const isAnySubItemActive = visibleSubItems.some(subItem => {
              const subItemPath = subItem.href.endsWith('/') ? subItem.href.slice(0, -1) : subItem.href;
              const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
-             return currentPath === subItemPath || currentPath.startsWith(subItemPath + '/');
+             return currentPath === subItemPath || (subItemPath !== '/' && currentPath.startsWith(subItemPath + '/'));
           });
-          
+
           return (
             <SidebarMenuItem key={item.label}>
               <SidebarMenuButton
@@ -170,15 +183,12 @@ export function AppSidebarNav() {
                 <SidebarMenuSub
                   className={cn(sidebarState === "collapsed" ? "hidden" : "", "pl-2")}
                 >
-                  {item.subItems.map((subItem) => {
-                    if (subItem.allowedRoles && user?.role && !subItem.allowedRoles.includes(user.role)) {
-                      return null;
-                    }
+                  {visibleSubItems.map((subItem) => {
                     const SubIcon = subItem.icon;
                     const subItemPath = subItem.href.endsWith('/') ? subItem.href.slice(0, -1) : subItem.href;
                     const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
                     const isSubItemActive = currentPath === subItemPath || (subItemPath !== '/' && currentPath.startsWith(subItemPath + '/'));
-                    
+
                     return (
                       <SidebarMenuSubItem key={subItem.href}>
                         <Link href={subItem.href} passHref legacyBehavior>
@@ -225,4 +235,3 @@ export function AppSidebarNav() {
     </SidebarMenu>
   );
 }
-

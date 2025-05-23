@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { getAllTickets } from '@/lib/actions';
 import type { Ticket, TicketPriority } from '@/lib/types';
 import { TicketListItem } from '@/components/tickets/ticket-list-item';
-import { Loader2, Ticket as TicketIcon, ListChecks, AlertCircle } from 'lucide-react';
+import { Loader2, Ticket as TicketIcon, ListChecks, AlertCircle, FileCheck } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 export default function DashboardPage() {
@@ -16,7 +16,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchTickets() {
-      if (user) {
+      if (user && (role === 'Admin' || role === 'User')) { // Fetch tickets only for Admin and User
         setIsLoading(true);
         try {
           const tickets = await getAllTickets();
@@ -26,10 +26,12 @@ export default function DashboardPage() {
         } finally {
           setIsLoading(false);
         }
+      } else {
+        setIsLoading(false); // No tickets to fetch for Presidente IEQ on this view
       }
     }
     fetchTickets();
-  }, [user]);
+  }, [user, role]);
 
   const priorityOrder: Record<TicketPriority, number> = { High: 0, Medium: 1, Low: 2 };
 
@@ -40,16 +42,16 @@ export default function DashboardPage() {
           if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
             return priorityOrder[a.priority] - priorityOrder[b.priority];
           }
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); 
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         })
     : [];
 
   const userCreatedTickets = role === 'User'
     ? allTickets
         .filter(ticket => ticket.userId === user?.id)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) 
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     : [];
-  
+
   if (isLoading && !user) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -57,33 +59,55 @@ export default function DashboardPage() {
       </div>
     );
   }
-  
+
   if (!user) {
     return <div className="p-8 text-center">Por favor, inicia sesión para ver el dashboard.</div>;
   }
 
   return (
-    <div className="space-y-8"> {/* Removed w-full */}
+    <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
           Bienvenido/a, {user.name}!
         </h1>
         <p className="text-muted-foreground">
-          {role === 'Admin'
-            ? "Aquí tienes un resumen de los tickets abiertos que requieren tu atención."
-            : "Aquí puedes ver el estado de los tickets que has creado."}
+          {role === 'Admin' && "Aquí tienes un resumen de los tickets abiertos que requieren tu atención."}
+          {role === 'User' && "Aquí puedes ver el estado de los tickets que has creado."}
+          {role === 'Presidente IEQ' && "Aquí puedes gestionar las aprobaciones pendientes."}
         </p>
       </div>
 
-      {isLoading && (
+      {isLoading && (role === 'Admin' || role === 'User') && (
         <div className="flex flex-col items-center justify-center p-8">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <p className="mt-2 text-muted-foreground">Cargando tickets...</p>
         </div>
       )}
 
+      {role === 'Presidente IEQ' && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <FileCheck className="mr-2 h-6 w-6 text-primary" />
+              Aprobaciones Pendientes
+            </CardTitle>
+            <CardDescription>
+              Revisa y gestiona las solicitudes que requieren tu aprobación. (Contenido de aprobaciones se mostrará aquí)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="py-10 text-center text-muted-foreground">
+              <FileCheck className="mx-auto h-12 w-12 mb-3" />
+              <p className="font-semibold">Funcionalidad de Aprobaciones en el Dashboard Próximamente.</p>
+              <p>Por ahora, puedes acceder a la sección de "Aprobaciones" desde el menú lateral.</p>
+            </div>
+            {/* Placeholder for approvals list/cards - to be implemented later */}
+          </CardContent>
+        </Card>
+      )}
+
       {!isLoading && role === 'Admin' && (
-        <Card className="shadow-lg"> {/* Removed w-full */}
+        <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center">
               <AlertCircle className="mr-2 h-6 w-6 text-destructive" />
@@ -112,7 +136,7 @@ export default function DashboardPage() {
       )}
 
       {!isLoading && role === 'User' && (
-        <Card className="shadow-lg"> {/* Removed w-full */}
+        <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center">
               <TicketIcon className="mr-2 h-6 w-6 text-primary" />
