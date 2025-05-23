@@ -140,6 +140,14 @@ export interface PaymentInstallment {
   paymentDate: Date;
 }
 
+// Simplified Attachment metadata for passing from client to server action
+export interface AttachmentClientData {
+  fileName: string;
+  size: number;
+  type?: string;
+}
+
+
 export interface ApprovalRequest {
   id: string;
   type: ApprovalRequestType;
@@ -173,4 +181,3 @@ export interface ApprovalRequest {
   totalAmountToPay?: number; 
   paymentInstallments?: PaymentInstallment[]; 
 }
-

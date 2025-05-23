@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole } from "./types"; // Added UserRole
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole, AttachmentClientData, Attachment } from "./types"; // Added UserRole, AttachmentClientData, Attachment
 import type { AuditLogEntry as AuditLogEntryType } from "./mock-data";
 import {
   addTicketToMock,
@@ -468,6 +468,11 @@ export async function importInventoryItemsAction(
 
 
 // --- Approval Actions ---
+const AttachmentDataSchema = z.object({
+  fileName: z.string(),
+  size: z.number(),
+  type: z.string().optional(),
+});
 
 const CreateApprovalRequestBaseSchema = z.object({
   type: z.enum(["Compra", "PagoProveedor"] as [ApprovalRequestType, ...ApprovalRequestType[]]),
@@ -476,23 +481,26 @@ const CreateApprovalRequestBaseSchema = z.object({
   requesterId: z.string(),
   requesterName: z.string(),
   requesterEmail: z.string().email().optional(),
+  attachmentsData: z.array(AttachmentDataSchema).optional(),
 });
 
-const PurchaseRequestDataSchema = z.object({
+const PurchaseRequestDataSchema = CreateApprovalRequestBaseSchema.extend({
+  type: z.literal("Compra"),
   itemDescription: z.string().min(3, "El ítem es obligatorio.").max(200),
   estimatedPrice: z.coerce.number().positive("El precio debe ser positivo.").optional(),
   supplierCompra: z.string().max(100).optional(),
 });
 
-const PaymentRequestDataSchema = z.object({
+const PaymentRequestDataSchema = CreateApprovalRequestBaseSchema.extend({
+  type: z.literal("PagoProveedor"),
   supplierPago: z.string().min(3, "El proveedor es obligatorio.").max(100),
   totalAmountToPay: z.coerce.number().positive("El monto debe ser positivo."),
-  paymentDueDate: z.date().optional(),
+  paymentDueDate: z.date({ required_error: "La fecha requerida es obligatoria."}),
 });
 
 const CreateApprovalRequestActionSchema = z.discriminatedUnion("type", [
-  CreateApprovalRequestBaseSchema.merge(z.object({ type: z.literal("Compra") })).merge(PurchaseRequestDataSchema),
-  CreateApprovalRequestBaseSchema.merge(z.object({ type: z.literal("PagoProveedor") })).merge(PaymentRequestDataSchema),
+  PurchaseRequestDataSchema,
+  PaymentRequestDataSchema,
 ]);
 
 
@@ -506,6 +514,14 @@ export async function createApprovalRequestAction(
 
   const data = validatedFields.data;
   
+  const newAttachments: Attachment[] = (data.attachmentsData || []).map(attData => ({
+    id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    fileName: attData.fileName,
+    size: attData.size,
+    type: attData.type,
+    url: `/uploads/mock/${attData.fileName}`, // Placeholder URL
+  }));
+
   const newApproval: ApprovalRequest = {
     id: `APR-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     type: data.type,
@@ -517,7 +533,7 @@ export async function createApprovalRequestAction(
     requesterEmail: data.requesterEmail,
     createdAt: new Date(),
     updatedAt: new Date(),
-    attachments: [], 
+    attachments: newAttachments, 
     activityLog: [
       {
         id: `ACT-${Date.now()}`,
@@ -559,8 +575,11 @@ export async function createApprovalRequestAction(
 export async function getApprovalRequestsForUser(userId: string, userRole: UserRole): Promise<ApprovalRequest[]> {
   const allRequests = getAllApprovalRequestsFromMock();
   if (userRole === "Presidente IEQ") {
+    // For President, show all requests that are "Pendiente" regardless of requester
     return allRequests.filter(req => req.status === "Pendiente");
   }
+  // For other users (including Admin if they create requests, or the special approvers),
+  // show requests they created.
   return allRequests.filter(req => req.requesterId === userId);
 }
 
@@ -569,4 +588,3 @@ export async function getApprovalRequestDetails(id: string): Promise<ApprovalReq
 }
 
 // More actions will be needed for approve, reject, request info, add attachments, etc.
-

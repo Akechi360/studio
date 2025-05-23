@@ -28,11 +28,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { createApprovalRequestAction } from '@/lib/actions';
-import type { ApprovalRequestType } from '@/lib/types';
+import type { ApprovalRequestType, AttachmentClientData } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
-import { Loader2, Send, CreditCard } from 'lucide-react';
+import { Loader2, Send, CreditCard, CalendarIcon, Paperclip, XCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -46,7 +45,7 @@ const paymentRequestFormSchema = z.object({
   fechaRequerida: z.date({
     required_error: "La fecha requerida es obligatoria.",
     invalid_type_error: "Formato de fecha inválido.",
-  }).optional(),
+  }),
   descripcion: z.string().max(2000, { message: "Máximo 2000 caracteres." }).optional(),
 });
 
@@ -62,6 +61,8 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const form = useForm<PaymentRequestFormValues>({
     resolver: zodResolver(paymentRequestFormSchema),
@@ -74,12 +75,51 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
     },
   });
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      const newFiles = Array.from(event.target.files);
+      const allFiles = [...selectedFiles, ...newFiles];
+
+      if (allFiles.length > 5) {
+        toast({ title: "Límite de archivos excedido", description: "Puedes adjuntar un máximo de 5 archivos PDF.", variant: "destructive" });
+        return;
+      }
+
+      const nonPdfFiles = newFiles.filter(file => file.type !== "application/pdf");
+      if (nonPdfFiles.length > 0) {
+        toast({ title: "Tipo de archivo no válido", description: "Solo se permiten archivos PDF.", variant: "destructive" });
+        return;
+      }
+      
+      const totalSize = allFiles.reduce((acc, file) => acc + file.size, 0);
+      if (totalSize > 50 * 1024 * 1024) { // 50MB
+         toast({ title: "Tamaño total excedido", description: "El tamaño total de los archivos no debe exceder los 50MB.", variant: "destructive" });
+         return;
+      }
+
+      setSelectedFiles(allFiles.slice(0, 5));
+    }
+  };
+
+  const removeFile = (fileName: string) => {
+    setSelectedFiles(prev => prev.filter(file => file.name !== fileName));
+     if (fileInputRef.current) {
+        fileInputRef.current.value = ""; 
+    }
+  };
+
   const onSubmit = async (data: PaymentRequestFormValues) => {
     if (!user) {
       toast({ title: "Error de Autenticación", description: "Debes iniciar sesión.", variant: "destructive" });
       return;
     }
     setIsSubmitting(true);
+
+    const attachmentsData: AttachmentClientData[] = selectedFiles.map(file => ({
+      fileName: file.name,
+      size: file.size,
+      type: file.type,
+    }));
 
     const requestData = {
       type: "PagoProveedor" as ApprovalRequestType,
@@ -91,6 +131,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
       supplierPago: data.proveedor,
       totalAmountToPay: data.montoTotal,
       paymentDueDate: data.fechaRequerida,
+      attachmentsData: attachmentsData,
     };
 
     const result = await createApprovalRequestAction(requestData);
@@ -102,6 +143,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
         description: result.message,
       });
       form.reset();
+      setSelectedFiles([]);
       if (onSuccess) onSuccess(result.approvalId);
       onClose();
     } else {
@@ -117,7 +159,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); form.reset(); setSelectedFiles([]); } }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center">
@@ -175,7 +217,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                     name="fechaRequerida"
                     render={({ field }) => (
                         <FormItem className="flex flex-col">
-                        <FormLabel className="mb-1.5">Fecha Requerida (Opcional)</FormLabel>
+                        <FormLabel className="mb-1.5">Fecha Requerida *</FormLabel>
                             <Popover>
                                 <PopoverTrigger asChild>
                                 <FormControl>
@@ -226,18 +268,40 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
               )}
             />
             <FormItem>
-                <FormLabel>Archivos Adjuntos (Opcional)</FormLabel>
+                <FormLabel className="flex items-center"><Paperclip className="mr-2 h-4 w-4"/>Archivos Adjuntos (PDF, máx. 5)</FormLabel>
                 <FormControl>
-                    <Input type="file" multiple accept="application/pdf" disabled /> 
+                    <Input 
+                        type="file" 
+                        multiple 
+                        accept="application/pdf" 
+                        onChange={handleFileChange}
+                        ref={fileInputRef}
+                        className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                    /> 
                 </FormControl>
+                 {selectedFiles.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                        <p className="text-sm font-medium">Archivos seleccionados:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                        {selectedFiles.map(file => (
+                            <li key={file.name} className="text-sm flex items-center justify-between">
+                                <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(file.name)} className="h-6 w-6 text-destructive">
+                                    <XCircle className="h-4 w-4" />
+                                </Button>
+                            </li>
+                        ))}
+                        </ul>
+                    </div>
+                )}
                 <FormDescription>
-                    (Funcionalidad de carga de archivos en desarrollo. Máx. 5 PDF, 50MB total).
+                    Máximo 5 archivos PDF. Tamaño total no debe exceder 50MB.
                 </FormDescription>
             </FormItem>
 
             <DialogFooter className="pt-6">
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={onClose}>
+                <Button type="button" variant="outline" onClick={() => { onClose(); form.reset(); setSelectedFiles([]); }}>
                   Cancelar
                 </Button>
               </DialogClose>
