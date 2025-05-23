@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { FileCheck, ShoppingCart, CreditCard, ShieldAlert, ListChecks } from "lucide-react";
 import { useAuth, SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context';
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
-import { useToast } from "@/hooks/use-toast"; // For placeholder button actions
+import { useToast } from "@/hooks/use-toast"; 
 import { useEffect, useState } from "react";
-import type { ApprovalRequest } from "@/lib/types"; // Placeholder for when we list requests
+import type { ApprovalRequest } from "@/lib/types"; 
 // import { getApprovalRequestsForUser } from "@/lib/actions"; // Placeholder
 
 function AccessDeniedMessage() {
@@ -28,15 +28,14 @@ function AccessDeniedMessage() {
 export default function ApprovalsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]); // Placeholder
-  const [isLoading, setIsLoading] = useState(false); // Placeholder
+  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]); 
+  const [isLoading, setIsLoading] = useState(false); 
 
   const canAccessApprovals =
     user?.role === "Admin" ||
     user?.role === "Presidente IEQ" ||
     (user?.email ? SPECIFIC_APPROVER_EMAILS.includes(user.email) : false);
 
-  // Placeholder: useEffect to fetch approvals if user is Presidente IEQ
   useEffect(() => {
     if (user?.role === "Presidente IEQ") {
       setIsLoading(true);
@@ -46,7 +45,6 @@ export default function ApprovalsPage() {
       //   setIsLoading(false);
       // };
       // fetchRequests();
-      // For now, just simulate loading and empty state
       setTimeout(() => {
         setPendingApprovals([]);
         setIsLoading(false);
@@ -61,18 +59,16 @@ export default function ApprovalsPage() {
 
   const handleNewPurchaseRequest = () => {
     toast({
-      title: "Nueva Solicitud de Compra",
+      title: "Formulario de Compras",
       description: "El formulario para crear solicitudes de compra aún no está implementado.",
     });
-    // Here you would open a modal or navigate to a form page
   };
 
   const handleNewPaymentRequest = () => {
     toast({
-      title: "Nueva Solicitud de Pago a Proveedores",
+      title: "Formulario de Pago a Proveedores",
       description: "El formulario para crear solicitudes de pago aún no está implementado.",
     });
-    // Here you would open a modal or navigate to a form page
   };
 
   return (
@@ -90,16 +86,15 @@ export default function ApprovalsPage() {
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
             <Button onClick={handleNewPurchaseRequest} size="lg" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
                 <ShoppingCart className="mr-2 h-5 w-5" />
-                Nueva Solicitud de Compra
+                Compras
             </Button>
             <Button onClick={handleNewPaymentRequest} size="lg" variant="outline" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
                 <CreditCard className="mr-2 h-5 w-5" />
-                Nueva Solicitud de Pago
+                Pago a Proveedores
             </Button>
         </div>
       </div>
 
-      {/* Section for Presidente IEQ to view their pending approvals */}
       {user?.role === "Presidente IEQ" && (
         <Card className="shadow-lg w-full">
           <CardHeader>
@@ -127,7 +122,6 @@ export default function ApprovalsPage() {
               </div>
             ) : (
               <div className="text-center py-10">
-                {/* Placeholder: Table/List of approval requests will go here */}
                 <p className="text-muted-foreground">(Aquí se mostrará la tabla de solicitudes pendientes)</p>
               </div>
             )}
@@ -135,7 +129,6 @@ export default function ApprovalsPage() {
         </Card>
       )}
 
-       {/* Placeholder for other users who can access approvals but are not "Presidente IEQ" */}
        {(user?.role === "Admin" || (user?.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente IEQ" && (
          <Card className="shadow-lg w-full">
            <CardHeader>
