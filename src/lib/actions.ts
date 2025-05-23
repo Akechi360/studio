@@ -15,8 +15,8 @@ import {
   updateInventoryItemInMock,
   deleteInventoryItemFromMock,
   getInventoryItemByIdFromMock,
-  addAuditLogEntryToMock, 
-  getAllAuditLogsFromMock 
+  addAuditLogEntryToMock,
+  getAllAuditLogsFromMock
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
@@ -30,10 +30,12 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
       action: actionDescription,
       details: details || undefined,
     });
-    revalidatePath("/admin/audit"); 
-  } catch (error)
+    revalidatePath("/admin/audit");
+  } catch (error) {
     // Depending on requirements, you might want to throw the error or handle it silently
+    // console.error("Error logging audit event:", error); // Optional: log the error
   }
+}
 
 
 export async function getAuditLogs(): Promise<AuditLogEntryType[]> {
@@ -50,8 +52,8 @@ const CreateTicketSchema = z.object({
 });
 
 export async function createTicketAction(
-  userId: string, 
-  userName: string, 
+  userId: string,
+  userName: string,
   values: z.infer<typeof CreateTicketSchema>
 ) {
   const validatedFields = CreateTicketSchema.safeParse(values);
@@ -74,9 +76,9 @@ export async function createTicketAction(
     priority: priority as TicketPriority,
     status: "Open",
     attachments: [],
-    userId, 
-    userName, 
-    userEmail, 
+    userId,
+    userName,
+    userEmail,
     createdAt: new Date(),
     updatedAt: new Date(),
     comments: [],
@@ -84,7 +86,7 @@ export async function createTicketAction(
 
   addTicketToMock(newTicket);
 
-  
+
   await logAuditEvent(userEmail, "Creación de Ticket", `Ticket ID: ${newTicket.id}, Asunto: ${subject}`);
 
   revalidatePath("/tickets");
@@ -108,14 +110,14 @@ const AddCommentSchema = z.object({
 
 export async function addCommentAction(
   ticketId: string,
-  commenter: User, 
+  commenter: User,
   values: z.infer<typeof AddCommentSchema>
 ) {
   const validatedFields = AddCommentSchema.safeParse(values);
 
   if (!validatedFields.success) {
     return {
-      success: false, 
+      success: false,
       errors: validatedFields.error.flatten().fieldErrors,
       message: "Fallo al añadir comentario debido a errores de validación.",
     };
@@ -137,8 +139,8 @@ export async function addCommentAction(
 
   ticket.comments.push(newComment);
   ticket.updatedAt = new Date();
-  
-  
+
+
   if (commenter.email) {
     await logAuditEvent(commenter.email, "Adición de Comentario", `Ticket ID: ${ticketId}, Usuario: ${commenter.name}`);
   }
@@ -182,14 +184,14 @@ export async function updateTicketStatusAction(
   if (!ticket) {
     return { success: false, message: "Ticket no encontrado." };
   }
-  
+
   const { status, actingUserEmail } = validatedFields.data;
 
   const oldStatus = ticket.status;
   ticket.status = status as TicketStatus;
   ticket.updatedAt = new Date();
 
-  
+
   await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatus}, A: ${ticket.status}`);
 
 
@@ -266,7 +268,7 @@ const BaseInventoryItemSchema = z.object({
   brand: z.string().max(50).optional(),
   model: z.string().max(50).optional(),
   serialNumber: z.string().max(100).optional(),
-  processor: z.string().max(100).optional(), 
+  processor: z.string().max(100).optional(),
   ram: z.enum(RAM_OPTIONS).optional(),
   storageType: z.enum(STORAGE_TYPES_ZOD_ENUM).optional(),
   storage: z.string().max(50).optional(),
@@ -298,8 +300,8 @@ const categoryPrefixMap: Record<InventoryItemCategory, string> = {
 };
 
 export async function addInventoryItemAction(
-  currentUser: Pick<User, 'id' | 'name' | 'email'>, 
-  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "currentUserEmail"> 
+  currentUser: Pick<User, 'id' | 'name' | 'email'>,
+  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "currentUserEmail">
 ) {
   const validatedFields = BaseInventoryItemSchema.safeParse(values);
 
@@ -312,9 +314,9 @@ export async function addInventoryItemAction(
   }
 
   const data = validatedFields.data;
-  
+
   const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
-  const allItems = getRawInventoryStore(); 
+  const allItems = getRawInventoryStore();
 
   let maxNum = 0;
   allItems.forEach(item => {
@@ -336,9 +338,9 @@ export async function addInventoryItemAction(
 
   const newItem: InventoryItem = {
     id: newId,
-    ...data, 
-    category: data.category as InventoryItemCategory, 
-    status: data.status as InventoryItemStatus, 
+    ...data,
+    category: data.category as InventoryItemCategory,
+    status: data.status as InventoryItemStatus,
     addedByUserId: currentUser.id,
     addedByUserName: currentUser.name,
     createdAt: new Date(),
@@ -346,7 +348,7 @@ export async function addInventoryItemAction(
   };
 
   addInventoryItemToMock(newItem);
-  
+
   await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo ID: ${newItem.id}, Nombre: ${newItem.name}`);
 
   revalidatePath("/inventory");
@@ -361,8 +363,8 @@ export async function addInventoryItemAction(
 
 export async function updateInventoryItemAction(
   itemId: string,
-  actingUserEmail: string, 
-  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "actingUserEmail"> 
+  actingUserEmail: string,
+  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "actingUserEmail">
 ) {
   const validatedFields = BaseInventoryItemSchema.safeParse(values);
 
@@ -377,7 +379,7 @@ export async function updateInventoryItemAction(
   if (!itemToUpdate) {
     return { success: false, message: "Artículo no encontrado." };
   }
-  
+
   const updatedData = validatedFields.data;
 
   const updatedItem: InventoryItem = {
@@ -391,7 +393,7 @@ export async function updateInventoryItemAction(
   const success = updateInventoryItemInMock(updatedItem);
 
   if (success) {
-    
+
     await logAuditEvent(actingUserEmail, "Actualización de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${updatedItem.name}`);
     revalidatePath("/inventory");
     return { success: true, message: `Artículo "${updatedItem.name}" actualizado exitosamente.` };
@@ -400,7 +402,7 @@ export async function updateInventoryItemAction(
   }
 }
 
-export async function deleteInventoryItemAction(itemId: string, actingUserEmail: string) { 
+export async function deleteInventoryItemAction(itemId: string, actingUserEmail: string) {
   const itemToDelete = getInventoryItemByIdFromMock(itemId);
   if (!itemToDelete) {
     return { success: false, message: "Artículo no encontrado para eliminar." };
@@ -408,7 +410,7 @@ export async function deleteInventoryItemAction(itemId: string, actingUserEmail:
 
   const success = deleteInventoryItemFromMock(itemId);
   if (success) {
-    
+
     await logAuditEvent(actingUserEmail, "Eliminación de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${itemToDelete.name}`);
     revalidatePath("/inventory");
     return { success: true, message: "Artículo eliminado exitosamente." };
@@ -508,7 +510,7 @@ export async function importInventoryItemsAction(
   for (let i = 0; i < itemDataArray.length; i++) {
     const rawRow = itemDataArray[i];
     const mappedData = mapExcelRowToInventoryItemFormValues(rawRow);
-    
+
     // Set defaults if not present, especially for required fields not perfectly mapped
     if (!mappedData.quantity) mappedData.quantity = 1;
     if (!mappedData.status) mappedData.status = "En Uso"; // Default status if not in Excel
@@ -552,7 +554,7 @@ export async function importInventoryItemsAction(
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    
+
     if (newItem.category === "Computadora") {
         newItem.ram = data.ram === "No Especificado" ? undefined : data.ram;
         newItem.storageType = data.storageType;
@@ -589,4 +591,3 @@ export async function importInventoryItemsAction(
     importedItems
   };
 }
-    
