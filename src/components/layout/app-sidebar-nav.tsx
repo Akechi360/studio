@@ -25,12 +25,12 @@ import {
   ClipboardList, 
   ScreenShare,
   CalendarDays,
-  ChevronRight, // Added for accordion arrow
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { Role } from "@/lib/types";
-import React, { useState, useEffect } from "react"; // Added useState, useEffect
-import { cn } from "@/lib/utils"; // Added cn for utility
+import React, { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 interface NavItem {
   href: string;
@@ -44,7 +44,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { 
-    href: "#tickets-toggle", // Changed href to indicate it's a toggle
+    href: "#tickets-toggle", 
     label: "Tickets", 
     icon: Ticket,
     subItems: [
@@ -57,7 +57,7 @@ const navItems: NavItem[] = [
   { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true }, 
   { href: "/profile", label: "Perfil", icon: User, exact: true },
   { 
-    href: "#", 
+    href: "#admin-toggle", 
     label: "Administración", 
     icon: Settings, 
     allowedRoles: ["Admin"],
@@ -77,25 +77,35 @@ export function AppSidebarNav() {
   const { user } = useAuth(); 
   const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
 
-  // Effect to open parent section if a sub-item is active on page load/navigation
   useEffect(() => {
     const newOpenStates: Record<string, boolean> = {};
+    let pathChanged = false;
     navItems.forEach(item => {
       if (item.subItems && item.subItems.length > 0) {
         const isParentActiveDueToChild = item.subItems.some(
-          subItem => pathname === subItem.href || pathname.startsWith(subItem.href + (subItem.href.endsWith('/') ? '' : '/'))
+          subItem => {
+            const subItemPath = subItem.href.endsWith('/') ? subItem.href.slice(0, -1) : subItem.href;
+            const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+            return currentPath === subItemPath || currentPath.startsWith(subItemPath + '/');
+          }
         );
-        // Preserve already manually opened states unless a child makes it active
-        newOpenStates[item.label] = openStates[item.label] || isParentActiveDueToChild;
+        const currentOpenState = openStates[item.label] || false;
+        if (isParentActiveDueToChild && !currentOpenState) {
+          newOpenStates[item.label] = true;
+          pathChanged = true;
+        } else if (!isParentActiveDueToChild && currentOpenState && !openStates[item.label]) {
+          // This case might not be strictly necessary if we only open on child active
+          // but good to keep in mind if manual toggle state needs to be preserved more complexly
+        } else {
+          newOpenStates[item.label] = currentOpenState;
+        }
       }
     });
-     // Only update if there's a change to prevent potential loops,
-     // though with [pathname] dependency it should be fine.
-    if (JSON.stringify(newOpenStates) !== JSON.stringify(openStates)) {
-        setOpenStates(newOpenStates);
+    if (pathChanged || Object.keys(newOpenStates).length !== Object.keys(openStates).length) {
+       setOpenStates(prev => ({...prev, ...newOpenStates}));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]); // navItems is static
+  }, [pathname]);
 
   const handleToggle = (label: string) => {
     setOpenStates(prev => ({ ...prev, [label]: !prev[label] }));
@@ -112,20 +122,23 @@ export function AppSidebarNav() {
         const isSectionOpen = !!openStates[item.label];
 
         if (item.subItems && item.subItems.length > 0) {
-          // This is a parent item that should be a toggle
-          const isAnySubItemActive = item.subItems.some(subItem => pathname === subItem.href || pathname.startsWith(subItem.href + (subItem.href.endsWith('/') ? '' : '/')));
+          const isAnySubItemActive = item.subItems.some(subItem => {
+             const subItemPath = subItem.href.endsWith('/') ? subItem.href.slice(0, -1) : subItem.href;
+             const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+             return currentPath === subItemPath || currentPath.startsWith(subItemPath + '/');
+          });
           
           return (
             <SidebarMenuItem key={item.label}>
               <SidebarMenuButton
                 onClick={() => handleToggle(item.label)}
-                isActive={isAnySubItemActive && isSectionOpen} // Active if a sub-item is active AND section is open for consistent styling
+                isActive={isAnySubItemActive && isSectionOpen}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-expanded={isSectionOpen}
-                className="justify-between w-full" // Ensure button takes full width for justify-between
+                className="justify-between w-full"
               >
-                <div className="flex items-center gap-2 overflow-hidden"> {/* Group icon and label */}
-                  <Icon className="shrink-0" />
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <Icon className="shrink-0 text-muted-foreground" /> {/* Changed for minimalist parent icon */}
                   <span className={cn("truncate", sidebarState === "collapsed" ? "sr-only" : "")}>
                     {item.label}
                   </span>
@@ -141,14 +154,17 @@ export function AppSidebarNav() {
               </SidebarMenuButton>
               {isSectionOpen && sidebarState === "expanded" && (
                 <SidebarMenuSub
-                  className={cn(sidebarState === "collapsed" ? "hidden" : "", "pl-2") } // Added some padding left for sub-menu
+                  className={cn(sidebarState === "collapsed" ? "hidden" : "", "pl-2")}
                 >
                   {item.subItems.map((subItem) => {
                     if (subItem.allowedRoles && user?.role && !subItem.allowedRoles.includes(user.role)) {
                       return null;
                     }
                     const SubIcon = subItem.icon;
-                    const isSubItemActive = pathname === subItem.href || (subItem.href !== '/' && pathname.startsWith(subItem.href + '/'));
+                    const subItemPath = subItem.href.endsWith('/') ? subItem.href.slice(0, -1) : subItem.href;
+                    const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+                    const isSubItemActive = currentPath === subItemPath || (subItemPath !== '/' && currentPath.startsWith(subItemPath + '/'));
+                    
                     return (
                       <SidebarMenuSubItem key={subItem.href}>
                         <Link href={subItem.href} passHref legacyBehavior>
@@ -168,8 +184,9 @@ export function AppSidebarNav() {
             </SidebarMenuItem>
           );
         } else {
-          // This is a regular item without sub-items
-          const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+          const itemPath = item.href.endsWith('/') ? item.href.slice(0, -1) : item.href;
+          const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+          const isActive = item.exact ? currentPath === itemPath : currentPath.startsWith(itemPath);
           return (
             <SidebarMenuItem key={item.label}>
               <Link href={item.href} passHref legacyBehavior>
@@ -180,7 +197,7 @@ export function AppSidebarNav() {
                   className="w-full"
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <Icon className="shrink-0" />
+                    <Icon className="shrink-0" /> {/* Default icon rendering for direct links */}
                     <span className={cn("truncate", sidebarState === "collapsed" ? "sr-only" : "")}>
                       {item.label}
                     </span>
