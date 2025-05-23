@@ -40,7 +40,7 @@ interface NavItem {
   allowedRoles?: Role[];
   subItems?: NavItem[];
   exact?: boolean;
-  specialAccessCheck?: (user: UserType | null) => boolean; // For specific user access
+  specialAccessCheck?: (user: UserType | null) => boolean; 
 }
 
 const navItems: NavItem[] = [
@@ -60,7 +60,7 @@ const navItems: NavItem[] = [
     icon: FileCheck, 
     exact: true,
     specialAccessCheck: (currentUser) => 
-      currentUser?.role === "Admin" || currentUser?.email === "presidente@clinicaieq.com",
+      currentUser?.role === "Admin" || currentUser?.role === "Presidente IEQ",
   },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
   { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true },
@@ -123,14 +123,14 @@ export function AppSidebarNav() {
   return (
     <SidebarMenu>
       {navItems.map((item) => {
-        // Role-based access
-        if (item.allowedRoles && user?.role && !item.allowedRoles.includes(user.role)) {
-          return null;
-        }
-        // Special access check (for Presidente and Aprobaciones)
+        
         if (item.specialAccessCheck && !item.specialAccessCheck(user)) {
           return null;
         }
+        if (item.allowedRoles && user?.role && !item.allowedRoles.includes(user.role) && item.label !== "Aprobaciones") { // Keep approvals logic separate
+             return null;
+        }
+
 
         const Icon = item.icon;
         const isSectionOpen = !!openStates[item.label];
@@ -149,7 +149,7 @@ export function AppSidebarNav() {
                 isActive={isAnySubItemActive && isSectionOpen}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-expanded={isSectionOpen}
-                className="justify-between w-full cursor-default" 
+                className="justify-between w-full cursor-default"
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   <Icon className="shrink-0" />

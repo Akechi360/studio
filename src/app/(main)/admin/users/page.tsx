@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert'; 
 import { ShieldAlert, Users, UserCog, Save, Loader2, Trash2, AlertTriangle, Building, LockKeyhole } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { User } from '@/lib/types';
+import type { User, Role } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from "@/components/ui/button";
@@ -56,7 +56,7 @@ const DEPARTMENTS = [
   "Admision", "Caja", "Radiologia", "Laboratorio", "CDI", "Cardiovascular",
   "Jefa Enfermeras", "Contabilidad", "Administracion", "RRHH", "Honorarios",
   "Seguros", "Pediatria", "UCI", "Ocupacional", "Gerencia", 
-  "Asistente Gerencia", "Sistemas",
+  "Asistente Gerencia", "Sistemas", "Presidente", // Added Presidente
   NO_DEPARTMENT_VALUE
 ];
 
@@ -80,13 +80,16 @@ const DEPARTMENT_DISPLAY_MAP: { [key: string]: string } = {
   "Gerencia": "Gerencia",
   "Asistente Gerencia": "Asistente Gerencia",
   "Sistemas": "Sistemas",
+  "Presidente": "Presidente", // Added Presidente
 };
+
+const ROLES_OPTIONS: Role[] = ["User", "Admin", "Presidente IEQ"];
 
 
 const userEditFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
   email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
-  role: z.enum(["Admin", "User"], { required_error: "El rol es obligatorio." }),
+  role: z.enum(ROLES_OPTIONS as [Role, ...Role[]], { required_error: "El rol es obligatorio." }), // Updated to use ROLES_OPTIONS
   department: z.string().optional(),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }).optional().or(z.literal('')), // Allow empty string or min 6 chars
 });
@@ -149,7 +152,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
       email: userToEdit?.email || "",
       role: userToEdit?.role || "User",
       department: userToEdit?.department || NO_DEPARTMENT_VALUE,
-      password: userToEdit?.password || "", // Display current password
+      password: userToEdit?.password || "", 
     },
   });
 
@@ -160,7 +163,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
         email: userToEdit.email,
         role: userToEdit.role,
         department: userToEdit.department || NO_DEPARTMENT_VALUE,
-        password: userToEdit.password || "", // Reset with current password
+        password: userToEdit.password || "", 
       });
     }
   }, [userToEdit, form]);
@@ -171,7 +174,6 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
     setIsSubmitting(true);
     const departmentToSave = data.department === NO_DEPARTMENT_VALUE ? undefined : data.department;
     
-    // Prepare data for update, only send password if it's not empty
     const updateData: Partial<UserEditFormValues> = { 
         name: data.name,
         email: data.email,
@@ -286,8 +288,11 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="User">Usuario</SelectItem>
-                        <SelectItem value="Admin">Administrador</SelectItem>
+                        {ROLES_OPTIONS.map((roleOption) => (
+                           <SelectItem key={roleOption} value={roleOption}>
+                             {roleOption === "Presidente IEQ" ? "Presidente IEQ" : roleOption}
+                           </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -367,11 +372,18 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
 }
 
 
-function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick: (user: User) => void; }) { // Renamed user prop to userEntry
+function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick: (user: User) => void; }) { 
   const getInitials = (name?: string) => {
     if (!name) return '??';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
+
+  const roleDisplayMap: Record<Role, string> = {
+    "User": "Usuario",
+    "Admin": "Administrador",
+    "Presidente IEQ": "Presidente IEQ"
+  };
+
   return (
     <TableRow>
       <TableCell>
@@ -385,8 +397,8 @@ function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick
       </TableCell>
       <TableCell>{userEntry.email}</TableCell>
       <TableCell>
-        <Badge variant={userEntry.role === "Admin" ? "default" : "secondary"}>
-          {userEntry.role === "Admin" ? "Administrador" : "Usuario"}
+        <Badge variant={userEntry.role === "Admin" ? "default" : (userEntry.role === "Presidente IEQ" ? "secondary" : "outline")}>
+           {roleDisplayMap[userEntry.role] || userEntry.role}
         </Badge>
       </TableCell>
       <TableCell>{userEntry.department ? (DEPARTMENT_DISPLAY_MAP[userEntry.department] || userEntry.department) : <span className="text-muted-foreground">N/A</span>}</TableCell>

@@ -23,7 +23,7 @@ function AccessDeniedMessage() {
 export default function ApprovalsPage() {
   const { user } = useAuth();
 
-  const canAccessApprovals = user?.role === "Admin" || user?.email === "presidente@clinicaieq.com";
+  const canAccessApprovals = user?.role === "Admin" || user?.role === "Presidente IEQ";
 
   if (!canAccessApprovals) {
     return <AccessDeniedMessage />;

@@ -28,9 +28,9 @@ const presidenteUser: User = {
   id: "presidente-user-001",
   name: "Presidente IEQ",
   email: "presidente@clinicaieq.com",
-  role: "User", // Role "User"
-  avatarUrl: "https://placehold.co/100x100.png?text=PR",
-  department: "Gerencia", // Example department
+  role: "Presidente IEQ", // Updated role
+  avatarUrl: "https://placehold.co/100x100.png?text=PI",
+  department: "Presidente", // Assigned department
   password: "presidentepassword",
 };
 
