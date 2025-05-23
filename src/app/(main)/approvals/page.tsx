@@ -10,7 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import type { ApprovalRequest } from "@/lib/types"; 
 import { CreatePurchaseRequestDialog } from "@/components/approvals/CreatePurchaseRequestDialog";
+import { CreatePaymentRequestDialog } from "@/components/approvals/CreatePaymentRequestDialog"; // Import new dialog
 import { getApprovalRequestsForUser } from "@/lib/actions"; 
+import { Badge } from "@/components/ui/badge"; // Import Badge
 
 function AccessDeniedMessage() {
   return (
@@ -32,24 +34,27 @@ export default function ApprovalsPage() {
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]); 
   const [isLoading, setIsLoading] = useState(false); 
   const [isCreatePurchaseDialogOpen, setIsCreatePurchaseDialogOpen] = useState(false);
+  const [isCreatePaymentDialogOpen, setIsCreatePaymentDialogOpen] = useState(false); // State for payment dialog
 
   const canAccessApprovals =
     user?.role === "Admin" ||
     user?.role === "Presidente IEQ" ||
     (user?.email ? SPECIFIC_APPROVER_EMAILS.includes(user.email) : false);
 
-  useEffect(() => {
+  const fetchRequests = async () => {
     if (user?.role === "Presidente IEQ" && user.id) {
       setIsLoading(true);
-      const fetchRequests = async () => {
-        const requests = await getApprovalRequestsForUser(user.id, user.role); // Pass userId and role
-        setPendingApprovals(requests);
-        setIsLoading(false);
-      };
-      fetchRequests();
+      const requests = await getApprovalRequestsForUser(user.id, user.role);
+      setPendingApprovals(requests);
+      setIsLoading(false);
     } else {
-        setIsLoading(false); // Not President or no user ID
+      setIsLoading(false); 
     }
+  };
+  
+  useEffect(() => {
+    fetchRequests();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
 
@@ -62,21 +67,12 @@ export default function ApprovalsPage() {
   };
 
   const handleNewPaymentRequest = () => {
-    toast({
-      title: "Formulario de Pago a Proveedores",
-      description: "El formulario para crear solicitudes de pago a proveedores aún no está implementado.",
-    });
+    setIsCreatePaymentDialogOpen(true); // Open payment dialog
   };
   
-  const handlePurchaseRequestSuccess = async (approvalId: string) => {
-    console.log("Purchase request created successfully with ID:", approvalId);
-    // Re-fetch pending approvals if the current user is Presidente IEQ
-    if (user?.role === "Presidente IEQ" && user.id) {
-        setIsLoading(true);
-        const requests = await getApprovalRequestsForUser(user.id, user.role);
-        setPendingApprovals(requests);
-        setIsLoading(false);
-    }
+  const handleRequestSuccess = async (approvalId: string) => {
+    console.log("Request created successfully with ID:", approvalId);
+    fetchRequests(); // Re-fetch requests for President IEQ
   };
 
   return (
@@ -141,7 +137,9 @@ export default function ApprovalsPage() {
                         {req.type === "Compra" && req.estimatedPrice && (
                             <p className="text-sm text-muted-foreground">Monto Est.: {req.estimatedPrice.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
                         )}
-                        {/* Placeholder for "Ver Detalles" button */}
+                        {req.type === "PagoProveedor" && req.totalAmountToPay && (
+                            <p className="text-sm text-muted-foreground">Monto a Pagar: {req.totalAmountToPay.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
+                        )}
                         <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" onClick={() => toast({title: "Funcionalidad en Desarrollo", description: `Ver detalles para ${req.id} aún no está implementado.`})}>
                             Ver Detalles
                         </Button>
@@ -171,9 +169,13 @@ export default function ApprovalsPage() {
       <CreatePurchaseRequestDialog 
         isOpen={isCreatePurchaseDialogOpen}
         onClose={() => setIsCreatePurchaseDialogOpen(false)}
-        onSuccess={handlePurchaseRequestSuccess}
+        onSuccess={handleRequestSuccess}
+      />
+      <CreatePaymentRequestDialog
+        isOpen={isCreatePaymentDialogOpen}
+        onClose={() => setIsCreatePaymentDialogOpen(false)}
+        onSuccess={handleRequestSuccess}
       />
     </div>
   );
 }
-

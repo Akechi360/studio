@@ -39,8 +39,10 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     console.error("Error logging audit event:", error);
+    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
+
 
 export async function getAuditLogs(): Promise<AuditLogEntryType[]> {
   return getAllAuditLogsFromMock();
@@ -303,7 +305,9 @@ export async function updateInventoryItemAction(
     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Fallo al actualizar artículo debido a errores de validación." };
   }
   const itemToUpdate = getInventoryItemByIdFromMock(itemId);
-  if (!itemToUpdate) return { success: false, message: "Artículo no encontrado." };
+  if (!itemToUpdate) {
+    return { success: false, message: "Artículo no encontrado." };
+  }
   const updatedData = validatedFields.data;
   const updatedItem: InventoryItem = {
     ...itemToUpdate, ...updatedData, category: updatedData.category as InventoryItemCategory, status: updatedData.status as InventoryItemStatus, updatedAt: new Date(),
@@ -372,6 +376,7 @@ const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Part
   return mapped;
 };
 
+
 export async function importInventoryItemsAction(
   itemDataArray: ExcelInventoryItemData[],
   currentUserEmail: string,
@@ -397,9 +402,10 @@ export async function importInventoryItemsAction(
         if (!validatedFields.success) {
           errorCount++;
           const fieldErrors = validatedFields.error.flatten().fieldErrors as Record<string, string[] | undefined>;
-          const errorMessage = Object.entries(fieldErrors)
+          let errorMessage = "Error de validación: ";
+          errorMessage += Object.entries(fieldErrors)
             .map(([field, messages]) => `${field}: ${(messages || ['Error desconocido']).join(', ')}`)
-            .join('; ') || "Error de validación desconocido.";
+            .join('; ') || "Error desconocido.";
           errors.push({ row: i + 2, message: errorMessage, data: rawRow });
           continue;
         }
@@ -455,6 +461,7 @@ export async function importInventoryItemsAction(
   } catch (e: any) {
     console.error("Error catastrófico durante la importación de inventario:", e);
     const errorMsg = `Error general del servidor durante la importación: ${e.message || 'Error desconocido'}. Revise los logs del servidor.`;
+    await logAuditEvent(currentUserEmail, "Error Crítico en Importación Masiva de Inventario", errorMsg);
     return { success: false, message: errorMsg, successCount: 0, errorCount: itemDataArray?.length || 0, errors: itemDataArray?.map((row, index) => ({ row: index + 2, message: errorMsg, data: row })) || [{ row: 0, message: errorMsg, data: {} }], importedItems: [] };
   }
 }
@@ -471,23 +478,26 @@ const CreateApprovalRequestBaseSchema = z.object({
   requesterEmail: z.string().email().optional(),
 });
 
-const PurchaseRequestSchema = CreateApprovalRequestBaseSchema.extend({
-  type: z.literal("Compra"),
+const PurchaseRequestDataSchema = z.object({
   itemDescription: z.string().min(3, "El ítem es obligatorio.").max(200),
   estimatedPrice: z.coerce.number().positive("El precio debe ser positivo.").optional(),
   supplierCompra: z.string().max(100).optional(),
 });
 
-const PaymentRequestSchema = CreateApprovalRequestBaseSchema.extend({
-  type: z.literal("PagoProveedor"),
-  // Add fields specific to PaymentRequest if needed in future iterations
+const PaymentRequestDataSchema = z.object({
+  supplierPago: z.string().min(3, "El proveedor es obligatorio.").max(100),
+  totalAmountToPay: z.coerce.number().positive("El monto debe ser positivo."),
+  paymentDueDate: z.date().optional(),
 });
 
-// Union schema for validation in the action
-const CreateApprovalRequestActionSchema = z.union([PurchaseRequestSchema, PaymentRequestSchema]);
+const CreateApprovalRequestActionSchema = z.discriminatedUnion("type", [
+  CreateApprovalRequestBaseSchema.merge(z.object({ type: z.literal("Compra") })).merge(PurchaseRequestDataSchema),
+  CreateApprovalRequestBaseSchema.merge(z.object({ type: z.literal("PagoProveedor") })).merge(PaymentRequestDataSchema),
+]);
+
 
 export async function createApprovalRequestAction(
-  values: z.infer<typeof PurchaseRequestSchema> | z.infer<typeof PaymentRequestSchema> 
+  values: z.infer<typeof CreateApprovalRequestActionSchema> 
 ): Promise<{ success: boolean; message: string; approvalId?: string; errors?: any }> {
   const validatedFields = CreateApprovalRequestActionSchema.safeParse(values);
   if (!validatedFields.success) {
@@ -524,7 +534,9 @@ export async function createApprovalRequestAction(
     newApproval.estimatedPrice = data.estimatedPrice;
     newApproval.supplierCompra = data.supplierCompra;
   } else if (data.type === "PagoProveedor") {
-    // Populate PagoProveedor specific fields if they exist in 'data'
+    newApproval.supplierPago = data.supplierPago;
+    newApproval.totalAmountToPay = data.totalAmountToPay;
+    newApproval.paymentDueDate = data.paymentDueDate;
   }
 
   addApprovalRequestToMock(newApproval);
@@ -547,10 +559,8 @@ export async function createApprovalRequestAction(
 export async function getApprovalRequestsForUser(userId: string, userRole: UserRole): Promise<ApprovalRequest[]> {
   const allRequests = getAllApprovalRequestsFromMock();
   if (userRole === "Presidente IEQ") {
-    // Presidente IEQ sees all requests with status "Pendiente"
     return allRequests.filter(req => req.status === "Pendiente");
   }
-  // Other users (Admin, User) see requests they submitted
   return allRequests.filter(req => req.requesterId === userId);
 }
 

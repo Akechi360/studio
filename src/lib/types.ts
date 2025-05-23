@@ -151,7 +151,7 @@ export interface ApprovalRequest {
   requesterEmail?: string;
   createdAt: Date;
   updatedAt: Date;
-  attachments: Attachment[]; // Will remain empty for now in mock data
+  attachments: Attachment[]; 
   activityLog: ApprovalActivityLogEntry[];
   
   // Fields for "Presidente IEQ" action
@@ -163,13 +163,14 @@ export interface ApprovalRequest {
   infoRequestedAt?: Date;
 
   // Compra Specific Fields
-  itemDescription?: string; // Specific item being bought for "Compra" (Field "Item" in form)
-  estimatedPrice?: number; // For "Compra" (Field "Precio Est. Completo" in form)
-  supplierCompra?: string; // Supplier for "Compra" (Field "Proveedor" in form)
+  itemDescription?: string; 
+  estimatedPrice?: number; 
+  supplierCompra?: string; 
 
   // PagoProveedor Specific Fields
-  supplierPago?: string; // Supplier for "PagoProveedor"
-  paymentDueDate?: Date; // Requested by submitter for "PagoProveedor"
-  totalAmountToPay?: number; // Original amount for "PagoProveedor", set by submitter
-  paymentInstallments?: PaymentInstallment[]; // Defined by approver for "PagoProveedor"
+  supplierPago?: string; 
+  paymentDueDate?: Date; 
+  totalAmountToPay?: number; 
+  paymentInstallments?: PaymentInstallment[]; 
 }
+
