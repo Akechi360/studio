@@ -142,7 +142,7 @@ export default function InventoryPage() {
       toast({ title: "Sin Archivo", description: "No se seleccionó ningún archivo.", variant: "destructive" });
       return;
     }
-    if (!user || !user.email || !user.name) {
+    if (!user || !user.email || !user.id || !user.name) { // Added user.id and user.name check
       toast({ title: "Error de Autenticación", description: "Debes iniciar sesión para importar.", variant: "destructive"});
       return;
     }
@@ -159,23 +159,26 @@ export default function InventoryPage() {
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<ExcelInventoryItemData>(worksheet);
+        const jsonDataFromExcel = XLSX.utils.sheet_to_json<ExcelInventoryItemData>(worksheet);
 
-        if (jsonData.length === 0) {
+        if (jsonDataFromExcel.length === 0) {
             toast({ title: "Archivo Vacío", description: "El archivo Excel no contiene datos.", variant: "destructive" });
             setIsImporting(false);
-            if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+            if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
         
-        const result = await importInventoryItemsAction(jsonData, user.email, user.id, user.name);
+        // Ensure jsonData is an array of plain objects
+        const plainJsonData = jsonDataFromExcel.map(item => ({ ...item }));
+
+        const result = await importInventoryItemsAction(plainJsonData, user.email, user.id, user.name);
 
         if (result.success) {
           toast({
             title: "Importación Exitosa",
             description: `${result.successCount} artículos importados. ${result.errorCount > 0 ? `${result.errorCount} filas con errores.` : ''}`,
           });
-          if (result.errorCount > 0) {
+          if (result.errorCount > 0 && result.errors) { // Check if result.errors exists
              console.error("Errores de importación:", result.errors);
              // Potentially display these errors in a more user-friendly way
           }
@@ -192,7 +195,7 @@ export default function InventoryPage() {
         toast({ title: "Error de Importación", description: `No se pudo procesar el archivo. Asegúrate de que el formato es correcto. Error: ${error instanceof Error ? error.message : String(error)}`, variant: "destructive" });
       } finally {
         setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = ""; 
       }
     };
     reader.readAsArrayBuffer(file);
