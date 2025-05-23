@@ -47,6 +47,11 @@ const paymentRequestFormSchema = z.object({
     invalid_type_error: "Formato de fecha inválido.",
   }),
   descripcion: z.string().max(2000, { message: "Máximo 2000 caracteres." }).optional(),
+  attachmentsData: z.array(z.object({ // Added for consistency, even if not directly in schema for this specific component
+    fileName: z.string(),
+    size: z.number(),
+    type: z.string().optional(),
+  })).optional(),
 });
 
 type PaymentRequestFormValues = z.infer<typeof paymentRequestFormSchema>;
@@ -72,6 +77,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
       montoTotal: undefined,
       fechaRequerida: undefined,
       descripcion: "",
+      attachmentsData: [],
     },
   });
 
@@ -115,7 +121,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
     }
     setIsSubmitting(true);
 
-    const attachmentsData: AttachmentClientData[] = selectedFiles.map(file => ({
+    const attachmentsClientData: AttachmentClientData[] = selectedFiles.map(file => ({
       fileName: file.name,
       size: file.size,
       type: file.type,
@@ -131,7 +137,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
       supplierPago: data.proveedor,
       totalAmountToPay: data.montoTotal,
       paymentDueDate: data.fechaRequerida,
-      attachmentsData: attachmentsData,
+      attachmentsData: attachmentsClientData,
     };
 
     const result = await createApprovalRequestAction(requestData);
@@ -157,9 +163,15 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
       }
     }
   };
+  
+  const handleDialogClose = () => {
+    form.reset(); 
+    setSelectedFiles([]);
+    onClose();
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); form.reset(); setSelectedFiles([]); } }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { handleDialogClose(); } }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center">
@@ -227,6 +239,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                                         "w-full pl-3 text-left font-normal",
                                         !field.value && "text-muted-foreground"
                                     )}
+                                    type="button" // Explicitly set type
                                     >
                                     {field.value ? (
                                         format(field.value, "PPP", { locale: es })
@@ -243,7 +256,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                                     selected={field.value}
                                     onSelect={field.onChange}
                                     disabled={(date) =>
-                                    date < new Date(new Date().setDate(new Date().getDate() -1)) // Disable past dates
+                                    date < new Date(new Date().setDate(new Date().getDate() -1)) // Disable past dates including today -1
                                     }
                                     initialFocus
                                 />
@@ -301,7 +314,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
 
             <DialogFooter className="pt-6">
               <DialogClose asChild>
-                <Button type="button" variant="outline" onClick={() => { onClose(); form.reset(); setSelectedFiles([]); }}>
+                <Button type="button" variant="outline" onClick={handleDialogClose}>
                   Cancelar
                 </Button>
               </DialogClose>
@@ -316,3 +329,5 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
     </Dialog>
   );
 }
+
+    
