@@ -26,10 +26,10 @@ import {
   ScreenShare,
   CalendarDays,
   ChevronRight,
-  FileCheck, // Added icon for Aprobaciones
+  FileCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import type { Role } from "@/lib/types";
+import type { Role, User as UserType } from "@/lib/types"; // Import UserType
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +40,7 @@ interface NavItem {
   allowedRoles?: Role[];
   subItems?: NavItem[];
   exact?: boolean;
+  specialAccessCheck?: (user: UserType | null) => boolean; // For specific user access
 }
 
 const navItems: NavItem[] = [
@@ -53,7 +54,14 @@ const navItems: NavItem[] = [
       { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true },
     ]
   },
-  { href: "/approvals", label: "Aprobaciones", icon: FileCheck, exact: true }, // New Approvals section
+  { 
+    href: "/approvals", 
+    label: "Aprobaciones", 
+    icon: FileCheck, 
+    exact: true,
+    specialAccessCheck: (currentUser) => 
+      currentUser?.role === "Admin" || currentUser?.email === "presidente@clinicaieq.com",
+  },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
   { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true },
   { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true }, 
@@ -97,7 +105,6 @@ export function AppSidebarNav() {
           pathChanged = true;
         } else if (!isParentActiveDueToChild && currentOpenState && !openStates[item.label]) {
           // This case might not be strictly necessary if we only open on child active
-          // but good to keep in mind if manual toggle state needs to be preserved more complexly
         } else {
           newOpenStates[item.label] = currentOpenState;
         }
@@ -116,7 +123,12 @@ export function AppSidebarNav() {
   return (
     <SidebarMenu>
       {navItems.map((item) => {
+        // Role-based access
         if (item.allowedRoles && user?.role && !item.allowedRoles.includes(user.role)) {
+          return null;
+        }
+        // Special access check (for Presidente and Aprobaciones)
+        if (item.specialAccessCheck && !item.specialAccessCheck(user)) {
           return null;
         }
 
@@ -137,7 +149,7 @@ export function AppSidebarNav() {
                 isActive={isAnySubItemActive && isSectionOpen}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-expanded={isSectionOpen}
-                className="justify-between w-full cursor-default"
+                className="justify-between w-full cursor-default" 
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   <Icon className="shrink-0" />
@@ -213,3 +225,4 @@ export function AppSidebarNav() {
     </SidebarMenu>
   );
 }
+

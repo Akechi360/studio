@@ -24,11 +24,21 @@ const initialAdminUser: User = {
   password: "adminpassword" 
 };
 
+const presidenteUser: User = {
+  id: "presidente-user-001",
+  name: "Presidente IEQ",
+  email: "presidente@clinicaieq.com",
+  role: "User", // Role "User"
+  avatarUrl: "https://placehold.co/100x100.png?text=PR",
+  department: "Gerencia", // Example department
+  password: "presidentepassword",
+};
+
 if (process.env.NODE_ENV === 'production') {
-  usersStore_auth_internal = [initialAdminUser];
+  usersStore_auth_internal = [initialAdminUser, presidenteUser];
 } else {
   if (!global.__mock_users_store_auth__) {
-    global.__mock_users_store_auth__ = [initialAdminUser];
+    global.__mock_users_store_auth__ = [initialAdminUser, presidenteUser];
   }
   usersStore_auth_internal = global.__mock_users_store_auth__;
 }
@@ -213,6 +223,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (data.password && data.password.trim() !== "") {
       updatedUserData.password = data.password;
     } else {
+      // If password field is not provided or is empty, keep the existing password
       updatedUserData.password = usersStore_auth_internal[userIndex].password;
     }
 
@@ -231,6 +242,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await logAuditEvent(user.email, "Actualización de Usuario por Administrador", details);
     }
     
+    // If the admin is updating their own details (less common through this flow, but possible)
+    // ensure their context user is updated.
     if (user && user.id === userId) {
       const updatedSelf = { ...user, ...usersStore_auth_internal[userIndex] };
       setUser(updatedSelf);
@@ -278,3 +291,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

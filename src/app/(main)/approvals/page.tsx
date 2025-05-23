@@ -1,8 +1,34 @@
 
+"use client";
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { FileCheck, Construction } from "lucide-react";
+import { FileCheck, Construction, ShieldAlert } from "lucide-react";
+import { useAuth } from '@/lib/auth-context';
+import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
+
+function AccessDeniedMessage() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4">
+      <Alert variant="destructive" className="max-w-md text-center shadow-lg">
+        <ShieldAlert className="h-8 w-8 mx-auto mb-3 text-destructive" />
+        <RadixAlertTitle className="text-xl font-bold">Acceso Denegado</RadixAlertTitle>
+        <AlertDescription className="mb-4">
+          No tienes permiso para acceder a la sección de Aprobaciones.
+        </AlertDescription>
+      </Alert>
+    </div>
+  );
+}
 
 export default function ApprovalsPage() {
+  const { user } = useAuth();
+
+  const canAccessApprovals = user?.role === "Admin" || user?.email === "presidente@clinicaieq.com";
+
+  if (!canAccessApprovals) {
+    return <AccessDeniedMessage />;
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col items-start">
