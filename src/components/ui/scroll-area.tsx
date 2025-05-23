@@ -33,22 +33,25 @@ const ScrollBar = React.forwardRef<
     orientation={orientation}
     className={cn(
       "flex touch-none select-none transition-colors",
-      orientation === "vertical" &&
-        "h-full w-2.5 border-l border-l-transparent p-[1px]",
-      orientation === "horizontal" &&
-        "h-2.5 flex-col border-t border-t-transparent p-[1px]",
-      "bg-muted rounded-full", // Added for track color and rounding
+      // Define the size of the track
+      orientation === "vertical" ? "w-2.5" : "h-2.5",
+      // Background color for the track
+      "bg-border",
+      // Make the track rounded
+      "rounded-full",
       className
     )}
     {...props}
   >
-    <ScrollAreaPrimitive.ScrollAreaThumb className={cn(
-        "relative flex-1 rounded-full", // Keep existing flex and rounding
-        "bg-muted-foreground" // Change thumb color
-    )} />
+    <ScrollAreaPrimitive.ScrollAreaThumb
+      className={cn(
+        "relative flex-1 rounded-full",
+        // Background color for the thumb
+        "bg-muted-foreground"
+      )}
+    />
   </ScrollAreaPrimitive.ScrollAreaScrollbar>
 ))
 ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName
 
 export { ScrollArea, ScrollBar }
-
