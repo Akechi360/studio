@@ -160,6 +160,9 @@ export default function InventoryPage() {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonDataFromExcel = XLSX.utils.sheet_to_json<ExcelInventoryItemData>(worksheet);
+        
+        const plainJsonData = jsonDataFromExcel.map(item => ({ ...item }));
+
 
         if (jsonDataFromExcel.length === 0) {
             toast({ title: "Archivo Vacío", description: "El archivo Excel no contiene datos.", variant: "destructive" });
@@ -168,8 +171,6 @@ export default function InventoryPage() {
             return;
         }
         
-        const plainJsonData = jsonDataFromExcel.map(item => ({ ...item }));
-
         const result = await importInventoryItemsAction(plainJsonData, user.email, user.id, user.name);
 
         if (result.success) {
@@ -193,7 +194,7 @@ export default function InventoryPage() {
         }
         
         if (result.errors && result.errors.length > 0) {
-           console.error("Detalles de errores de importación:", result.errors);
+           console.warn("Detalles de errores de importación de Excel (filas que no pudieron procesarse):", result.errors);
            // For more user-friendly error display, you could format result.errors here
            // and show them in a dialog or an expandable section.
         }
@@ -434,3 +435,5 @@ export default function InventoryPage() {
   );
 }
 
+
+    
