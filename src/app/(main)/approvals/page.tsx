@@ -9,8 +9,8 @@ import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/compon
 import { useToast } from "@/hooks/use-toast"; 
 import { useEffect, useState } from "react";
 import type { ApprovalRequest } from "@/lib/types"; 
-import { CreatePurchaseRequestDialog } from "@/components/approvals/CreatePurchaseRequestDialog"; // Import the new dialog
-// import { getApprovalRequestsForUser } from "@/lib/actions"; // Placeholder
+import { CreatePurchaseRequestDialog } from "@/components/approvals/CreatePurchaseRequestDialog";
+import { getApprovalRequestsForUser } from "@/lib/actions"; 
 
 function AccessDeniedMessage() {
   return (
@@ -39,18 +39,16 @@ export default function ApprovalsPage() {
     (user?.email ? SPECIFIC_APPROVER_EMAILS.includes(user.email) : false);
 
   useEffect(() => {
-    if (user?.role === "Presidente IEQ") {
+    if (user?.role === "Presidente IEQ" && user.id) {
       setIsLoading(true);
-      // const fetchRequests = async () => {
-      //   const requests = await getApprovalRequestsForUser(user.id, user.role);
-      //   setPendingApprovals(requests);
-      //   setIsLoading(false);
-      // };
-      // fetchRequests();
-      setTimeout(() => {
-        setPendingApprovals([]); // Mock: no pending approvals for now
+      const fetchRequests = async () => {
+        const requests = await getApprovalRequestsForUser(user.id, user.role); // Pass userId and role
+        setPendingApprovals(requests);
         setIsLoading(false);
-      }, 500);
+      };
+      fetchRequests();
+    } else {
+        setIsLoading(false); // Not President or no user ID
     }
   }, [user]);
 
@@ -70,9 +68,15 @@ export default function ApprovalsPage() {
     });
   };
   
-  const handlePurchaseRequestSuccess = (approvalId: string) => {
-    // Potentially refresh a list of "my sent requests" if we implement that view
+  const handlePurchaseRequestSuccess = async (approvalId: string) => {
     console.log("Purchase request created successfully with ID:", approvalId);
+    // Re-fetch pending approvals if the current user is Presidente IEQ
+    if (user?.role === "Presidente IEQ" && user.id) {
+        setIsLoading(true);
+        const requests = await getApprovalRequestsForUser(user.id, user.role);
+        setPendingApprovals(requests);
+        setIsLoading(false);
+    }
   };
 
   return (
@@ -125,9 +129,25 @@ export default function ApprovalsPage() {
                 <p className="font-semibold">No tienes solicitudes pendientes de aprobación en este momento.</p>
               </div>
             ) : (
-              <div className="text-center py-10">
-                <p className="text-muted-foreground">(Aquí se mostrará la tabla de solicitudes pendientes)</p>
-              </div>
+              <ul className="space-y-3">
+                {pendingApprovals.map(req => (
+                    <li key={req.id} className="p-4 border rounded-md shadow-sm hover:shadow-md transition-shadow bg-muted/20">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-semibold text-primary">{req.subject}</h3>
+                            <Badge variant={req.type === "Compra" ? "default" : "secondary"}>{req.type}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">Solicitante: {req.requesterName}</p>
+                        <p className="text-sm text-muted-foreground">Fecha: {new Date(req.createdAt).toLocaleDateString('es-ES')}</p>
+                        {req.type === "Compra" && req.estimatedPrice && (
+                            <p className="text-sm text-muted-foreground">Monto Est.: {req.estimatedPrice.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
+                        )}
+                        {/* Placeholder for "Ver Detalles" button */}
+                        <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" onClick={() => toast({title: "Funcionalidad en Desarrollo", description: `Ver detalles para ${req.id} aún no está implementado.`})}>
+                            Ver Detalles
+                        </Button>
+                    </li>
+                ))}
+              </ul>
             )}
           </CardContent>
         </Card>
@@ -156,3 +176,4 @@ export default function ApprovalsPage() {
     </div>
   );
 }
+

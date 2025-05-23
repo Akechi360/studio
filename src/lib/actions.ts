@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus } from "./types";
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole } from "./types"; // Added UserRole
 import type { AuditLogEntry as AuditLogEntryType } from "./mock-data";
 import {
   addTicketToMock,
@@ -17,10 +17,10 @@ import {
   getInventoryItemByIdFromMock,
   addAuditLogEntryToMock,
   getAllAuditLogsFromMock,
-  addApprovalRequestToMock, 
-  getAllApprovalRequestsFromMock, 
-  getApprovalRequestByIdFromMock, 
-  updateApprovalRequestInMock 
+  addApprovalRequestToMock,
+  getAllApprovalRequestsFromMock,
+  getApprovalRequestByIdFromMock,
+  updateApprovalRequestInMock
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
@@ -94,7 +94,7 @@ export async function createTicketAction(
   revalidatePath("/tickets");
   revalidatePath(`/tickets/${newTicket.id}`);
   revalidatePath("/dashboard");
-  revalidatePath("/admin/reports"); // Though removed from sidebar, revalidate if used elsewhere
+  revalidatePath("/admin/reports");
   revalidatePath("/admin/analytics");
 
 
@@ -331,14 +331,18 @@ export async function deleteInventoryItemAction(itemId: string, actingUserEmail:
 
 const excelToInternalFieldMap: Record<string, keyof InventoryItem | keyof Omit<z.infer<typeof BaseInventoryItemSchema>, 'name'>> = {
   'nombre': 'name', 'nombre del articulo': 'name', 'nombre del artículo': 'name', 'articulo': 'name', 'artículo': 'name', 'equipo': 'name',
-  'categoría': 'category', 'categoria': 'category', 'marca': 'brand', 'modelo': 'model',
+  'categoría': 'category', 'categoria': 'category',
+  'marca': 'brand',
+  'modelo': 'model',
   'número de serie': 'serialNumber', 'numero de serie': 'serialNumber', 'n/s': 'serialNumber', 'serial': 'serialNumber', 'serie': 'serialNumber',
-  'procesador': 'processor', 'ram': 'ram', 'memoria ram': 'ram',
+  'procesador': 'processor',
+  'ram': 'ram', 'memoria ram': 'ram',
   'tipo de almacenamiento': 'storageType', 'tipo de disco': 'storageType',
   'capacidad de almacenamiento': 'storage', 'almacenamiento': 'storage',
   'cantidad': 'quantity', 'cant': 'quantity',
   'ubicación': 'location', 'ubicacion': 'location', 'departamento': 'location', 'asignacion': 'location', 'asignación': 'location',
-  'estado': 'status', 'notas adicionales': 'notes', 'notas': 'notes', 'observaciones': 'notes',
+  'estado': 'status',
+  'notas adicionales': 'notes', 'notas': 'notes', 'observaciones': 'notes',
 };
 
 const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Partial<z.infer<typeof BaseInventoryItemSchema>> => {
@@ -373,11 +377,12 @@ export async function importInventoryItemsAction(
   currentUserEmail: string,
   currentUserId: string,
   currentUserName: string
-) {
+): Promise<{ success: boolean; message: string; successCount: number; errorCount: number; errors: { row: number; message: string; data: ExcelInventoryItemData }[]; importedItems: InventoryItem[] }> {
   try {
     if (!itemDataArray || itemDataArray.length === 0) {
       return { success: false, message: "No se proporcionaron datos para importar o el archivo está vacío.", successCount: 0, errorCount: itemDataArray?.length || 0, errors: [{ row: 0, message: "Archivo vacío o sin datos.", data: {} }], importedItems: [] };
     }
+
     let successCount = 0;
     let errorCount = 0;
     const errors: { row: number; message: string; data: ExcelInventoryItemData }[] = [];
@@ -441,7 +446,12 @@ export async function importInventoryItemsAction(
     else if (errorCount > 0 && itemDataArray.length > 0) await logAuditEvent(currentUserEmail, "Intento Fallido de Importación Masiva de Inventario", `No se importaron artículos. Errores: ${errorCount} de ${itemDataArray.length} filas.`);
     
     revalidatePath("/inventory");
-    return { success: successCount > 0 && errorCount === 0, message: `Importación completada. ${successCount} artículos importados, ${errorCount} filas con errores.`, successCount, errorCount, errors, importedItems };
+    const importSuccessful = successCount > 0 && errorCount === 0;
+    const finalMessage = errorCount > 0 ? 
+        `Importación parcial: ${successCount} artículos importados. ${errorCount} filas con errores.` :
+        `Importación completada. ${successCount} artículos importados.`;
+
+    return { success: importSuccessful, message: finalMessage, successCount, errorCount, errors, importedItems };
   } catch (e: any) {
     console.error("Error catastrófico durante la importación de inventario:", e);
     const errorMsg = `Error general del servidor durante la importación: ${e.message || 'Error desconocido'}. Revise los logs del servidor.`;
@@ -477,7 +487,7 @@ const PaymentRequestSchema = CreateApprovalRequestBaseSchema.extend({
 const CreateApprovalRequestActionSchema = z.union([PurchaseRequestSchema, PaymentRequestSchema]);
 
 export async function createApprovalRequestAction(
-  values: z.infer<typeof PurchaseRequestSchema> | z.infer<typeof PaymentRequestSchema> // Adjust based on which form calls it
+  values: z.infer<typeof PurchaseRequestSchema> | z.infer<typeof PaymentRequestSchema> 
 ): Promise<{ success: boolean; message: string; approvalId?: string; errors?: any }> {
   const validatedFields = CreateApprovalRequestActionSchema.safeParse(values);
   if (!validatedFields.success) {
@@ -497,7 +507,7 @@ export async function createApprovalRequestAction(
     requesterEmail: data.requesterEmail,
     createdAt: new Date(),
     updatedAt: new Date(),
-    attachments: [], // Placeholder for now
+    attachments: [], 
     activityLog: [
       {
         id: `ACT-${Date.now()}`,
@@ -524,7 +534,7 @@ export async function createApprovalRequestAction(
   }
   
   revalidatePath("/approvals");
-  revalidatePath("/dashboard"); // For President's dashboard
+  revalidatePath("/dashboard"); 
 
   return {
     success: true,
@@ -534,11 +544,13 @@ export async function createApprovalRequestAction(
 }
 
 
-export async function getApprovalRequestsForUser(userId: string, userRole: Role): Promise<ApprovalRequest[]> {
+export async function getApprovalRequestsForUser(userId: string, userRole: UserRole): Promise<ApprovalRequest[]> {
   const allRequests = getAllApprovalRequestsFromMock();
   if (userRole === "Presidente IEQ") {
+    // Presidente IEQ sees all requests with status "Pendiente"
     return allRequests.filter(req => req.status === "Pendiente");
   }
+  // Other users (Admin, User) see requests they submitted
   return allRequests.filter(req => req.requesterId === userId);
 }
 
@@ -547,3 +559,4 @@ export async function getApprovalRequestDetails(id: string): Promise<ApprovalReq
 }
 
 // More actions will be needed for approve, reject, request info, add attachments, etc.
+
