@@ -4,7 +4,7 @@
 import type { User, Role } from "@/lib/types";
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { logAuditEvent } from "@/lib/actions"; 
+import { logAuditEvent } from "@/lib/actions";
 
 // --- Mock Users Store (similar to mock-data.ts pattern) ---
 declare global {
@@ -15,30 +15,81 @@ declare global {
 let usersStore_auth_internal: User[];
 
 const initialAdminUser: User = {
-  id: "admin-user-001", 
+  id: "admin-user-001",
   name: "Sistemas ClinicaIEQ",
   email: "sistemas@clinicaieq.com",
   role: "Admin",
   avatarUrl: "https://placehold.co/100x100.png?text=SC",
   department: "Sistemas",
-  password: "adminpassword" 
+  password: "adminpassword"
 };
 
 const presidenteUser: User = {
   id: "presidente-user-001",
   name: "Presidente IEQ",
   email: "presidente@clinicaieq.com",
-  role: "Presidente IEQ", // Updated role
+  role: "Presidente IEQ",
   avatarUrl: "https://placehold.co/100x100.png?text=PI",
-  department: "Presidente", // Assigned department
+  department: "Presidente",
   password: "presidentepassword",
 };
 
+const additionalApprovers: User[] = [
+  {
+    id: "approver-user-001",
+    name: "Margarita Malek",
+    email: "proveedoresvarios@clinicaieq.com",
+    role: "User",
+    avatarUrl: "https://placehold.co/100x100.png?text=MM",
+    department: "Tesoreria",
+    password: "123456789",
+  },
+  {
+    id: "approver-user-002",
+    name: "Carolina Ramirez",
+    email: "gerencia_administracion@clinicaieq.com",
+    role: "User",
+    avatarUrl: "https://placehold.co/100x100.png?text=CR",
+    department: "Gerencia",
+    password: "123456789",
+  },
+  {
+    id: "approver-user-003",
+    name: "Emilia Valderrama",
+    email: "electromedicina@clinicaieq.com",
+    role: "User",
+    avatarUrl: "https://placehold.co/100x100.png?text=EV",
+    department: "Equipos Medicos",
+    password: "123456789",
+  },
+  {
+    id: "approver-user-004",
+    name: "Cesar Gil",
+    email: "gerencia_sistemas@clinicaieq.com",
+    role: "User",
+    avatarUrl: "https://placehold.co/100x100.png?text=CG",
+    department: "Gerencia Sistemas",
+    password: "123456789",
+  },
+  {
+    id: "approver-user-005",
+    name: "Pina Aulino",
+    email: "suministros@clinicaieq.com",
+    role: "User",
+    avatarUrl: "https://placehold.co/100x100.png?text=PA",
+    department: "Suministros",
+    password: "123456789",
+  },
+];
+
+export const SPECIFIC_APPROVER_EMAILS = additionalApprovers.map(u => u.email);
+
+
 if (process.env.NODE_ENV === 'production') {
-  usersStore_auth_internal = [initialAdminUser, presidenteUser];
+  usersStore_auth_internal = [initialAdminUser, presidenteUser, ...additionalApprovers];
 } else {
   if (!global.__mock_users_store_auth__) {
-    global.__mock_users_store_auth__ = [initialAdminUser, presidenteUser];
+    global.__mock_users_store_auth__ = [initialAdminUser, presidenteUser, ...additionalApprovers];
   }
   usersStore_auth_internal = global.__mock_users_store_auth__;
 }
@@ -71,15 +122,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedUserJson = localStorage.getItem("ticketflow_user");
       if (storedUserJson) {
         const parsedUserFromStorage = JSON.parse(storedUserJson) as User;
-        // Validate against the current usersStore_auth_internal
         const existingUserInStore = usersStore_auth_internal.find(u => u.id === parsedUserFromStorage.id);
         if (existingUserInStore) {
-          // Ensure the user object in context is the one from the store, which might have been updated
-          setUser(existingUserInStore); 
+          setUser(existingUserInStore);
         } else {
-          // User in localStorage no longer exists or is stale, clear it
           localStorage.removeItem("ticketflow_user");
-          setUser(null); 
+          setUser(null);
         }
       }
     } catch (error) {
@@ -87,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem("ticketflow_user");
     }
     setIsLoading(false);
-  }, []); // Run once on mount to load user state
+  }, []);
 
   const login = async (email: string, pass: string): Promise<boolean> => {
     setIsLoading(true);
@@ -97,16 +145,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(foundUser);
       localStorage.setItem("ticketflow_user", JSON.stringify(foundUser));
       setIsLoading(false);
-      // await logAuditEvent(foundUser.email, "Inicio de Sesión Exitoso");
       return true;
     }
     setIsLoading(false);
-    // await logAuditEvent(email, "Intento de Inicio de Sesión Fallido");
     return false;
   };
 
   const logout = () => {
-    if (user?.email) { 
+    if (user?.email) {
        logAuditEvent(user.email, "Cierre de Sesión");
     }
     setUser(null);
@@ -129,14 +175,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,2).toUpperCase()}`,
       password: pass,
     };
-    usersStore_auth_internal.push(newUser); 
+    usersStore_auth_internal.push(newUser);
     setUser(newUser);
     localStorage.setItem("ticketflow_user", JSON.stringify(newUser));
     setIsLoading(false);
     await logAuditEvent(email, "Registro de Nuevo Usuario", `Usuario: ${name} (${email})`);
     return true;
   };
-  
+
   const updateProfile = async (name: string, email: string): Promise<boolean> => {
     if (!user) return false;
     setIsLoading(true);
@@ -204,16 +250,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, message: "Usuario no encontrado." };
     }
 
-    const targetUserOriginal = { ...usersStore_auth_internal[userIndex] }; 
+    const targetUserOriginal = { ...usersStore_auth_internal[userIndex] };
 
     if (data.email && data.email !== usersStore_auth_internal[userIndex].email) {
       if (usersStore_auth_internal.some(u => u.email === data.email && u.id !== userId)) {
         return { success: false, message: "El correo electrónico ya está en uso por otro usuario." };
       }
     }
-    
+
     const updatedUserData = { ...usersStore_auth_internal[userIndex], ...data };
-    
+
     if (data.department === "_NO_DEPARTMENT_") {
         updatedUserData.department = undefined;
     } else if (data.department !== undefined) {
@@ -223,7 +269,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (data.password && data.password.trim() !== "") {
       updatedUserData.password = data.password;
     } else {
-      // If password field is not provided or is empty, keep the existing password
       updatedUserData.password = usersStore_auth_internal[userIndex].password;
     }
 
@@ -235,15 +280,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (data.email && data.email !== targetUserOriginal.email) changes.push(`Email de '${targetUserOriginal.email}' a '${data.email}'`);
     if (data.role && data.role !== targetUserOriginal.role) changes.push(`Rol de '${targetUserOriginal.role}' a '${data.role}'`);
     if (data.department !== targetUserOriginal.department) changes.push(`Departamento de '${targetUserOriginal.department || "N/A"}' a '${updatedUserData.department || "N/A"}'`);
-    if (data.password && data.password.trim() !== "" && data.password !== targetUserOriginal.password) changes.push(`Contraseña actualizada.`);
+    if (data.password && data.password.trim() !== "" && updatedUserData.password !== targetUserOriginal.password) changes.push(`Contraseña actualizada.`);
     details += changes.join(', ') || "Sin cambios detectables en campos principales.";
 
-    if (user.email) { 
+    if (user.email) {
         await logAuditEvent(user.email, "Actualización de Usuario por Administrador", details);
     }
-    
-    // If the admin is updating their own details (less common through this flow, but possible)
-    // ensure their context user is updated.
+
     if (user && user.id === userId) {
       const updatedSelf = { ...user, ...usersStore_auth_internal[userIndex] };
       setUser(updatedSelf);
@@ -265,7 +308,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const deletedUserName = usersStore_auth_internal[userIndex].name;
       const deletedUserEmail = usersStore_auth_internal[userIndex].email;
       usersStore_auth_internal.splice(userIndex, 1);
-      if (user.email) { 
+      if (user.email) {
         await logAuditEvent(user.email, "Eliminación de Usuario por Administrador", `Usuario: ${deletedUserName} (${deletedUserEmail}), ID: ${userId}`);
       }
       return { success: true, message: "Usuario eliminado exitosamente." };
@@ -291,4 +334,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

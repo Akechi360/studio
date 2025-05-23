@@ -3,7 +3,7 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { FileCheck, Construction, ShieldAlert } from "lucide-react";
-import { useAuth } from '@/lib/auth-context';
+import { useAuth, SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context'; // Import SPECIFIC_APPROVER_EMAILS
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
 
 function AccessDeniedMessage() {
@@ -23,7 +23,10 @@ function AccessDeniedMessage() {
 export default function ApprovalsPage() {
   const { user } = useAuth();
 
-  const canAccessApprovals = user?.role === "Admin" || user?.role === "Presidente IEQ";
+  const canAccessApprovals =
+    user?.role === "Admin" ||
+    user?.role === "Presidente IEQ" ||
+    (user?.email ? SPECIFIC_APPROVER_EMAILS.includes(user.email) : false);
 
   if (!canAccessApprovals) {
     return <AccessDeniedMessage />;

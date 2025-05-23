@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert'; 
+import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
 import { ShieldAlert, Users, UserCog, Save, Loader2, Trash2, AlertTriangle, Building, LockKeyhole } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { User, Role } from '@/lib/types';
@@ -27,7 +27,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle as RadixAlertDialogTitle, 
+  AlertDialogTitle as RadixAlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
   Form,
@@ -50,13 +50,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 
-const NO_DEPARTMENT_VALUE = "_NO_DEPARTMENT_"; 
+const NO_DEPARTMENT_VALUE = "_NO_DEPARTMENT_";
 
 const DEPARTMENTS = [
   "Admision", "Caja", "Radiologia", "Laboratorio", "CDI", "Cardiovascular",
   "Jefa Enfermeras", "Contabilidad", "Administracion", "RRHH", "Honorarios",
-  "Seguros", "Pediatria", "UCI", "Ocupacional", "Gerencia", 
-  "Asistente Gerencia", "Sistemas", "Presidente", // Added Presidente
+  "Seguros", "Pediatria", "UCI", "Ocupacional", "Gerencia",
+  "Asistente Gerencia", "Sistemas", "Presidente", "Tesoreria", "Equipos Medicos", "Gerencia Sistemas", "Suministros",
   NO_DEPARTMENT_VALUE
 ];
 
@@ -80,7 +80,11 @@ const DEPARTMENT_DISPLAY_MAP: { [key: string]: string } = {
   "Gerencia": "Gerencia",
   "Asistente Gerencia": "Asistente Gerencia",
   "Sistemas": "Sistemas",
-  "Presidente": "Presidente", // Added Presidente
+  "Presidente": "Presidente",
+  "Tesoreria": "Tesorería",
+  "Equipos Medicos": "Equipos Médicos",
+  "Gerencia Sistemas": "Gerencia Sistemas",
+  "Suministros": "Suministros",
 };
 
 const ROLES_OPTIONS: Role[] = ["User", "Admin", "Presidente IEQ"];
@@ -89,9 +93,9 @@ const ROLES_OPTIONS: Role[] = ["User", "Admin", "Presidente IEQ"];
 const userEditFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
   email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
-  role: z.enum(ROLES_OPTIONS as [Role, ...Role[]], { required_error: "El rol es obligatorio." }), // Updated to use ROLES_OPTIONS
+  role: z.enum(ROLES_OPTIONS as [Role, ...Role[]], { required_error: "El rol es obligatorio." }),
   department: z.string().optional(),
-  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }).optional().or(z.literal('')), // Allow empty string or min 6 chars
+  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }).optional().or(z.literal('')),
 });
 
 type UserEditFormValues = z.infer<typeof userEditFormSchema>;
@@ -131,14 +135,14 @@ function DeleteUserConfirmationDialog({ isOpen, onClose, onConfirm, userName, is
 
 
 interface EditUserDialogProps {
-  userToEdit: User | null; 
+  userToEdit: User | null;
   currentUser: User | null;
   isOpen: boolean;
   onClose: () => void;
   onUserUpdate: () => void;
 }
 
-function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate }: EditUserDialogProps) { 
+function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate }: EditUserDialogProps) {
   const { updateUserByAdmin, deleteUserByAdmin } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -152,7 +156,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
       email: userToEdit?.email || "",
       role: userToEdit?.role || "User",
       department: userToEdit?.department || NO_DEPARTMENT_VALUE,
-      password: userToEdit?.password || "", 
+      password: "", // Always start password field empty for editing
     },
   });
 
@@ -163,7 +167,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
         email: userToEdit.email,
         role: userToEdit.role,
         department: userToEdit.department || NO_DEPARTMENT_VALUE,
-        password: userToEdit.password || "", 
+        password: "", // Reset password to empty, admin can choose to set a new one
       });
     }
   }, [userToEdit, form]);
@@ -173,8 +177,8 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
   const onSubmit = async (data: UserEditFormValues) => {
     setIsSubmitting(true);
     const departmentToSave = data.department === NO_DEPARTMENT_VALUE ? undefined : data.department;
-    
-    const updateData: Partial<UserEditFormValues> = { 
+
+    const updateData: Partial<UserEditFormValues> = {
         name: data.name,
         email: data.email,
         role: data.role,
@@ -220,18 +224,18 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
     if (result.success) {
         toast({
             title: "Usuario Eliminado",
-            description: result.message || "Usuario eliminado.", 
+            description: result.message || "Usuario eliminado.",
         });
-        onUserUpdate(); 
-        onClose(); 
+        onUserUpdate();
+        onClose();
     } else {
         toast({
             title: "Eliminación Fallida",
-            description: result.message || "No se pudo eliminar el usuario.", 
+            description: result.message || "No se pudo eliminar el usuario.",
             variant: "destructive",
         });
     }
-    setIsDeleteConfirmOpen(false); 
+    setIsDeleteConfirmOpen(false);
   };
 
   const canDelete = currentUser && userToEdit && currentUser.id !== userToEdit.id;
@@ -333,7 +337,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
                         Contraseña (dejar en blanco para no cambiar)
                     </FormLabel>
                     <FormControl>
-                      <Input type="text" placeholder="••••••••" {...field} />
+                      <Input type="text" placeholder="••••••••" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -372,7 +376,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
 }
 
 
-function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick: (user: User) => void; }) { 
+function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick: (user: User) => void; }) {
   const getInitials = (name?: string) => {
     if (!name) return '??';
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -413,7 +417,7 @@ function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick
 }
 
 export default function UserManagementPage() {
-  const { user: currentUser, role, getAllUsers } = useAuth(); 
+  const { user: currentUser, role, getAllUsers } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
@@ -422,7 +426,7 @@ export default function UserManagementPage() {
     if (getAllUsers) {
       setUsers(getAllUsers());
     }
-  }, [getAllUsers, currentUser]); 
+  }, [getAllUsers, currentUser]);
 
   const handleManageUser = (userToManage: User) => {
     setSelectedUser(userToManage);
@@ -463,7 +467,7 @@ export default function UserManagementPage() {
           Gestionar usuarios, roles, departamentos y permisos.
         </p>
       </div>
-      <Card className="shadow-lg">
+      <Card className="w-full shadow-lg">
         <CardHeader>
           <CardTitle>Lista de Usuarios</CardTitle>
           <CardDescription>Ver y gestionar todos los usuarios del sistema.</CardDescription>
@@ -487,7 +491,7 @@ export default function UserManagementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((userEntry) => ( 
+                {users.map((userEntry) => (
                   <UserRow key={userEntry.id} user={userEntry} onManageClick={handleManageUser} />
                 ))}
               </TableBody>
@@ -497,8 +501,8 @@ export default function UserManagementPage() {
       </Card>
       {selectedUser && (
         <EditUserDialog
-          userToEdit={selectedUser} 
-          currentUser={currentUser} 
+          userToEdit={selectedUser}
+          currentUser={currentUser}
           isOpen={isEditUserDialogOpen}
           onClose={handleCloseDialog}
           onUserUpdate={handleUserUpdate}

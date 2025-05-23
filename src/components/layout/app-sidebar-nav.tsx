@@ -28,7 +28,7 @@ import {
   ChevronRight,
   FileCheck,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, SPECIFIC_APPROVER_EMAILS } from "@/lib/auth-context"; // Import SPECIFIC_APPROVER_EMAILS
 import type { Role, User as UserType } from "@/lib/types";
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -53,7 +53,7 @@ const navItems: NavItem[] = [
       { href: "/tickets", label: "Todos los Tickets", icon: Ticket, exact: true, allowedRoles: ["User", "Admin"] },
       { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true, allowedRoles: ["User", "Admin"] },
     ],
-    allowedRoles: ["User", "Admin"], // Only "User" and "Admin" can see "Tickets"
+    allowedRoles: ["User", "Admin"],
   },
   {
     href: "/approvals",
@@ -61,11 +61,13 @@ const navItems: NavItem[] = [
     icon: FileCheck,
     exact: true,
     specialAccessCheck: (currentUser) =>
-      currentUser?.role === "Admin" || currentUser?.role === "Presidente IEQ",
+      currentUser?.role === "Admin" ||
+      currentUser?.role === "Presidente IEQ" ||
+      (currentUser?.email ? SPECIFIC_APPROVER_EMAILS.includes(currentUser.email) : false),
   },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
-  { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["User", "Admin"] }, // Only "User" and "Admin"
-  { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true, allowedRoles: ["User", "Admin"] }, // Only "User" and "Admin"
+  { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["User", "Admin"] },
+  { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true, allowedRoles: ["User", "Admin"] },
   { href: "/profile", label: "Perfil", icon: User, exact: true },
   {
     href: "#admin-toggle",
@@ -79,7 +81,7 @@ const navItems: NavItem[] = [
       { href: "/settings", label: "Configuración App", icon: Settings, allowedRoles: ["Admin"], exact: true },
     ]
   },
-  { href: "/help", label: "Ayuda y FAQ", icon: HelpCircle, exact: true, allowedRoles: ["User", "Admin"] }, // Only "User" and "Admin"
+  { href: "/help", label: "Ayuda y FAQ", icon: HelpCircle, exact: true, allowedRoles: ["User", "Admin"] },
 ];
 
 export function AppSidebarNav() {
@@ -104,12 +106,16 @@ export function AppSidebarNav() {
         if (isParentActiveDueToChild && !currentOpenState) {
           newOpenStates[item.label] = true;
           pathChanged = true;
-        } else {
+        } else if (isParentActiveDueToChild && currentOpenState) {
+          // Keep it open if already open and active
+           newOpenStates[item.label] = true;
+        }
+         else {
           newOpenStates[item.label] = currentOpenState;
         }
       }
     });
-    if (pathChanged || Object.keys(newOpenStates).length !== Object.keys(openStates).length) {
+    if (pathChanged || Object.keys(newOpenStates).some(key => newOpenStates[key] !== openStates[key])) {
        setOpenStates(prev => ({...prev, ...newOpenStates}));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,7 +129,9 @@ export function AppSidebarNav() {
     <SidebarMenu>
       {navItems.map((item) => {
         if (item.allowedRoles && user?.role && !item.allowedRoles.includes(user.role)) {
-          return null;
+          if (!item.specialAccessCheck || (item.specialAccessCheck && !item.specialAccessCheck(user))) {
+            return null;
+          }
         }
         if (item.specialAccessCheck && !item.specialAccessCheck(user)) {
           return null;
@@ -133,7 +141,6 @@ export function AppSidebarNav() {
         const isSectionOpen = !!openStates[item.label];
 
         if (item.subItems && item.subItems.length > 0) {
-          // Check if any sub-item should be visible for the current user role
           const visibleSubItems = item.subItems.filter(subItem => {
             if (subItem.allowedRoles && user?.role && !subItem.allowedRoles.includes(user.role)) {
               return false;
@@ -145,7 +152,7 @@ export function AppSidebarNav() {
           });
 
           if (visibleSubItems.length === 0) {
-            return null; // Don't render the parent if no sub-items are visible
+            return null;
           }
 
 
@@ -162,7 +169,7 @@ export function AppSidebarNav() {
                 isActive={isAnySubItemActive && isSectionOpen}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-expanded={isSectionOpen}
-                className="justify-between w-full cursor-default"
+                className="justify-between w-full"
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   <Icon className="shrink-0" />
