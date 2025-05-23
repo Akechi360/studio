@@ -26,6 +26,7 @@ import {
   ScreenShare,
   CalendarDays,
   ChevronRight,
+  FileCheck, // Added icon for Aprobaciones
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import type { Role } from "@/lib/types";
@@ -52,6 +53,7 @@ const navItems: NavItem[] = [
       { href: "/tickets/new", label: "Nuevo Ticket", icon: PlusCircle, exact: true },
     ]
   },
+  { href: "/approvals", label: "Aprobaciones", icon: FileCheck, exact: true }, // New Approvals section
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
   { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true },
   { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true }, 
@@ -211,4 +213,3 @@ export function AppSidebarNav() {
     </SidebarMenu>
   );
 }
-
