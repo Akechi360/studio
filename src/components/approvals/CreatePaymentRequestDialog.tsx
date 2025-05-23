@@ -47,7 +47,7 @@ const paymentRequestFormSchema = z.object({
     invalid_type_error: "Formato de fecha inválido.",
   }),
   descripcion: z.string().max(2000, { message: "Máximo 2000 caracteres." }).optional(),
-  attachmentsData: z.array(z.object({ // Added for consistency, even if not directly in schema for this specific component
+  attachmentsData: z.array(z.object({
     fileName: z.string(),
     size: z.number(),
     type: z.string().optional(),
@@ -232,23 +232,21 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                         <FormLabel className="mb-1.5">Fecha Requerida *</FormLabel>
                             <Popover>
                                 <PopoverTrigger asChild>
-                                <FormControl>
                                     <Button
                                     variant={"outline"}
                                     className={cn(
-                                        "w-full pl-3 text-left font-normal",
+                                        "w-full justify-start text-left font-normal", // Changed pl-3 to justify-start
                                         !field.value && "text-muted-foreground"
                                     )}
-                                    type="button" // Explicitly set type
+                                    type="button"
                                     >
+                                    <CalendarIcon className="mr-2 h-4 w-4" /> {/* Moved icon to the left */}
                                     {field.value ? (
                                         format(field.value, "PPP", { locale: es })
                                     ) : (
                                         <span>Selecciona una fecha</span>
                                     )}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                     </Button>
-                                </FormControl>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
                                 <Calendar
@@ -256,7 +254,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                                     selected={field.value}
                                     onSelect={field.onChange}
                                     disabled={(date) =>
-                                    date < new Date(new Date().setDate(new Date().getDate() -1)) // Disable past dates including today -1
+                                    date < new Date(new Date().setDate(new Date().getDate() -1))
                                     }
                                     initialFocus
                                 />
@@ -329,5 +327,3 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
     </Dialog>
   );
 }
-
-    
