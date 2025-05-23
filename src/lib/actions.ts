@@ -15,12 +15,12 @@ import {
   updateInventoryItemInMock,
   deleteInventoryItemFromMock,
   getInventoryItemByIdFromMock,
-  addAuditLogEntryToMock, // Import new function
-  getAllAuditLogsFromMock // Import new function
+  addAuditLogEntryToMock, 
+  getAllAuditLogsFromMock 
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
-import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from "./types";
+import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM } from "./types";
 
 // --- Audit Log Actions ---
 export async function logAuditEvent(performingUserEmail: string, actionDescription: string, details?: string): Promise<void> {
@@ -30,12 +30,11 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
       action: actionDescription,
       details: details || undefined,
     });
-    revalidatePath("/admin/audit"); // Revalidate audit log page after adding new entry
-  } catch (error) {
-    console.error("Failed to log audit event:", error);
+    revalidatePath("/admin/audit"); 
+  } catch (error)
     // Depending on requirements, you might want to throw the error or handle it silently
   }
-}
+
 
 export async function getAuditLogs(): Promise<AuditLogEntryType[]> {
   return getAllAuditLogsFromMock();
@@ -51,8 +50,8 @@ const CreateTicketSchema = z.object({
 });
 
 export async function createTicketAction(
-  userId: string, // Kept for compatibility, but userEmail is preferred for logging
-  userName: string, // Kept for compatibility
+  userId: string, 
+  userName: string, 
   values: z.infer<typeof CreateTicketSchema>
 ) {
   const validatedFields = CreateTicketSchema.safeParse(values);
@@ -75,9 +74,9 @@ export async function createTicketAction(
     priority: priority as TicketPriority,
     status: "Open",
     attachments: [],
-    userId, // Keep existing userId
-    userName, // Keep existing userName
-    userEmail, // Store userEmail on ticket
+    userId, 
+    userName, 
+    userEmail, 
     createdAt: new Date(),
     updatedAt: new Date(),
     comments: [],
@@ -85,7 +84,7 @@ export async function createTicketAction(
 
   addTicketToMock(newTicket);
 
-  // Log audit event
+  
   await logAuditEvent(userEmail, "Creación de Ticket", `Ticket ID: ${newTicket.id}, Asunto: ${subject}`);
 
   revalidatePath("/tickets");
@@ -109,7 +108,7 @@ const AddCommentSchema = z.object({
 
 export async function addCommentAction(
   ticketId: string,
-  commenter: User, // User object which includes email
+  commenter: User, 
   values: z.infer<typeof AddCommentSchema>
 ) {
   const validatedFields = AddCommentSchema.safeParse(values);
@@ -139,7 +138,7 @@ export async function addCommentAction(
   ticket.comments.push(newComment);
   ticket.updatedAt = new Date();
   
-  // Log audit event
+  
   if (commenter.email) {
     await logAuditEvent(commenter.email, "Adición de Comentario", `Ticket ID: ${ticketId}, Usuario: ${commenter.name}`);
   }
@@ -190,7 +189,7 @@ export async function updateTicketStatusAction(
   ticket.status = status as TicketStatus;
   ticket.updatedAt = new Date();
 
-  // Log audit event
+  
   await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatus}, A: ${ticket.status}`);
 
 
@@ -260,8 +259,6 @@ export async function getAllInventoryItems(): Promise<InventoryItem[]> {
   return getAllInventoryItemsFromMock();
 }
 
-const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
-const STORAGE_TYPES_ZOD_ENUM = ["HDD", "SSD"] as [StorageType, ...StorageType[]];
 
 const BaseInventoryItemSchema = z.object({
   name: z.string().min(3, "El nombre debe tener al menos 3 caracteres.").max(100),
@@ -277,10 +274,6 @@ const BaseInventoryItemSchema = z.object({
   location: z.string().max(100).optional(),
   status: z.enum(INVENTORY_ITEM_STATUSES),
   notes: z.string().max(500).optional(),
-});
-
-const AddInventoryItemSchema = BaseInventoryItemSchema.extend({
-  currentUserEmail: z.string().email("Debe proporcionar el correo del usuario que crea el artículo.")
 });
 
 
@@ -305,8 +298,8 @@ const categoryPrefixMap: Record<InventoryItemCategory, string> = {
 };
 
 export async function addInventoryItemAction(
-  currentUser: Pick<User, 'id' | 'name' | 'email'>, // Now expects email too
-  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "currentUserEmail"> // Values from form
+  currentUser: Pick<User, 'id' | 'name' | 'email'>, 
+  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "currentUserEmail"> 
 ) {
   const validatedFields = BaseInventoryItemSchema.safeParse(values);
 
@@ -332,7 +325,7 @@ export async function addInventoryItemAction(
           maxNum = numPart;
         }
       } catch (e) {
-        console.error("Error parsing item ID number:", item.id, e);
+        // Error parsing item ID number
       }
     }
   });
@@ -353,7 +346,7 @@ export async function addInventoryItemAction(
   };
 
   addInventoryItemToMock(newItem);
-  // Log audit event
+  
   await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo ID: ${newItem.id}, Nombre: ${newItem.name}`);
 
   revalidatePath("/inventory");
@@ -365,15 +358,11 @@ export async function addInventoryItemAction(
   };
 }
 
-const UpdateInventoryItemSchema = BaseInventoryItemSchema.extend({
-  actingUserEmail: z.string().email("Debe proporcionar el correo del usuario que realiza la acción.")
-});
-
 
 export async function updateInventoryItemAction(
   itemId: string,
-  actingUserEmail: string, // Added for auditing
-  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "actingUserEmail"> // Values from form
+  actingUserEmail: string, 
+  values: Omit<z.infer<typeof BaseInventoryItemSchema>, "actingUserEmail"> 
 ) {
   const validatedFields = BaseInventoryItemSchema.safeParse(values);
 
@@ -402,7 +391,7 @@ export async function updateInventoryItemAction(
   const success = updateInventoryItemInMock(updatedItem);
 
   if (success) {
-    // Log audit event
+    
     await logAuditEvent(actingUserEmail, "Actualización de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${updatedItem.name}`);
     revalidatePath("/inventory");
     return { success: true, message: `Artículo "${updatedItem.name}" actualizado exitosamente.` };
@@ -411,7 +400,7 @@ export async function updateInventoryItemAction(
   }
 }
 
-export async function deleteInventoryItemAction(itemId: string, actingUserEmail: string) { // Added actingUserEmail
+export async function deleteInventoryItemAction(itemId: string, actingUserEmail: string) { 
   const itemToDelete = getInventoryItemByIdFromMock(itemId);
   if (!itemToDelete) {
     return { success: false, message: "Artículo no encontrado para eliminar." };
@@ -419,7 +408,7 @@ export async function deleteInventoryItemAction(itemId: string, actingUserEmail:
 
   const success = deleteInventoryItemFromMock(itemId);
   if (success) {
-    // Log audit event
+    
     await logAuditEvent(actingUserEmail, "Eliminación de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${itemToDelete.name}`);
     revalidatePath("/inventory");
     return { success: true, message: "Artículo eliminado exitosamente." };
@@ -428,17 +417,176 @@ export async function deleteInventoryItemAction(itemId: string, actingUserEmail:
   }
 }
 
-// This action is for getting AI suggestions, which has been removed.
-// export async function getAISolutionSuggestion(ticketDescription: string): Promise<{ suggestion?: string | null; error?: string | null }> {
-//   try {
-//     const { output } = await suggestSolution({ ticketDescription });
-//     if (output && output.suggestedSolution) {
-//       return { suggestion: output.suggestedSolution };
-//     }
-//     return { error: "No se pudo generar una sugerencia en este momento." };
-//   } catch (error) {
-//     console.error("Error fetching AI suggestion:", error);
-//     return { error: "Error al contactar el servicio de IA." };
-//   }
-// }
+
+// Type for data expected from Excel (can be more lenient initially)
+export type ExcelInventoryItemData = {
+  // All fields are optional as they might be missing in Excel
+  // Using string for most to handle varied Excel inputs, conversion/validation happens later
+  Nombre?: string;
+  Categoría?: string;
+  Marca?: string;
+  Modelo?: string;
+  'Número de Serie'?: string; // Excel header might have spaces
+  Procesador?: string;
+  RAM?: string;
+  'Tipo de Almacenamiento'?: string;
+  'Capacidad de Almacenamiento'?: string;
+  Cantidad?: string | number;
+  Ubicación?: string;
+  Estado?: string;
+  'Notas Adicionales'?: string;
+  [key: string]: any; // Allow other columns
+};
+
+const excelToInternalFieldMap: Record<string, keyof InventoryItem> = {
+  'nombre': 'name',
+  'categoría': 'category',
+  'categoria': 'category',
+  'marca': 'brand',
+  'modelo': 'model',
+  'número de serie': 'serialNumber',
+  'numero de serie': 'serialNumber',
+  'n/s': 'serialNumber',
+  'procesador': 'processor',
+  'ram': 'ram',
+  'tipo de almacenamiento': 'storageType',
+  'tipo de disco': 'storageType',
+  'capacidad de almacenamiento': 'storage',
+  'almacenamiento': 'storage',
+  'cantidad': 'quantity',
+  'ubicación': 'location',
+  'ubicacion': 'location',
+  'departamento': 'location',
+  'estado': 'status',
+  'notas adicionales': 'notes',
+  'notas': 'notes',
+};
+
+const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Partial<z.infer<typeof BaseInventoryItemSchema>> => {
+  const mapped: Partial<z.infer<typeof BaseInventoryItemSchema>> = {};
+  for (const excelHeader in row) {
+    const lowerExcelHeader = excelHeader.toLowerCase().trim();
+    const internalField = excelToInternalFieldMap[lowerExcelHeader];
+    if (internalField) {
+      let value = row[excelHeader];
+      if (internalField === 'quantity' && typeof value === 'string') {
+        const parsedQuantity = parseInt(value, 10);
+        (mapped as any)[internalField] = isNaN(parsedQuantity) ? undefined : parsedQuantity;
+      } else if (internalField === 'category') {
+        const foundCategory = INVENTORY_ITEM_CATEGORIES.find(cat => cat.toLowerCase() === String(value).toLowerCase());
+        (mapped as any)[internalField] = foundCategory || undefined;
+      } else if (internalField === 'status') {
+         const foundStatus = INVENTORY_ITEM_STATUSES.find(stat => stat.toLowerCase() === String(value).toLowerCase());
+        (mapped as any)[internalField] = foundStatus || undefined;
+      } else if (internalField === 'ram') {
+        const foundRam = RAM_OPTIONS.find(r => String(value).toLowerCase().replace(/\s/g, '') === r.toLowerCase().replace(/\s/g, ''));
+        (mapped as any)[internalField] = foundRam || undefined;
+      } else if (internalField === 'storageType') {
+        const foundStorageType = STORAGE_TYPES_ZOD_ENUM.find(st => String(value).toLowerCase() === st.toLowerCase());
+         (mapped as any)[internalField] = foundStorageType || undefined;
+      }
+      else {
+        (mapped as any)[internalField] = value === null || value === undefined ? undefined : String(value).trim();
+      }
+    }
+  }
+  return mapped;
+};
+
+
+export async function importInventoryItemsAction(
+  itemDataArray: ExcelInventoryItemData[],
+  currentUserEmail: string,
+  currentUserId: string,
+  currentUserName: string
+) {
+  let successCount = 0;
+  let errorCount = 0;
+  const errors: { row: number; message: string; data: ExcelInventoryItemData }[] = [];
+  const importedItems: InventoryItem[] = [];
+
+  for (let i = 0; i < itemDataArray.length; i++) {
+    const rawRow = itemDataArray[i];
+    const mappedData = mapExcelRowToInventoryItemFormValues(rawRow);
+    
+    // Set defaults if not present, especially for required fields not perfectly mapped
+    if (!mappedData.quantity) mappedData.quantity = 1;
+    if (!mappedData.status) mappedData.status = "En Uso"; // Default status if not in Excel
+
+
+    const validatedFields = BaseInventoryItemSchema.safeParse(mappedData);
+
+    if (!validatedFields.success) {
+      errorCount++;
+      errors.push({
+        row: i + 2, // Assuming Excel row numbers start from 1 and row 1 is header
+        message: Object.values(validatedFields.error.flatten().fieldErrors).flat().join('; ') || "Error de validación desconocido.",
+        data: rawRow,
+      });
+      continue;
+    }
+
+    const data = validatedFields.data;
+    const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
+    const allItems = getRawInventoryStore();
+    let maxNum = 0;
+    allItems.forEach(item => {
+      if (item.id.startsWith(`${prefix}-IEQ-`)) {
+        try {
+          const numPart = parseInt(item.id.substring(item.id.lastIndexOf('-') + 1), 10);
+          if (numPart > maxNum) maxNum = numPart;
+        } catch (e) { /* ignore */ }
+      }
+    });
+    const newNum = maxNum + 1;
+    const formattedNum = String(newNum).padStart(3, '0');
+    const newId = `${prefix}-IEQ-${formattedNum}`;
+
+    const newItem: InventoryItem = {
+      id: newId,
+      ...data,
+      category: data.category as InventoryItemCategory,
+      status: data.status as InventoryItemStatus,
+      addedByUserId: currentUserId,
+      addedByUserName: currentUserName,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    
+    if (newItem.category === "Computadora") {
+        newItem.ram = data.ram === "No Especificado" ? undefined : data.ram;
+        newItem.storageType = data.storageType;
+        newItem.storage = data.storage;
+        newItem.processor = data.processor;
+    } else {
+        newItem.ram = undefined;
+        newItem.storageType = undefined;
+        newItem.storage = undefined;
+        newItem.processor = undefined;
+    }
+
+
+    addInventoryItemToMock(newItem);
+    importedItems.push(newItem);
+    successCount++;
+  }
+
+  if (successCount > 0) {
+    await logAuditEvent(currentUserEmail, "Importación Masiva de Inventario", `Se importaron ${successCount} artículos. Errores: ${errorCount}.`);
+  } else if (errorCount > 0) {
+     await logAuditEvent(currentUserEmail, "Intento Fallido de Importación Masiva de Inventario", `No se importaron artículos. Errores: ${errorCount}.`);
+  }
+
+
+  revalidatePath("/inventory");
+
+  return {
+    success: successCount > 0,
+    message: `Importación completada. ${successCount} artículos importados, ${errorCount} filas con errores.`,
+    successCount,
+    errorCount,
+    errors,
+    importedItems
+  };
+}
     

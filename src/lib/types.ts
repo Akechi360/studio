@@ -91,7 +91,12 @@ export const INVENTORY_ITEM_STATUSES = [
 
 export type InventoryItemStatus = typeof INVENTORY_ITEM_STATUSES[number];
 
-export type StorageType = "HDD" | "SSD";
+export const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
+export type RamOption = typeof RAM_OPTIONS[number];
+
+export const STORAGE_TYPES_ZOD_ENUM = ["HDD", "SSD"] as const;
+export type StorageType = typeof STORAGE_TYPES_ZOD_ENUM[number];
+
 
 export interface InventoryItem {
   id: string;
@@ -100,7 +105,7 @@ export interface InventoryItem {
   brand?: string;
   model?: string;
   serialNumber?: string;
-  ram?: string;
+  ram?: RamOption;
   storageType?: StorageType;
   storage?: string; // For capacity like "500GB", "1TB"
   processor?: string; 
@@ -119,4 +124,22 @@ export interface InventoryItem {
   updatedAt: Date;
   lastSeen?: Date;
 }
+
+// Type for data expected from Excel for import
+export type ExcelInventoryItemData = {
+  Nombre?: string;
+  Categoría?: string;
+  Marca?: string;
+  Modelo?: string;
+  'Número de Serie'?: string;
+  Procesador?: string;
+  RAM?: string;
+  'Tipo de Almacenamiento'?: string;
+  'Capacidad de Almacenamiento'?: string;
+  Cantidad?: string | number;
+  Ubicación?: string;
+  Estado?: string;
+  'Notas Adicionales'?: string;
+  [key: string]: any; // Allows other columns to be present but ignored
+};
 

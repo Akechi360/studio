@@ -2,11 +2,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Archive, PlusCircle, Loader2, Pencil, Trash2, Eye, ShieldAlert } from "lucide-react";
-import React, { useState, useEffect, useCallback } from 'react';
-import { getAllInventoryItems, deleteInventoryItemAction } from "@/lib/actions";
-import type { InventoryItem } from "@/lib/types";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Archive, PlusCircle, Loader2, Pencil, Trash2, Eye, ShieldAlert, UploadCloud, Info } from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
+import { getAllInventoryItems, deleteInventoryItemAction, importInventoryItemsAction } from "@/lib/actions";
+import type { InventoryItem, ExcelInventoryItemData } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { AddItemDialog } from '@/components/inventory/add-item-dialog';
 import { EditItemDialog } from '@/components/inventory/edit-item-dialog';
@@ -24,6 +26,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
+import * as XLSX from 'xlsx';
 
 const getInitialsForItem = (name: string) => {
   if (!name) return '??';
@@ -58,6 +61,8 @@ export default function InventoryPage() {
   const [isViewDetailsDialogVisible, setIsViewDetailsDialogVisible] = useState(false);
 
   const [currentFilters, setCurrentFilters] = useState<{ category: string; location: string }>({ category: "all", location: "all" });
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
@@ -132,6 +137,68 @@ export default function InventoryPage() {
     setIsViewDetailsDialogVisible(false);
   };
 
+  const handleFileImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) {
+      toast({ title: "Sin Archivo", description: "No se seleccionó ningún archivo.", variant: "destructive" });
+      return;
+    }
+    if (!user || !user.email || !user.name) {
+      toast({ title: "Error de Autenticación", description: "Debes iniciar sesión para importar.", variant: "destructive"});
+      return;
+    }
+
+    const file = event.target.files[0];
+    setIsImporting(true);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) throw new Error("No se pudo leer el archivo.");
+        
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json<ExcelInventoryItemData>(worksheet);
+
+        if (jsonData.length === 0) {
+            toast({ title: "Archivo Vacío", description: "El archivo Excel no contiene datos.", variant: "destructive" });
+            setIsImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+            return;
+        }
+        
+        const result = await importInventoryItemsAction(jsonData, user.email, user.id, user.name);
+
+        if (result.success) {
+          toast({
+            title: "Importación Exitosa",
+            description: `${result.successCount} artículos importados. ${result.errorCount > 0 ? `${result.errorCount} filas con errores.` : ''}`,
+          });
+          if (result.errorCount > 0) {
+             console.error("Errores de importación:", result.errors);
+             // Potentially display these errors in a more user-friendly way
+          }
+          fetchItems();
+        } else {
+          toast({
+            title: "Fallo en la Importación",
+            description: result.message || "Ocurrió un error durante la importación.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Error al procesar el archivo Excel:", error);
+        toast({ title: "Error de Importación", description: `No se pudo procesar el archivo. Asegúrate de que el formato es correcto. Error: ${error instanceof Error ? error.message : String(error)}`, variant: "destructive" });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+
   if (authIsLoading) {
     return (
       <div className="flex items-center justify-center p-8 min-h-[calc(100vh-200px)]">
@@ -157,7 +224,7 @@ export default function InventoryPage() {
 
   return (
     <TooltipProvider>
-    <div className="space-y-8"> {/* Removed w-full */}
+    <div className="space-y-8 w-full"> 
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center">
@@ -168,17 +235,46 @@ export default function InventoryPage() {
             Gestiona los activos y periféricos de la clínica.
           </p>
         </div>
-        {user && (
-            <Button onClick={() => setIsAddDialogVisible(true)} size="lg" className="shadow-md hover:shadow-lg transition-shadow">
-            <PlusCircle className="mr-2 h-5 w-5" />
-            Añadir Nuevo Artículo
-            </Button>
-        )}
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          {user && (
+              <Button onClick={() => setIsAddDialogVisible(true)} size="lg" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Añadir Nuevo Artículo
+              </Button>
+          )}
+           <Button 
+            onClick={() => fileInputRef.current?.click()} 
+            size="lg" 
+            variant="outline"
+            className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto"
+            disabled={isImporting}
+          >
+            {isImporting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
+            {isImporting ? "Importando..." : "Importar Excel"}
+          </Button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileImport} 
+            accept=".xlsx, .xls" 
+            className="hidden" 
+            disabled={isImporting}
+          />
+        </div>
       </div>
+      <Alert variant="default" className="bg-primary/5 border-primary/20">
+        <Info className="h-5 w-5 text-primary" />
+        <RadixAlertTitle className="font-semibold text-primary">Importación de Excel</RadixAlertTitle>
+        <AlertDescription className="text-sm text-primary/80">
+          Para importar desde Excel, asegúrate de que tu archivo tenga encabezados como: Nombre, Categoría, Marca, Modelo, Número de Serie, Procesador, RAM, Tipo de Almacenamiento, Capacidad de Almacenamiento, Cantidad, Ubicación, Estado, Notas Adicionales.
+          La primera hoja del libro será procesada. <a href="/plantilla_inventario_ieq.xlsx" download className="underline font-medium hover:text-primary/90">Descargar plantilla de ejemplo</a>.
+        </AlertDescription>
+      </Alert>
+
 
       <InventoryFilters allItems={allItems} onFilterChange={handleFilterChange} />
 
-      <Card className="shadow-lg"> {/* Removed w-full */}
+      <Card className="shadow-lg w-full"> 
         <CardHeader>
           <CardTitle>Lista de Artículos</CardTitle>
           <CardDescription>Visualiza los artículos del inventario según los filtros aplicados. Haz clic en el nombre para ver detalles.</CardDescription>
