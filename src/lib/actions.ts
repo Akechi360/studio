@@ -98,6 +98,7 @@ export async function createTicketAction(
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
   revalidatePath("/admin/analytics");
+  revalidatePath("/approvals"); // Revalidate approvals page as well
 
 
   return {
@@ -401,8 +402,8 @@ export async function importInventoryItemsAction(
 
         if (!validatedFields.success) {
           errorCount++;
-          const fieldErrors = validatedFields.error.flatten().fieldErrors as Record<string, string[] | undefined>;
           let errorMessage = "Error de validación: ";
+          const fieldErrors = validatedFields.error.flatten().fieldErrors as Record<string, string[] | undefined>;
           errorMessage += Object.entries(fieldErrors)
             .map(([field, messages]) => `${field}: ${(messages || ['Error desconocido']).join(', ')}`)
             .join('; ') || "Error desconocido.";
@@ -562,7 +563,7 @@ export async function createApprovalRequestAction(
   }
   
   revalidatePath("/approvals");
-  revalidatePath("/dashboard"); 
+  revalidatePath("/dashboard"); // For President's dashboard
 
   return {
     success: true,
@@ -588,3 +589,5 @@ export async function getApprovalRequestDetails(id: string): Promise<ApprovalReq
 }
 
 // More actions will be needed for approve, reject, request info, add attachments, etc.
+
+    
