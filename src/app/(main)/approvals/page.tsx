@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { FileCheck, ShoppingCart, CreditCard, ShieldAlert, ListChecks } from "lucide-react";
 import { useAuth, SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context';
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
-import { useToast } from "@/hooks/use-toast"; 
+import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import type { ApprovalRequest } from "@/lib/types"; 
+import type { ApprovalRequest } from "@/lib/types";
 import { CreatePurchaseRequestDialog } from "@/components/approvals/CreatePurchaseRequestDialog";
-import { CreatePaymentRequestDialog } from "@/components/approvals/CreatePaymentRequestDialog"; // Import new dialog
-import { getApprovalRequestsForUser } from "@/lib/actions"; 
-import { Badge } from "@/components/ui/badge"; // Import Badge
+import { CreatePaymentRequestDialog } from "@/components/approvals/CreatePaymentRequestDialog"; // Will use the new minimal version
+import { getApprovalRequestsForUser } from "@/lib/actions";
+import { Badge } from "@/components/ui/badge";
 
 function AccessDeniedMessage() {
   return (
@@ -31,10 +31,10 @@ function AccessDeniedMessage() {
 export default function ApprovalsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]); 
-  const [isLoading, setIsLoading] = useState(false); 
+  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isCreatePurchaseDialogOpen, setIsCreatePurchaseDialogOpen] = useState(false);
-  const [isCreatePaymentDialogOpen, setIsCreatePaymentDialogOpen] = useState(false); // State for payment dialog
+  const [isCreatePaymentDialogOpen, setIsCreatePaymentDialogOpen] = useState(false); // For the new minimal dialog
 
   const canAccessApprovals =
     user?.role === "Admin" ||
@@ -48,14 +48,20 @@ export default function ApprovalsPage() {
       setPendingApprovals(requests);
       setIsLoading(false);
     } else {
-      setIsLoading(false); 
+      setPendingApprovals([]); // Clear if not president or no user
+      setIsLoading(false);
     }
   };
-  
+
   useEffect(() => {
-    fetchRequests();
+    if (canAccessApprovals) {
+        fetchRequests();
+    } else {
+        setPendingApprovals([]);
+        setIsLoading(false);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, canAccessApprovals]);
 
 
   if (!canAccessApprovals) {
@@ -67,12 +73,17 @@ export default function ApprovalsPage() {
   };
 
   const handleNewPaymentRequest = () => {
-    setIsCreatePaymentDialogOpen(true); // Open payment dialog
+    setIsCreatePaymentDialogOpen(true); // Opens the new minimal dialog
   };
-  
+
   const handleRequestSuccess = async (approvalId: string) => {
     console.log("Request created successfully with ID:", approvalId);
-    fetchRequests(); // Re-fetch requests for President IEQ
+    if (user?.role === "Presidente IEQ") {
+        fetchRequests();
+    }
+    // Close relevant dialogs
+    setIsCreatePurchaseDialogOpen(false);
+    setIsCreatePaymentDialogOpen(false);
   };
 
   return (
@@ -166,7 +177,7 @@ export default function ApprovalsPage() {
            </CardContent>
          </Card>
        )}
-      <CreatePurchaseRequestDialog 
+      <CreatePurchaseRequestDialog
         isOpen={isCreatePurchaseDialogOpen}
         onClose={() => setIsCreatePurchaseDialogOpen(false)}
         onSuccess={handleRequestSuccess}
@@ -174,8 +185,9 @@ export default function ApprovalsPage() {
       <CreatePaymentRequestDialog
         isOpen={isCreatePaymentDialogOpen}
         onClose={() => setIsCreatePaymentDialogOpen(false)}
-        onSuccess={handleRequestSuccess}
+        // onSuccess will be wired up later
       />
     </div>
   );
 }
+    
