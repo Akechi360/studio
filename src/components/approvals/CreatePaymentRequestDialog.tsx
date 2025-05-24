@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState } from 'react'; // Added useState
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -30,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { createApprovalRequestAction } from '@/lib/actions';
 import type { ApprovalRequestType, AttachmentClientData } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
-import { Loader2, Send, CreditCard, CalendarIcon as CalendarLucideIcon, Paperclip, XCircle } from 'lucide-react'; // Renamed CalendarIcon to avoid conflict
+import { Loader2, Send, CreditCard, CalendarIcon as CalendarLucideIcon, Paperclip, XCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -68,13 +67,14 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false); // Explicit state for Popover
 
   const form = useForm<PaymentRequestFormValues>({
     resolver: zodResolver(paymentRequestFormSchema),
     defaultValues: {
       asunto: "",
       proveedor: "",
-      montoTotal: "" as unknown as number, // Initialize with empty string for controlled input
+      montoTotal: "" as unknown as number,
       fechaRequerida: undefined,
       descripcion: "",
       attachmentsData: [],
@@ -151,7 +151,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
       form.reset();
       setSelectedFiles([]);
       if (onSuccess) onSuccess(result.approvalId);
-      onClose();
+      onClose(); // This will also close the calendar if it was open via handleDialogClose
     } else {
       toast({
         title: "Fallo al Enviar Solicitud",
@@ -167,6 +167,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
   const handleDialogClose = () => {
     form.reset(); 
     setSelectedFiles([]);
+    setIsCalendarOpen(false); // Ensure calendar is closed when dialog closes
     onClose();
   }
 
@@ -218,7 +219,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                         <FormItem>
                         <FormLabel>Monto Total a Pagar *</FormLabel>
                         <FormControl>
-                            <Input type="number" placeholder="Ej: 350.75" {...field} />
+                            <Input type="number" placeholder="Ej: 350.75" {...field} value={field.value === undefined ? '' : field.value} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -230,7 +231,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                     render={({ field }) => (
                        <FormItem className="flex flex-col">
                         <FormLabel className="mb-1.5">Fecha Requerida *</FormLabel>
-                        <Popover>
+                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                             <PopoverTrigger asChild>
                                 <Button
                                 variant={"outline"}
@@ -248,11 +249,14 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                                 )}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
+                            <PopoverContent className="w-auto p-0 z-[51]" align="start"> {/* Increased z-index */}
                             <Calendar
                                 mode="single"
                                 selected={field.value}
-                                onSelect={field.onChange}
+                                onSelect={(date) => {
+                                  field.onChange(date);
+                                  setIsCalendarOpen(false); // Close on select
+                                }}
                                 disabled={(date) =>
                                 date < new Date(new Date().setDate(new Date().getDate() -1))
                                 }
@@ -327,5 +331,3 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
     </Dialog>
   );
 }
-
-    
