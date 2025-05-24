@@ -26,16 +26,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Loader2, Send, CreditCard, Paperclip, XCircle } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { Loader2, Send, CreditCard, Paperclip, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createApprovalRequestAction } from '@/lib/actions';
 import type { ApprovalRequestType, AttachmentClientData } from '@/lib/types';
@@ -45,8 +36,7 @@ const paymentRequestFormSchema = z.object({
   asunto: z.string().min(5, { message: "El asunto debe tener al menos 5 caracteres." }).max(100, { message: "Máximo 100 caracteres." }),
   proveedor: z.string().min(3, { message: "El proveedor debe tener al menos 3 caracteres." }).max(100, { message: "Máximo 100 caracteres." }),
   montoTotal: z.coerce.number({invalid_type_error: "Debe ser un número."}).positive({ message: "El monto total debe ser positivo." }),
-  fechaRequerida: z.date({ required_error: "La fecha requerida es obligatoria."}),
-  descripcion: z.string().max(2000, { message: "Máximo 2000 caracteres." }).optional(),
+  descripcion: z.string().min(10, {message: "Por favor, incluye la fecha requerida de pago en la descripción."}).max(2000, { message: "Máximo 2000 caracteres." }).optional(),
   attachmentsData: z.array(z.object({
     fileName: z.string(),
     size: z.number(),
@@ -66,7 +56,6 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -76,7 +65,6 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
       asunto: "",
       proveedor: "",
       montoTotal: "" as unknown as number,
-      fechaRequerida: undefined,
       descripcion: "",
       attachmentsData: [],
     },
@@ -118,7 +106,6 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
   const handleDialogClose = () => {
     form.reset();
     setSelectedFiles([]);
-    setIsCalendarOpen(false);
     onClose();
   };
 
@@ -144,7 +131,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
       requesterEmail: user.email,
       supplierPago: data.proveedor,
       totalAmountToPay: data.montoTotal,
-      paymentDueDate: data.fechaRequerida,
+      // paymentDueDate: data.fechaRequerida, // Removed
       attachmentsData: attachmentsData,
     };
 
@@ -180,6 +167,8 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
           </DialogTitle>
           <DialogDescription>
             Completa los detalles para tu solicitud de pago. Los campos marcados con * son obligatorios.
+            <br />
+            <span className="font-semibold text-primary">Importante:</span> Por favor, especifica la fecha requerida de pago dentro del campo "Descripción Adicional".
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -210,71 +199,29 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="montoTotal"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Monto Total a Pagar *</FormLabel>
-                    <FormControl>
-                       <Input type="number" placeholder="Ej: 150.75" {...field} value={field.value === undefined ? "" : field.value} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="fechaRequerida"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel className="mb-1.5">Fecha Requerida *</FormLabel>
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full justify-start text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                )}
-                                type="button"
-                                onClick={() => setIsCalendarOpen(true)}
-                            >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {field.value ? (
-                                    format(field.value, "PPP", { locale: es })
-                                ) : (
-                                    <span>Selecciona una fecha</span>
-                                )}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-[51]" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={(date) => {
-                                    field.onChange(date);
-                                    setIsCalendarOpen(false);
-                                }}
-                                initialFocus
-                                disabled={(d) => d < new Date(new Date().setDate(new Date().getDate() -1))}
-                            />
-                        </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            
+            <FormField
+              control={form.control}
+              name="montoTotal"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Monto Total a Pagar *</FormLabel>
+                  <FormControl>
+                     <Input type="number" placeholder="Ej: 150.75" {...field} value={field.value === undefined ? "" : field.value} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+           
             <FormField
               control={form.control}
               name="descripcion"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Descripción Adicional</FormLabel>
+                  <FormLabel>Descripción Adicional (Incluir Fecha Requerida de Pago aquí) *</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Cualquier detalle relevante sobre el pago..." className="min-h-[100px]" {...field} />
+                    <Textarea placeholder="Cualquier detalle relevante sobre el pago, y la fecha en que se requiere..." className="min-h-[100px]" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -328,5 +275,3 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
     </Dialog>
   );
 }
-
-    

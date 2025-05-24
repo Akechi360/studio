@@ -56,7 +56,7 @@ export default function ApprovalsPage() {
   };
   
   const fetchSubmittedRequests = async () => {
-    if (user && user.id && user.role && (user.role === "Admin" || SPECIFIC_APPROVER_EMAILS.includes(user.email)) && user.role !== "Presidente IEQ") {
+    if (user && user.id && user.role && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente IEQ") {
       setIsLoadingSubmitted(true);
       const requests = await getApprovalRequestsForUser(user.id, user.role);
       setSubmittedRequests(requests);
@@ -80,7 +80,7 @@ export default function ApprovalsPage() {
     if (user?.role === "Presidente IEQ") {
         fetchPresidenteRequests();
         setSubmittedRequests([]); // President doesn't see "submitted by them" here
-    } else if (user && (user.role === "Admin" || SPECIFIC_APPROVER_EMAILS.includes(user.email))) {
+    } else if (user && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email)))) {
         fetchSubmittedRequests();
         setPendingApprovals([]); // Admins/Approvers don't see "pending for president" here
     }
@@ -104,7 +104,7 @@ export default function ApprovalsPage() {
     console.log("Request created successfully with ID:", approvalId);
     if (user?.role === "Presidente IEQ") {
         fetchPresidenteRequests();
-    } else if (user && (user.role === "Admin" || SPECIFIC_APPROVER_EMAILS.includes(user.email))) {
+    } else if (user && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email)))) {
         fetchSubmittedRequests();
     }
     setIsCreatePurchaseDialogOpen(false);
@@ -166,13 +166,14 @@ export default function ApprovalsPage() {
                             <Badge variant={req.type === "Compra" ? "default" : "secondary"}>{req.type}</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">Solicitante: {req.requesterName}</p>
-                        <p className="text-sm text-muted-foreground">Fecha: {new Date(req.createdAt).toLocaleDateString('es-ES')}</p>
+                        <p className="text-sm text-muted-foreground">Fecha Solicitud: {new Date(req.createdAt).toLocaleDateString('es-ES')}</p>
                         {req.type === "Compra" && req.estimatedPrice && (
                             <p className="text-sm text-muted-foreground">Monto Est.: {req.estimatedPrice.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
                         )}
                         {req.type === "PagoProveedor" && req.totalAmountToPay && (
                             <p className="text-sm text-muted-foreground">Monto a Pagar: {req.totalAmountToPay.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
                         )}
+                        {/* Fecha Requerida no se muestra como campo separado aquí, estará en la descripción */}
                         <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" onClick={() => toast({title: "Funcionalidad en Desarrollo", description: `Ver detalles para ${req.id} aún no está implementado.`})}>
                             Ver Detalles
                         </Button>

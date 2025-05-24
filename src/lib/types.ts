@@ -177,7 +177,8 @@ export interface ApprovalRequest {
 
   // PagoProveedor Specific Fields
   supplierPago?: string; 
-  paymentDueDate?: Date; 
+  paymentDueDate?: Date; // Made optional, will be read from description by approver
   totalAmountToPay?: number; 
   paymentInstallments?: PaymentInstallment[]; 
 }
+

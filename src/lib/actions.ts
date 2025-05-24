@@ -98,7 +98,7 @@ export async function createTicketAction(
   revalidatePath("/dashboard");
   revalidatePath("/admin/reports");
   revalidatePath("/admin/analytics");
-  revalidatePath("/approvals"); // Revalidate approvals page as well
+  revalidatePath("/approvals");
 
 
   return {
@@ -496,7 +496,8 @@ const PaymentRequestDataSchema = CreateApprovalRequestBaseSchema.extend({
   type: z.literal("PagoProveedor"),
   supplierPago: z.string().min(3, "El proveedor es obligatorio.").max(100),
   totalAmountToPay: z.coerce.number().positive("El monto debe ser positivo."),
-  paymentDueDate: z.date({ required_error: "La fecha requerida es obligatoria."}),
+  // paymentDueDate is removed from Zod schema as per user request
+  description: z.string().min(10, {message: "Por favor, incluye la fecha requerida de pago en la descripción."}).max(2000).optional(),
 });
 
 const CreateApprovalRequestActionSchema = z.discriminatedUnion("type", [
@@ -553,7 +554,7 @@ export async function createApprovalRequestAction(
   } else if (data.type === "PagoProveedor") {
     newApproval.supplierPago = data.supplierPago;
     newApproval.totalAmountToPay = data.totalAmountToPay;
-    newApproval.paymentDueDate = data.paymentDueDate;
+    // newApproval.paymentDueDate = data.paymentDueDate; // Removed
   }
 
   addApprovalRequestToMock(newApproval);
