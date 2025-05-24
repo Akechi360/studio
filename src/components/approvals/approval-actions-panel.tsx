@@ -14,8 +14,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog"; // Removed AlertDialogTrigger as it's not used directly here
 import { useToast } from '@/hooks/use-toast';
 import { approveRequestAction, rejectRequestAction, requestMoreInfoAction } from '@/lib/actions';
 import type { ApprovalRequest, ApprovalStatus, ApprovalRequestType } from '@/lib/types';
@@ -25,8 +24,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 interface ApprovalActionsPanelProps {
   requestId: string;
-  currentRequestStatus: ApprovalStatus; 
-  requestType: ApprovalRequestType; // To conditionally show specific UI later
+  currentRequestStatus: ApprovalStatus;
+  requestType: ApprovalRequestType;
   onActionSuccess: () => void;
 }
 
@@ -61,17 +60,17 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, requestT
     const actionData = {
       requestId,
       approverId: user.id,
-      approverName: user.name,
+      approverName: user.name || "Usuario del Sistema", // Fallback name
       approverEmail: user.email,
-      comment: comment.trim() || undefined, 
+      comment: comment.trim() || undefined,
     };
     const actionDataWithRequiredComment = {
       requestId,
       approverId: user.id,
-      approverName: user.name,
+      approverName: user.name || "Usuario del Sistema", // Fallback name
       approverEmail: user.email,
       comment: comment.trim(),
-    }
+    };
 
     try {
       switch (actionToConfirm) {
@@ -93,7 +92,7 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, requestT
         setComment("");
         onActionSuccess();
       } else {
-        toast({ title: "Error en la Acción", description: result.message, variant: "destructive" });
+        toast({ title: "Error en la Acción", description: result.message || "Ocurrió un error desconocido.", variant: "destructive" });
       }
     } catch (error) {
       toast({ title: "Error Inesperado", description: "Ocurrió un error al procesar la acción.", variant: "destructive" });
@@ -107,7 +106,7 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, requestT
   if (currentRequestStatus !== 'Pendiente') {
     return null; // Only show panel for pending requests
   }
-  
+
   const getConfirmationDetails = () => {
     switch (actionToConfirm) {
       case 'approve': return { title: "Confirmar Aprobación", description: "¿Estás seguro de que deseas aprobar esta solicitud?" };
@@ -155,26 +154,26 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, requestT
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                <Button 
-                    variant="destructive" 
-                    onClick={() => handleActionClick('reject')} 
+                <Button
+                    variant="destructive"
+                    onClick={() => handleActionClick('reject')}
                     disabled={isSubmitting}
                     className="w-full sm:w-auto"
                 >
                 {isSubmitting && actionToConfirm === 'reject' ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <XCircle className="mr-2 h-4 w-4"/>}
                 Rechazar
                 </Button>
-                <Button 
-                    variant="outline" 
-                    onClick={() => handleActionClick('requestInfo')} 
+                <Button
+                    variant="outline"
+                    onClick={() => handleActionClick('requestInfo')}
                     disabled={isSubmitting}
                     className="w-full sm:w-auto"
                 >
                 {isSubmitting && actionToConfirm === 'requestInfo' ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <HelpCircle className="mr-2 h-4 w-4"/>}
                 Solicitar Información
                 </Button>
-                <Button 
-                    onClick={() => handleActionClick('approve')} 
+                <Button
+                    onClick={() => handleActionClick('approve')}
                     disabled={isSubmitting}
                     className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
                 >
