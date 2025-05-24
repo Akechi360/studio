@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { getAllTickets, getApprovalRequestsForUser } from '@/lib/actions';
 import type { Ticket, TicketPriority, ApprovalRequest } from '@/lib/types';
 import { TicketListItem } from '@/components/tickets/ticket-list-item';
+import { ApprovalRequestListItem } from '@/components/approvals/approval-request-list-item'; // Import the new component
 import { Loader2, Ticket as TicketIcon, ListChecks, AlertCircle, FileCheck } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +20,7 @@ export default function DashboardPage() {
   const [isLoadingTickets, setIsLoadingTickets] = useState(true);
 
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
-  const [isLoadingApprovals, setIsLoadingApprovals] = useState(false);
+  const [isLoadingApprovals, setIsLoadingApprovals] = useState(false); // Changed from true to false initially
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -39,7 +40,7 @@ export default function DashboardPage() {
       }
 
       if (role === 'Presidente IEQ') {
-        setIsLoadingApprovals(true);
+        setIsLoadingApprovals(true); // Set to true when starting fetch
         try {
           const approvals = await getApprovalRequestsForUser(user.id, user.role);
           setPendingApprovals(approvals);
@@ -73,7 +74,7 @@ export default function DashboardPage() {
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     : [];
 
-  if (isLoadingTickets && !user) { // Initial loading before user is set
+  if (isLoadingTickets && !user) { 
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -94,7 +95,7 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">
           {role === 'Admin' && "Aquí tienes un resumen de los tickets abiertos que requieren tu atención."}
           {role === 'User' && "Aquí puedes ver el estado de los tickets que has creado."}
-          {role === 'Presidente IEQ' && "Aquí puedes gestionar las aprobaciones pendientes."}
+          {role === 'Presidente IEQ' && "Revisa y gestiona las aprobaciones pendientes."}
         </p>
       </div>
 
@@ -106,7 +107,7 @@ export default function DashboardPage() {
               Aprobaciones Pendientes
             </CardTitle>
             <CardDescription>
-              Revisa y gestiona las solicitudes que requieren tu aprobación.
+              Estas son las solicitudes actuales que requieren tu acción.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -122,27 +123,11 @@ export default function DashboardPage() {
                 <p>No tienes aprobaciones pendientes en este momento.</p>
               </div>
             ) : (
-              <ul className="space-y-3">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {pendingApprovals.map(req => (
-                    <li key={req.id} className="p-4 border rounded-md shadow-sm hover:shadow-md transition-shadow bg-muted/20">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-semibold text-primary">{req.subject}</h3>
-                            <Badge variant={req.type === "Compra" ? "default" : "secondary"}>{req.type}</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">Solicitante: {req.requesterName}</p>
-                        <p className="text-sm text-muted-foreground">Fecha Solicitud: {new Date(req.createdAt).toLocaleDateString('es-ES')}</p>
-                        {req.type === "Compra" && req.estimatedPrice && (
-                            <p className="text-sm text-muted-foreground">Monto Est.: {req.estimatedPrice.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
-                        )}
-                        {req.type === "PagoProveedor" && req.totalAmountToPay && (
-                            <p className="text-sm text-muted-foreground">Monto a Pagar: {req.totalAmountToPay.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
-                        )}
-                        <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" onClick={() => toast({title: "Funcionalidad en Desarrollo", description: `Ver detalles para ${req.id} aún no está implementado.`})}>
-                            Ver Detalles
-                        </Button>
-                    </li>
+                  <ApprovalRequestListItem key={req.id} request={req} />
                 ))}
-              </ul>
+              </div>
             )}
           </CardContent>
         </Card>
