@@ -402,9 +402,8 @@ export async function importInventoryItemsAction(
 
         if (!validatedFields.success) {
           errorCount++;
-          let errorMessage = "Error de validación: ";
           const fieldErrors = validatedFields.error.flatten().fieldErrors as Record<string, string[] | undefined>;
-          errorMessage += Object.entries(fieldErrors)
+          const errorMessage = "Error de validación: " + Object.entries(fieldErrors)
             .map(([field, messages]) => `${field}: ${(messages || ['Error desconocido']).join(', ')}`)
             .join('; ') || "Error desconocido.";
           errors.push({ row: i + 2, message: errorMessage, data: rawRow });
@@ -496,7 +495,6 @@ const PaymentRequestDataSchema = CreateApprovalRequestBaseSchema.extend({
   type: z.literal("PagoProveedor"),
   supplierPago: z.string().min(3, "El proveedor es obligatorio.").max(100),
   totalAmountToPay: z.coerce.number().positive("El monto debe ser positivo."),
-  // paymentDueDate is removed from Zod schema as per user request
   description: z.string().min(10, {message: "Por favor, incluye la fecha requerida de pago en la descripción."}).max(2000).optional(),
 });
 
@@ -554,7 +552,6 @@ export async function createApprovalRequestAction(
   } else if (data.type === "PagoProveedor") {
     newApproval.supplierPago = data.supplierPago;
     newApproval.totalAmountToPay = data.totalAmountToPay;
-    // newApproval.paymentDueDate = data.paymentDueDate; // Removed
   }
 
   addApprovalRequestToMock(newApproval);

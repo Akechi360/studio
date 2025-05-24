@@ -13,6 +13,7 @@ import { CreatePurchaseRequestDialog } from "@/components/approvals/CreatePurcha
 import { CreatePaymentRequestDialog } from "@/components/approvals/CreatePaymentRequestDialog"; 
 import { getApprovalRequestsForUser } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
+import Link from 'next/link'; // Import Link
 
 function AccessDeniedMessage() {
   return (
@@ -173,9 +174,8 @@ export default function ApprovalsPage() {
                         {req.type === "PagoProveedor" && req.totalAmountToPay && (
                             <p className="text-sm text-muted-foreground">Monto a Pagar: {req.totalAmountToPay.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
                         )}
-                        {/* Fecha Requerida no se muestra como campo separado aquí, estará en la descripción */}
-                        <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" onClick={() => toast({title: "Funcionalidad en Desarrollo", description: `Ver detalles para ${req.id} aún no está implementado.`})}>
-                            Ver Detalles
+                        <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" asChild>
+                            <Link href={`/approvals/${req.id}`}>Ver Detalles</Link>
                         </Button>
                     </li>
                 ))}
@@ -229,8 +229,8 @@ export default function ApprovalsPage() {
                             {req.type === "PagoProveedor" && req.totalAmountToPay && (
                                 <p className="text-sm text-muted-foreground">Monto a Pagar: {req.totalAmountToPay.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
                             )}
-                            <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" onClick={() => toast({title: "Funcionalidad en Desarrollo", description: `Ver detalles para ${req.id} aún no está implementado.`})}>
-                                Ver Detalles
+                            <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" asChild>
+                               <Link href={`/approvals/${req.id}`}>Ver Detalles</Link>
                             </Button>
                         </li>
                     ))}

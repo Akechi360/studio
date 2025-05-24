@@ -47,7 +47,6 @@ export function ApprovalRequestListItem({ request }: ApprovalRequestListItemProp
       <CardHeader>
         <div className="flex justify-between items-start gap-2">
           <CardTitle className="text-lg font-semibold leading-tight">
-            {/* Link to a future detail page */}
             <Link href={`/approvals/${request.id}`} className="hover:underline text-primary flex items-center">
               <TypeIcon className="mr-2 h-5 w-5 shrink-0" />
               {request.subject}
@@ -83,7 +82,6 @@ export function ApprovalRequestListItem({ request }: ApprovalRequestListItemProp
         <time dateTime={new Date(request.createdAt).toISOString()} title={format(new Date(request.createdAt), "PPPppp", { locale: es })}>
           {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true, locale: es })}
         </time>
-        {/* Link to a future detail page */}
         <Link href={`/approvals/${request.id}`} className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
           Ver Detalles <ArrowRight className="h-4 w-4" />
         </Link>
@@ -91,3 +89,4 @@ export function ApprovalRequestListItem({ request }: ApprovalRequestListItemProp
     </Card>
   );
 }
+
