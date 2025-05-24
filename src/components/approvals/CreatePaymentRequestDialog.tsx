@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState } from 'react'; // Added useState
+import React, { useState } from 'react'; 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -67,7 +68,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false); // Explicit state for Popover
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const form = useForm<PaymentRequestFormValues>({
     resolver: zodResolver(paymentRequestFormSchema),
@@ -151,7 +152,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
       form.reset();
       setSelectedFiles([]);
       if (onSuccess) onSuccess(result.approvalId);
-      onClose(); // This will also close the calendar if it was open via handleDialogClose
+      onClose(); 
     } else {
       toast({
         title: "Fallo al Enviar Solicitud",
@@ -167,7 +168,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
   const handleDialogClose = () => {
     form.reset(); 
     setSelectedFiles([]);
-    setIsCalendarOpen(false); // Ensure calendar is closed when dialog closes
+    setIsCalendarOpen(false);
     onClose();
   }
 
@@ -219,7 +220,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                         <FormItem>
                         <FormLabel>Monto Total a Pagar *</FormLabel>
                         <FormControl>
-                            <Input type="number" placeholder="Ej: 350.75" {...field} value={field.value === undefined ? '' : field.value} />
+                            <Input type="number" placeholder="Ej: 350.75" {...field} value={field.value === undefined || Number.isNaN(field.value) ? '' : field.value} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -240,6 +241,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                                     !field.value && "text-muted-foreground"
                                 )}
                                 type="button"
+                                onClick={() => setIsCalendarOpen(true)} // Explicitly open the popover
                                 >
                                 <CalendarLucideIcon className="mr-2 h-4 w-4" />
                                 {field.value ? (
@@ -249,13 +251,13 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                                 )}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 z-[51]" align="start"> {/* Increased z-index */}
+                            <PopoverContent className="w-auto p-0 z-[51]" align="start"> 
                             <Calendar
                                 mode="single"
                                 selected={field.value}
                                 onSelect={(date) => {
                                   field.onChange(date);
-                                  setIsCalendarOpen(false); // Close on select
+                                  setIsCalendarOpen(false); 
                                 }}
                                 disabled={(date) =>
                                 date < new Date(new Date().setDate(new Date().getDate() -1))
