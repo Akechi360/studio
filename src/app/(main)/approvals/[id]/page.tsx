@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, AlertTriangle, FileText, UserCircle, CalendarDays, Tag, Info, MessageSquare, Paperclip, ShoppingCart, CreditCard, CheckCircle, XCircle, HelpCircle, ListCollapse, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // For refreshing data
+import { useRouter, useParams } from 'next/navigation'; // Import useParams
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -16,11 +16,12 @@ import { cn } from "@/lib/utils";
 import { ApprovalActionsPanel } from '@/components/approvals/approval-actions-panel'; 
 import { useAuth } from '@/lib/auth-context';
 import { SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react'; // Import useCallback
 
-interface ApprovalDetailPageProps {
-  params: { id: string };
-}
+// The params prop is no longer the primary way to get the ID here
+// interface ApprovalDetailPageProps {
+//   params: { id: string };
+// }
 
 const typeDisplayMap: Record<ApprovalRequest["type"], string> = {
   Compra: "Solicitud de Compra",
@@ -68,30 +69,37 @@ const DetailRow = ({ label, value, icon: Icon }: { label: string; value?: string
 };
 
 
-export default function ApprovalDetailPage({ params }: ApprovalDetailPageProps) {
+export default function ApprovalDetailPage() {
   const router = useRouter();
+  const pageParams = useParams<{ id: string }>(); // Use useParams to get route parameters
+  const id = pageParams.id; // Extract the id
+
   const { user } = useAuth();
   const [request, setRequest] = useState<ApprovalRequest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchRequestDetails = async () => {
+  const fetchRequestDetails = useCallback(async () => {
+    if (!id) { // Check if id is available
+      setIsLoading(false);
+      setRequest(null); // Ensure request is null if id is missing
+      return;
+    }
     setIsLoading(true);
-    const fetchedRequest = await getApprovalRequestDetails(params.id);
+    const fetchedRequest = await getApprovalRequestDetails(id); // Use id from useParams
     setRequest(fetchedRequest);
     setIsLoading(false);
-  };
+  }, [id]); // Depend on id from useParams
   
   useEffect(() => {
     fetchRequestDetails();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+  }, [fetchRequestDetails]); // useEffect depends on the stable fetchRequestDetails
 
   const handleActionSuccess = () => {
-    fetchRequestDetails(); // Refetch data after an action
-    router.refresh(); // Also trigger a server-side refresh for good measure
+    fetchRequestDetails(); 
+    router.refresh(); 
   };
 
-  const canTakeAction = user && (user.role === 'Admin' || user.role === 'Presidente IEQ');
+  const canTakeAction = user && request && (user.role === 'Admin' || user.role === 'Presidente IEQ');
 
   if (isLoading) {
     return (
@@ -110,7 +118,7 @@ export default function ApprovalDetailPage({ params }: ApprovalDetailPageProps) 
           <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
           <AlertTitle className="text-xl font-bold">Solicitud No Encontrada</AlertTitle>
           <AlertDescription className="mb-4">
-            La solicitud de aprobación que estás buscando no existe o ha sido eliminada.
+            La solicitud de aprobación que estás buscando no existe o ha sido eliminada (ID: {id}).
           </AlertDescription>
           <Button asChild variant="outline">
             <Link href="/approvals">
