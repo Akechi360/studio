@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { createApprovalRequestAction } from '@/lib/actions';
 import type { ApprovalRequestType, AttachmentClientData } from '@/lib/types';
 import { useAuth } from '@/lib/auth-context';
-import { Loader2, Send, CreditCard, CalendarIcon, Paperclip, XCircle } from 'lucide-react';
+import { Loader2, Send, CreditCard, CalendarIcon as CalendarLucideIcon, Paperclip, XCircle } from 'lucide-react'; // Renamed CalendarIcon to avoid conflict
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -74,7 +74,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
     defaultValues: {
       asunto: "",
       proveedor: "",
-      montoTotal: undefined,
+      montoTotal: "" as unknown as number, // Initialize with empty string for controlled input
       fechaRequerida: undefined,
       descripcion: "",
       attachmentsData: [],
@@ -218,7 +218,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                         <FormItem>
                         <FormLabel>Monto Total a Pagar *</FormLabel>
                         <FormControl>
-                            <Input type="number" placeholder="Ej: 350.75" {...field} onChange={e => field.onChange(parseFloat(e.target.value))}/>
+                            <Input type="number" placeholder="Ej: 350.75" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -228,38 +228,38 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
                     control={form.control}
                     name="fechaRequerida"
                     render={({ field }) => (
-                        <FormItem className="flex flex-col">
+                       <FormItem className="flex flex-col">
                         <FormLabel className="mb-1.5">Fecha Requerida *</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-full justify-start text-left font-normal", // Changed pl-3 to justify-start
-                                        !field.value && "text-muted-foreground"
-                                    )}
-                                    type="button"
-                                    >
-                                    <CalendarIcon className="mr-2 h-4 w-4" /> {/* Moved icon to the left */}
-                                    {field.value ? (
-                                        format(field.value, "PPP", { locale: es })
-                                    ) : (
-                                        <span>Selecciona una fecha</span>
-                                    )}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    disabled={(date) =>
-                                    date < new Date(new Date().setDate(new Date().getDate() -1))
-                                    }
-                                    initialFocus
-                                />
-                                </PopoverContent>
-                            </Popover>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                )}
+                                type="button"
+                                >
+                                <CalendarLucideIcon className="mr-2 h-4 w-4" />
+                                {field.value ? (
+                                    format(field.value, "PPP", { locale: es })
+                                ) : (
+                                    <span>Selecciona una fecha</span>
+                                )}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                date < new Date(new Date().setDate(new Date().getDate() -1))
+                                }
+                                initialFocus
+                            />
+                            </PopoverContent>
+                        </Popover>
                         <FormMessage />
                         </FormItem>
                     )}
@@ -327,3 +327,5 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
     </Dialog>
   );
 }
+
+    

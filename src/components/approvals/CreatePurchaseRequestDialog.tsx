@@ -38,6 +38,11 @@ const purchaseRequestFormSchema = z.object({
   descripcion: z.string().max(2000, { message: "Máximo 2000 caracteres." }).optional(),
   precioEstimado: z.coerce.number({ invalid_type_error: "Debe ser un número." }).positive({ message: "El precio debe ser positivo." }).optional(),
   proveedor: z.string().max(100, { message: "Máximo 100 caracteres." }).optional(),
+  attachmentsData: z.array(z.object({
+    fileName: z.string(),
+    size: z.number(),
+    type: z.string().optional(),
+  })).optional(),
 });
 
 type PurchaseRequestFormValues = z.infer<typeof purchaseRequestFormSchema>;
@@ -61,8 +66,9 @@ export function CreatePurchaseRequestDialog({ isOpen, onClose, onSuccess }: Crea
       asunto: "",
       item: "",
       descripcion: "",
-      precioEstimado: undefined,
+      precioEstimado: "" as unknown as number, // Initialize with empty string
       proveedor: "",
+      attachmentsData: [],
     },
   });
 
@@ -82,7 +88,6 @@ export function CreatePurchaseRequestDialog({ isOpen, onClose, onSuccess }: Crea
         return;
       }
       
-      // Simplified total size check (more robust check ideally on server)
       const totalSize = allFiles.reduce((acc, file) => acc + file.size, 0);
       if (totalSize > 50 * 1024 * 1024) { // 50MB
          toast({ title: "Tamaño total excedido", description: "El tamaño total de los archivos no debe exceder los 50MB.", variant: "destructive" });
@@ -96,7 +101,7 @@ export function CreatePurchaseRequestDialog({ isOpen, onClose, onSuccess }: Crea
   const removeFile = (fileName: string) => {
     setSelectedFiles(prev => prev.filter(file => file.name !== fileName));
     if (fileInputRef.current) {
-        fileInputRef.current.value = ""; // Reset file input to allow re-selection of the same file
+        fileInputRef.current.value = ""; 
     }
   };
 
@@ -213,7 +218,7 @@ export function CreatePurchaseRequestDialog({ isOpen, onClose, onSuccess }: Crea
                     <FormItem>
                     <FormLabel>Precio Est. Completo (Opcional)</FormLabel>
                     <FormControl>
-                        <Input type="number" placeholder="Ej: 750.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                        <Input type="number" placeholder="Ej: 750.00" {...field} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -284,3 +289,5 @@ export function CreatePurchaseRequestDialog({ isOpen, onClose, onSuccess }: Crea
     </Dialog>
   );
 }
+
+    
