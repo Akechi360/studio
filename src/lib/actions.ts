@@ -2,8 +2,8 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole, AttachmentClientData, Attachment } from "./types"; // Added UserRole, AttachmentClientData, Attachment
-import type { AuditLogEntry as AuditLogEntryType } from "./mock-data";
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole, AttachmentClientData, Attachment } from "./types"; 
+import type { AuditLogEntry as AuditLogEntryType } from "./lib/types"; // Corrected path for AuditLogEntryType
 import {
   addTicketToMock,
   getAllTicketsFromMock,
@@ -39,7 +39,6 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     console.error("Error logging audit event:", error);
-    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
 
@@ -403,10 +402,10 @@ export async function importInventoryItemsAction(
         if (!validatedFields.success) {
           errorCount++;
           const fieldErrors = validatedFields.error.flatten().fieldErrors as Record<string, string[] | undefined>;
-          const errorMessage = "Error de validación: " + Object.entries(fieldErrors)
+          const errorMessage = Object.entries(fieldErrors)
             .map(([field, messages]) => `${field}: ${(messages || ['Error desconocido']).join(', ')}`)
-            .join('; ') || "Error desconocido.";
-          errors.push({ row: i + 2, message: errorMessage, data: rawRow });
+            .join('; ') || "Error desconocido en validación.";
+          errors.push({ row: i + 2, message: `Error de validación: ${errorMessage}`, data: rawRow });
           continue;
         }
 
@@ -519,7 +518,7 @@ export async function createApprovalRequestAction(
     fileName: attData.fileName,
     size: attData.size,
     type: attData.type,
-    url: `/uploads/mock/${attData.fileName}`, // Placeholder URL
+    url: `/uploads/mock/${attData.fileName}`, 
   }));
 
   const newApproval: ApprovalRequest = {
@@ -536,7 +535,7 @@ export async function createApprovalRequestAction(
     attachments: newAttachments, 
     activityLog: [
       {
-        id: `ACT-${Date.now()}`,
+        id: `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         action: "Solicitud Enviada",
         userId: data.requesterId,
         userName: data.requesterName,
@@ -561,7 +560,7 @@ export async function createApprovalRequestAction(
   }
   
   revalidatePath("/approvals");
-  revalidatePath("/dashboard"); // For President's dashboard
+  revalidatePath("/dashboard"); 
 
   return {
     success: true,
@@ -574,11 +573,8 @@ export async function createApprovalRequestAction(
 export async function getApprovalRequestsForUser(userId: string, userRole: UserRole): Promise<ApprovalRequest[]> {
   const allRequests = getAllApprovalRequestsFromMock();
   if (userRole === "Presidente IEQ") {
-    // For President, show all requests that are "Pendiente" regardless of requester
     return allRequests.filter(req => req.status === "Pendiente");
   }
-  // For other users (including Admin if they create requests, or the special approvers),
-  // show requests they created.
   return allRequests.filter(req => req.requesterId === userId);
 }
 
@@ -586,6 +582,94 @@ export async function getApprovalRequestDetails(id: string): Promise<ApprovalReq
     return getApprovalRequestByIdFromMock(id);
 }
 
-// More actions will be needed for approve, reject, request info, add attachments, etc.
 
-    
+// Actions for approving/rejecting requests
+const BaseApprovalActionSchema = z.object({
+  requestId: z.string(),
+  approverId: z.string(),
+  approverName: z.string(),
+  approverEmail: z.string().email(),
+  comment: z.string().optional(),
+});
+
+const RejectOrInfoActionSchema = BaseApprovalActionSchema.extend({
+  comment: z.string().min(1, "Se requiere un comentario para esta acción."),
+});
+
+export async function approveRequestAction(
+  values: z.infer<typeof BaseApprovalActionSchema>
+): Promise<{ success: boolean; message: string }> {
+  const validatedFields = BaseApprovalActionSchema.safeParse(values);
+  if (!validatedFields.success) {
+    return { success: false, message: "Datos de aprobación inválidos." };
+  }
+  const { requestId, approverId, approverName, approverEmail, comment } = validatedFields.data;
+  const request = getApprovalRequestByIdFromMock(requestId);
+  if (!request) return { success: false, message: "Solicitud no encontrada." };
+
+  const updatedRequest: Partial<ApprovalRequest> = {
+    status: "Aprobado",
+    approverId,
+    approverName,
+    approverComment: comment,
+    approvedAt: new Date(),
+  };
+  updateApprovalRequestInMock({ ...request, ...updatedRequest } as ApprovalRequest);
+  await logAuditEvent(approverEmail, "Aprobación de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment || 'N/A'}`);
+  revalidatePath(`/approvals/${requestId}`);
+  revalidatePath('/approvals');
+  revalidatePath('/dashboard');
+  return { success: true, message: "Solicitud aprobada." };
+}
+
+export async function rejectRequestAction(
+  values: z.infer<typeof RejectOrInfoActionSchema>
+): Promise<{ success: boolean; message: string }> {
+  const validatedFields = RejectOrInfoActionSchema.safeParse(values);
+  if (!validatedFields.success) {
+    return { success: false, message: validatedFields.error.flatten().fieldErrors.comment?.[0] || "Error de validación." };
+  }
+  const { requestId, approverId, approverName, approverEmail, comment } = validatedFields.data;
+  const request = getApprovalRequestByIdFromMock(requestId);
+  if (!request) return { success: false, message: "Solicitud no encontrada." };
+
+  const updatedRequest: Partial<ApprovalRequest> = {
+    status: "Rechazado",
+    approverId,
+    approverName,
+    approverComment: comment,
+    rejectedAt: new Date(),
+  };
+  updateApprovalRequestInMock({ ...request, ...updatedRequest } as ApprovalRequest);
+  await logAuditEvent(approverEmail, "Rechazo de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
+  revalidatePath(`/approvals/${requestId}`);
+  revalidatePath('/approvals');
+  revalidatePath('/dashboard');
+  return { success: true, message: "Solicitud rechazada." };
+}
+
+export async function requestMoreInfoAction(
+  values: z.infer<typeof RejectOrInfoActionSchema>
+): Promise<{ success: boolean; message: string }> {
+  const validatedFields = RejectOrInfoActionSchema.safeParse(values);
+  if (!validatedFields.success) {
+    return { success: false, message: validatedFields.error.flatten().fieldErrors.comment?.[0] || "Error de validación." };
+  }
+  const { requestId, approverId, approverName, approverEmail, comment } = validatedFields.data;
+  const request = getApprovalRequestByIdFromMock(requestId);
+  if (!request) return { success: false, message: "Solicitud no encontrada." };
+
+  const updatedRequest: Partial<ApprovalRequest> = {
+    status: "InformacionSolicitada",
+    approverId,
+    approverName,
+    approverComment: comment,
+    infoRequestedAt: new Date(),
+  };
+  updateApprovalRequestInMock({ ...request, ...updatedRequest } as ApprovalRequest);
+  await logAuditEvent(approverEmail, "Solicitud de Más Información", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
+  revalidatePath(`/approvals/${requestId}`);
+  revalidatePath('/approvals');
+  revalidatePath('/dashboard');
+  return { success: true, message: "Se solicitó más información." };
+}

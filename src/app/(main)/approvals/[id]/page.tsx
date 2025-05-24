@@ -1,18 +1,22 @@
 
+"use client"; // Required for hooks like useRouter and useState, and for useAuth
+
 import { getApprovalRequestDetails } from '@/lib/actions';
-import type { ApprovalRequest } from '@/lib/types';
+import type { ApprovalRequest, ApprovalActivityLogEntry } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, AlertTriangle, FileText, UserCircle, CalendarDays, Tag, Info, MessageSquare, Paperclip, ShoppingCart, CreditCard, CheckCircle, XCircle, HelpCircle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, FileText, UserCircle, CalendarDays, Tag, Info, MessageSquare, Paperclip, ShoppingCart, CreditCard, CheckCircle, XCircle, HelpCircle, ListCollapse, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // For refreshing data
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
-// Placeholder for future approval actions component
-// import { ApprovalActionsPanel } from '@/components/approvals/approval-actions-panel'; 
-
+import { ApprovalActionsPanel } from '@/components/approvals/approval-actions-panel'; 
+import { useAuth } from '@/lib/auth-context';
+import { SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context';
+import React, { useEffect, useState } from 'react';
 
 interface ApprovalDetailPageProps {
   params: { id: string };
@@ -64,8 +68,40 @@ const DetailRow = ({ label, value, icon: Icon }: { label: string; value?: string
 };
 
 
-export default async function ApprovalDetailPage({ params }: ApprovalDetailPageProps) {
-  const request = await getApprovalRequestDetails(params.id);
+export default function ApprovalDetailPage({ params }: ApprovalDetailPageProps) {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [request, setRequest] = useState<ApprovalRequest | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchRequestDetails = async () => {
+    setIsLoading(true);
+    const fetchedRequest = await getApprovalRequestDetails(params.id);
+    setRequest(fetchedRequest);
+    setIsLoading(false);
+  };
+  
+  useEffect(() => {
+    fetchRequestDetails();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]);
+
+  const handleActionSuccess = () => {
+    fetchRequestDetails(); // Refetch data after an action
+    router.refresh(); // Also trigger a server-side refresh for good measure
+  };
+
+  const canTakeAction = user && (user.role === 'Admin' || user.role === 'Presidente IEQ');
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="mt-2 text-muted-foreground">Cargando detalles de la solicitud...</p>
+      </div>
+    );
+  }
+
 
   if (!request) {
     return (
@@ -160,40 +196,50 @@ export default async function ApprovalDetailPage({ params }: ApprovalDetailPageP
         </CardContent>
       </Card>
 
-      {/* Placeholder for Activity Log */}
       <Card className="w-full shadow-lg">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center"><HelpCircle className="mr-2 h-5 w-5 text-primary"/>Historial de Actividad</CardTitle>
+          <CardTitle className="text-lg flex items-center"><ListCollapse className="mr-2 h-5 w-5 text-primary"/>Historial de Actividad</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">El historial de actividad para esta solicitud se mostrará aquí.</p>
-          {/* TODO: Implement activity log rendering */}
+          {request.activityLog && request.activityLog.length > 0 ? (
+            <ul className="space-y-3">
+              {request.activityLog.slice().sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map(log => (
+                <li key={log.id} className="p-3 border rounded-md bg-muted/20 text-sm">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-semibold text-primary">{log.action}</span>
+                    <span className="text-xs text-muted-foreground">{format(new Date(log.timestamp), "PPpp", { locale: es })}</span>
+                  </div>
+                  <p className="text-muted-foreground">Por: {log.userName}</p>
+                  {log.comment && <p className="mt-1 italic text-foreground/80">Comentario: "{log.comment}"</p>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground">No hay actividad registrada para esta solicitud.</p>
+          )}
         </CardContent>
       </Card>
       
-      {/* Placeholder for Approval Actions Panel */}
-      {request.status === 'Pendiente' && (
-          <Card className="w-full shadow-lg">
-            <CardHeader>
-                <CardTitle className="text-lg flex items-center"><CheckCircle className="mr-2 h-5 w-5 text-primary"/>Tomar Acción</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p className="text-muted-foreground">Las acciones para aprobar, rechazar o solicitar más información se mostrarán aquí.</p>
-                {/* <ApprovalActionsPanel requestId={request.id} requestType={request.type} currentRequest={request} /> */}
-            </CardContent>
-          </Card>
+      {canTakeAction && request.status === 'Pendiente' && (
+          <ApprovalActionsPanel
+            requestId={request.id}
+            currentRequestStatus={request.status}
+            requestType={request.type}
+            onActionSuccess={handleActionSuccess}
+          />
       )}
     </div>
   );
 }
-
-export async function generateMetadata({ params }: ApprovalDetailPageProps) {
-  const request = await getApprovalRequestDetails(params.id);
-  if (!request) {
-    return { title: "Solicitud No Encontrada" };
-  }
-  return {
-    title: `Solicitud #${request.id}: ${request.subject}`,
-    description: `Detalles de la solicitud de aprobación ${request.subject.substring(0, 100)}...`,
-  };
-}
+// Metadata generation can remain a server-side aspect or be simplified if errors occur.
+// For now, keeping it to illustrate the full structure.
+// export async function generateMetadata({ params }: ApprovalDetailPageProps) {
+//   const request = await getApprovalRequestDetails(params.id);
+//   if (!request) {
+//     return { title: "Solicitud No Encontrada" };
+//   }
+//   return {
+//     title: `Solicitud #${request.id}: ${request.subject}`,
+//     description: `Detalles de la solicitud de aprobación ${request.subject.substring(0, 100)}...`,
+//   };
+// }

@@ -1,5 +1,5 @@
 
-import type { Ticket, InventoryItem, User, AuditLogEntry as AuditLogEntryType, ApprovalRequest } from '@/lib/types';
+import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest, ApprovalActivityLogEntry } from '@/lib/types';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -120,7 +120,6 @@ export function addAuditLogEntryToMock(entryData: Omit<AuditLogEntryType, 'id' |
 
 // --- Funciones para Solicitudes de Aprobación ---
 export function getAllApprovalRequestsFromMock(): ApprovalRequest[] {
-  // Sort by creation date, newest first, could be adapted for other sorting
   return [...approvalsStore_internal].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
@@ -131,19 +130,32 @@ export function getApprovalRequestByIdFromMock(id: string): ApprovalRequest | nu
 export function addApprovalRequestToMock(request: ApprovalRequest): void {
   const existingIndex = approvalsStore_internal.findIndex(r => r.id === request.id);
   if (existingIndex !== -1) {
-    approvalsStore_internal[existingIndex] = request; // Update if ID exists
+    approvalsStore_internal[existingIndex] = request; 
   } else {
-    approvalsStore_internal.unshift(request); // Add new one to the beginning
+    approvalsStore_internal.unshift(request); 
   }
 }
 
 export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): boolean {
   const reqIndex = approvalsStore_internal.findIndex(req => req.id === updatedRequest.id);
   if (reqIndex !== -1) {
+    const originalRequest = approvalsStore_internal[reqIndex];
+    
+    const newActivityLogEntry: ApprovalActivityLogEntry = {
+        id: `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        action: `Estado Cambiado a: ${updatedRequest.status}`,
+        userId: updatedRequest.approverId || originalRequest.requesterId, // Use approver if available
+        userName: updatedRequest.approverName || originalRequest.requesterName,
+        timestamp: new Date(),
+        comment: updatedRequest.approverComment,
+    };
+
+    // Update main fields
     approvalsStore_internal[reqIndex] = { 
-        ...approvalsStore_internal[reqIndex], 
+        ...originalRequest, 
         ...updatedRequest, 
-        updatedAt: new Date() 
+        updatedAt: new Date(),
+        activityLog: [...originalRequest.activityLog, newActivityLogEntry] // Add to existing log
     };
     return true;
   }

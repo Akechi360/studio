@@ -17,9 +17,9 @@ export type TicketStatus = "Open" | "In Progress" | "Resolved" | "Closed";
 export interface Attachment {
   id: string;
   fileName: string;
-  url: string; // For mock, this could be a placeholder or data URL
-  size: number; // in bytes
-  type?: string; // MIME type
+  url: string; 
+  size: number; 
+  type?: string; 
 }
 
 export interface Comment {
@@ -127,7 +127,7 @@ export type ApprovalStatus = "Pendiente" | "Aprobado" | "Rechazado" | "Informaci
 
 export interface ApprovalActivityLogEntry {
   id: string;
-  action: string; // e.g., "Solicitud Enviada", "Aprobado", "Rechazado"
+  action: string; 
   userId: string;
   userName: string;
   timestamp: Date;
@@ -135,12 +135,11 @@ export interface ApprovalActivityLogEntry {
 }
 
 export interface PaymentInstallment {
-  id: string; // Unique ID for the installment
+  id: string; 
   amount: number;
   paymentDate: Date;
 }
 
-// Simplified Attachment metadata for passing from client to server action
 export interface AttachmentClientData {
   fileName: string;
   size: number;
@@ -151,8 +150,8 @@ export interface AttachmentClientData {
 export interface ApprovalRequest {
   id: string;
   type: ApprovalRequestType;
-  subject: string; // Asunto/Concepto
-  description?: string; // Justification or full explanation
+  subject: string; 
+  description?: string; 
   status: ApprovalStatus;
   requesterId: string;
   requesterName: string;
@@ -162,23 +161,27 @@ export interface ApprovalRequest {
   attachments: Attachment[]; 
   activityLog: ApprovalActivityLogEntry[];
   
-  // Fields for "Presidente IEQ" action
-  approverId?: string; // User ID of the approver
+  approverId?: string; 
   approverName?: string;
   approverComment?: string;
   approvedAt?: Date;
   rejectedAt?: Date;
   infoRequestedAt?: Date;
 
-  // Compra Specific Fields
   itemDescription?: string; 
   estimatedPrice?: number; 
   supplierCompra?: string; 
 
-  // PagoProveedor Specific Fields
   supplierPago?: string; 
-  paymentDueDate?: Date; // Made optional, will be read from description by approver
+  paymentDueDate?: Date; 
   totalAmountToPay?: number; 
   paymentInstallments?: PaymentInstallment[]; 
 }
 
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string; 
+  user: string; 
+  action: string;
+  details?: string;
+}
