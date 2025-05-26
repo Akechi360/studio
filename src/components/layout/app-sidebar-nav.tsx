@@ -27,7 +27,8 @@ import {
   CalendarDays,
   ChevronRight,
   FileCheck,
-  // Wrench, // Icon for Fallas/Mantenimiento removed
+  Wrench,
+  Bug, // Added Bug icon
 } from "lucide-react";
 import { useAuth, SPECIFIC_APPROVER_EMAILS } from "@/lib/auth-context";
 import type { Role, User as UserType } from "@/lib/types";
@@ -66,16 +67,26 @@ const navItems: NavItem[] = [
       currentUser.role === "Presidente IEQ" ||
       (currentUser.email ? SPECIFIC_APPROVER_EMAILS.includes(currentUser.email) : false)),
   },
-  // {
-  //   href: "/mantenimiento", // Previously /fallas
-  //   label: "Gestión de Mantenimiento", // Previously Gestión de Fallas
-  //   icon: Wrench,
-  //   exact: true,
-  //   specialAccessCheck: (currentUser) =>
-  //     !!currentUser && (currentUser.role === "Admin" ||
-  //     currentUser.role === "Presidente IEQ" ||
-  //     currentUser.email === "electromedicina@clinicaieq.com"),
-  // }, // Removed Fallas/Mantenimiento module
+  {
+    href: "/mantenimiento",
+    label: "Gestión de Mantenimiento",
+    icon: Wrench,
+    exact: true,
+    specialAccessCheck: (currentUser) =>
+      !!currentUser && (currentUser.role === "Admin" ||
+      currentUser.role === "Presidente IEQ" ||
+      currentUser.email === "electromedicina@clinicaieq.com"),
+  },
+  {
+    href: "/fallas", // New section for Fallas
+    label: "Gestión de Fallas",
+    icon: Bug,
+    exact: true,
+    specialAccessCheck: (currentUser) =>
+      !!currentUser && (currentUser.role === "Admin" ||
+      currentUser.role === "Presidente IEQ" ||
+      currentUser.email === "electromedicina@clinicaieq.com"),
+  },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
   { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["User", "Admin"] },
   { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true, allowedRoles: ["User", "Admin"] },
