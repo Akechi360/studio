@@ -124,6 +124,7 @@ export type ExcelInventoryItemData = {
 // --- Approval Module Types ---
 export type ApprovalRequestType = "Compra" | "PagoProveedor";
 export type ApprovalStatus = "Pendiente" | "Aprobado" | "Rechazado" | "InformacionSolicitada";
+export type PaymentType = 'Contado' | 'Cuotas';
 
 export interface ApprovalActivityLogEntry {
   id: string;
@@ -168,7 +169,9 @@ export interface ApprovalRequest {
   approvedAt?: Date;
   rejectedAt?: Date;
   infoRequestedAt?: Date;
-  approvedAmount?: number; // Total amount approved by President for installments
+  
+  approvedPaymentType?: PaymentType; // New field
+  approvedAmount?: number; // For 'Contado' OR total for 'Cuotas'
   paymentInstallments?: PaymentInstallment[]; // Array of installments for PagoProveedor
 
   // Purchase specific
@@ -178,7 +181,6 @@ export interface ApprovalRequest {
 
   // Payment specific
   supplierPago?: string;
-  // paymentDueDate?: Date; // Original due date requested, now part of description
   totalAmountToPay?: number; // Original total amount requested
 }
 
@@ -189,3 +191,4 @@ export interface AuditLogEntry {
   action: string;
   details?: string;
 }
+

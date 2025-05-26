@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment } from "./types";
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType } from "./types";
 import type { AuditLogEntry as AuditLogEntryType } from "@/lib/types"; // Corrected path for AuditLogEntryType
 import {
   addTicketToMock,
@@ -14,14 +14,13 @@ import {
   getRawInventoryStore,
   updateInventoryItemInMock,
   deleteInventoryItemFromMock,
-  // getInventoryItemByIdFromMock, // Already imported below
   addAuditLogEntryToMock,
   getAllAuditLogsFromMock,
   addApprovalRequestToMock,
   getAllApprovalRequestsFromMock,
   getApprovalRequestByIdFromMock,
   updateApprovalRequestInMock,
-  getInventoryItemByIdFromMock, // Ensure this is imported
+  getInventoryItemByIdFromMock, 
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
@@ -40,7 +39,6 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     console.error("Error logging audit event:", error);
-    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
 
@@ -84,14 +82,14 @@ export async function createTicketAction(
     attachments: [],
     userId,
     userName,
-    userEmail, // Storing userEmail
+    userEmail, 
     createdAt: new Date(),
     updatedAt: new Date(),
     comments: [],
   };
 
   addTicketToMock(newTicket);
-  if (userEmail) { // Check if userEmail is provided
+  if (userEmail) { 
     await logAuditEvent(userEmail, "Creación de Ticket", `Ticket ID: ${newTicket.id}, Asunto: ${subject}`);
   }
   revalidatePath("/tickets");
@@ -191,7 +189,7 @@ export async function updateTicketStatusAction(
 
   const { status, actingUserEmail } = validatedFields.data;
   const oldStatus = ticket.status;
-  ticket.status = status as TicketStatus; // Cast to ensure type correctness
+  ticket.status = status as TicketStatus; 
   ticket.updatedAt = new Date();
 
   await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatus}, A: ${ticket.status}`);
@@ -220,7 +218,7 @@ export async function getAllTickets(): Promise<Ticket[]> {
 
 // --- Fetch Dashboard Stats ---
 export async function getDashboardStats() {
-  const currentTickets = getRawTicketsStoreForStats(); // Ensure this uses the actual store
+  const currentTickets = getRawTicketsStoreForStats(); 
   const total = currentTickets.length;
   const open = currentTickets.filter(t => t.status === "Open").length;
   const inProgress = currentTickets.filter(t => t.status === "In Progress").length;
@@ -520,7 +518,7 @@ export async function createApprovalRequestAction(
     fileName: attData.fileName,
     size: attData.size,
     type: attData.type,
-    url: `/uploads/mock/${attData.fileName}`, // Placeholder URL
+    url: `/uploads/mock/${attData.fileName}`, 
   }));
 
   const newApproval: ApprovalRequest = {
@@ -553,7 +551,6 @@ export async function createApprovalRequestAction(
   } else if (data.type === "PagoProveedor") {
     newApproval.supplierPago = data.supplierPago;
     newApproval.totalAmountToPay = data.totalAmountToPay;
-    // newApproval.paymentDueDate = data.paymentDueDate; // No longer a direct field
   }
 
   addApprovalRequestToMock(newApproval);
@@ -588,57 +585,76 @@ export async function getApprovalRequestDetails(id: string): Promise<ApprovalReq
 }
 
 
-// Actions for approving/rejecting requests
-const PaymentInstallmentSchema = z.object({
+const PaymentInstallmentActionSchema = z.object({
   id: z.string(),
   amount: z.coerce.number().positive("El monto de la cuota debe ser positivo."),
-  dueDate: z.date({ required_error: "La fecha de vencimiento de la cuota es obligatoria." }),
+  dueDate: z.date({ coerce: true, required_error: "La fecha de vencimiento de la cuota es obligatoria." }),
 });
 
-const BaseApprovalActionSchema = z.object({
+const ApproveActionBaseSchema = z.object({
   requestId: z.string(),
   approverId: z.string(),
   approverName: z.string(),
   approverEmail: z.string().email(),
   comment: z.string().optional(),
-  // Fields specific to PagoProveedor approval with installments
-  approvedAmount: z.coerce.number().positive("El monto aprobado debe ser positivo.").optional(),
-  installments: z.array(PaymentInstallmentSchema).optional(),
 });
 
-const ApproveActionSchema = BaseApprovalActionSchema.refine(data => {
-  if (data.installments && data.installments.length > 0) {
-    if (data.approvedAmount === undefined) return false; // approvedAmount is required if installments exist
-    const sumOfInstallments = data.installments.reduce((sum, inst) => sum + inst.amount, 0);
-    // Using a small tolerance for floating point comparisons
-    return Math.abs(sumOfInstallments - data.approvedAmount) < 0.01;
+const ApprovePagoProveedorContadoSchema = ApproveActionBaseSchema.extend({
+  approvedPaymentType: z.literal('Contado'),
+  approvedAmount: z.coerce.number().positive("Monto (Contado) debe ser positivo."),
+  installments: z.array(PaymentInstallmentActionSchema).max(0, "No debe haber cuotas para pago de contado.").optional(),
+});
+
+const ApprovePagoProveedorCuotasSchema = ApproveActionBaseSchema.extend({
+  approvedPaymentType: z.literal('Cuotas'),
+  approvedAmount: z.coerce.number().positive("Monto total para cuotas debe ser positivo."),
+  installments: z.array(PaymentInstallmentActionSchema).min(1, "Se requiere al menos una cuota."),
+}).superRefine((data, ctx) => {
+  const sumOfInstallments = data.installments.reduce((sum, inst) => sum + inst.amount, 0);
+  if (Math.abs(sumOfInstallments - data.approvedAmount) > 0.01) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "La suma de las cuotas debe igualar el Monto Aprobado para Cuotas.",
+      path: ["installments"],
+    });
   }
-  return true;
-}, {
-  message: "La suma de las cuotas debe ser igual al Monto Aprobado para Cuotas.",
-  path: ["installments"], // Attach error to installments field for better UI feedback
 });
 
-
-const RejectOrInfoActionSchema = BaseApprovalActionSchema.extend({
-  comment: z.string().min(1, "Se requiere un comentario para esta acción."),
+const ApproveCompraSchema = ApproveActionBaseSchema.extend({
+  // For 'Compra', these fields are not directly set by approver in this action
+  approvedPaymentType: z.undefined().optional(),
+  approvedAmount: z.undefined().optional(),
+  installments: z.undefined().optional(),
 });
 
 
 export async function approveRequestAction(
-  values: z.infer<typeof ApproveActionSchema>
+  values: any // Using 'any' here as discriminatedUnion with Zod in server actions can be complex
+             // We will validate internally based on request type.
 ): Promise<{ success: boolean; message: string }> {
-  const validatedFields = ApproveActionSchema.safeParse(values);
-  if (!validatedFields.success) {
-     const errors = validatedFields.error.flatten();
-     const mainError = errors.formErrors.join(', ') ||
-                       (errors.fieldErrors.installments ? `Cuotas: ${errors.fieldErrors.installments.join(', ')}` : '') ||
-                       "Datos de aprobación inválidos.";
-    return { success: false, message: mainError };
-  }
-  const { requestId, approverId, approverName, approverEmail, comment, approvedAmount, installments } = validatedFields.data;
-  const request = getApprovalRequestByIdFromMock(requestId);
+  const request = getApprovalRequestByIdFromMock(values.requestId);
   if (!request) return { success: false, message: "Solicitud no encontrada." };
+
+  let validatedData;
+  if (request.type === "PagoProveedor") {
+    if (values.approvedPaymentType === 'Contado') {
+      const result = ApprovePagoProveedorContadoSchema.safeParse(values);
+      if (!result.success) return { success: false, message: result.error.flatten().fieldErrors.approvedAmount?.[0] || "Error de validación de pago de contado." };
+      validatedData = result.data;
+    } else if (values.approvedPaymentType === 'Cuotas') {
+      const result = ApprovePagoProveedorCuotasSchema.safeParse(values);
+      if (!result.success) return { success: false, message: result.error.flatten().fieldErrors.installments?.[0] || result.error.flatten().formErrors[0] || "Error de validación de pago por cuotas." };
+      validatedData = result.data;
+    } else {
+      return { success: false, message: "Tipo de pago para aprobación no válido." };
+    }
+  } else { // Compra
+    const result = ApproveCompraSchema.safeParse(values);
+    if (!result.success) return { success: false, message: "Error de validación de aprobación de compra." };
+    validatedData = result.data;
+  }
+  
+  const { requestId, approverId, approverName, approverEmail, comment } = validatedData;
 
   const updatedRequestData: Partial<ApprovalRequest> = {
     status: "Aprobado",
@@ -648,19 +664,28 @@ export async function approveRequestAction(
     approvedAt: new Date(),
   };
 
-  if (request.type === "PagoProveedor" && installments && installments.length > 0 && approvedAmount !== undefined) {
-    updatedRequestData.approvedAmount = approvedAmount;
-    updatedRequestData.paymentInstallments = installments;
+  if (request.type === "PagoProveedor") {
+    updatedRequestData.approvedPaymentType = validatedData.approvedPaymentType as PaymentType;
+    updatedRequestData.approvedAmount = validatedData.approvedAmount;
+    if (validatedData.approvedPaymentType === 'Cuotas') {
+      updatedRequestData.paymentInstallments = validatedData.installments;
+    } else { // Contado
+      updatedRequestData.paymentInstallments = []; // Clear any previous installments
+    }
   }
 
-
   updateApprovalRequestInMock({ ...request, ...updatedRequestData } as ApprovalRequest);
-  await logAuditEvent(approverEmail, "Aprobación de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment || 'N/A'}${installments && installments.length > 0 ? `. Aprobado con ${installments.length} cuotas.` : ''}`);
+  await logAuditEvent(approverEmail, "Aprobación de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment || 'N/A'}. Tipo Pago: ${updatedRequestData.approvedPaymentType || 'N/A'}`);
   revalidatePath(`/approvals/${requestId}`);
   revalidatePath('/approvals');
   revalidatePath('/dashboard');
   return { success: true, message: "Solicitud aprobada." };
 }
+
+const RejectOrInfoActionSchema = ApproveActionBaseSchema.extend({
+  comment: z.string().min(1, "Se requiere un comentario para esta acción."),
+});
+
 
 export async function rejectRequestAction(
   values: z.infer<typeof RejectOrInfoActionSchema>
@@ -713,3 +738,4 @@ export async function requestMoreInfoAction(
   revalidatePath('/dashboard');
   return { success: true, message: "Se solicitó más información." };
 }
+

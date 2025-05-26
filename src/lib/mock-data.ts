@@ -1,5 +1,5 @@
 
-import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest, ApprovalActivityLogEntry } from '@/lib/types';
+import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest, ApprovalActivityLogEntry, PaymentType } from '@/lib/types';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -141,24 +141,47 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
   if (reqIndex !== -1) {
     const originalRequest = approvalsStore_internal[reqIndex];
 
+    // Determine action based on status change or other significant updates
+    let actionDescription = `Estado Cambiado a: ${updatedRequest.status}`;
+    if (originalRequest.status !== updatedRequest.status && updatedRequest.status === "Aprobado") {
+        actionDescription = `Solicitud Aprobada (${updatedRequest.approvedPaymentType || 'N/A'})`;
+    } else if (originalRequest.status !== updatedRequest.status && updatedRequest.status === "Rechazado") {
+        actionDescription = "Solicitud Rechazada";
+    } else if (originalRequest.status !== updatedRequest.status && updatedRequest.status === "InformacionSolicitada") {
+        actionDescription = "Información Adicional Solicitada";
+    }
+
+
     const newActivityLogEntry: ApprovalActivityLogEntry = {
         id: `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        action: `Estado Cambiado a: ${updatedRequest.status}`,
-        userId: updatedRequest.approverId || originalRequest.requesterId, // Use approver if available
-        userName: updatedRequest.approverName || originalRequest.requesterName,
+        action: actionDescription,
+        userId: updatedRequest.approverId || originalRequest.requesterId,
+        userName: updatedRequest.approverName || originalRequest.requesterName || "Sistema",
         timestamp: new Date(),
         comment: updatedRequest.approverComment,
     };
 
-    // Ensure activityLog is always an array before pushing
     const currentActivityLog = Array.isArray(originalRequest.activityLog) ? originalRequest.activityLog : [];
-
-    approvalsStore_internal[reqIndex] = {
-        ...originalRequest,
-        ...updatedRequest, // This will overwrite fields from originalRequest
-        updatedAt: new Date(),
-        activityLog: [...currentActivityLog, newActivityLogEntry]
+    
+    const finalRequestData: ApprovalRequest = {
+      ...originalRequest,
+      ...updatedRequest, // This applies all fields from updatedRequest over originalRequest
+      updatedAt: new Date(),
+      activityLog: [...currentActivityLog, newActivityLogEntry]
     };
+
+    // Specifically handle clearing or setting payment details based on approvedPaymentType
+    if (updatedRequest.type === "PagoProveedor") {
+        if (updatedRequest.approvedPaymentType === 'Contado') {
+            finalRequestData.paymentInstallments = []; // Clear installments
+        } else if (updatedRequest.approvedPaymentType === 'Cuotas') {
+            // installments are already set by updatedRequest spread
+        }
+         // approvedAmount is also set by updatedRequest spread
+    }
+
+
+    approvalsStore_internal[reqIndex] = finalRequestData;
     return true;
   }
   return false;
@@ -174,3 +197,4 @@ export const mockTickets: Ticket[] = ticketsStore_internal;
 export const mockInventory: InventoryItem[] = inventoryStore_internal;
 export const mockAuditLogs: AuditLogEntryType[] = auditLogsStore_internal;
 export const mockApprovalRequests: ApprovalRequest[] = approvalsStore_internal;
+

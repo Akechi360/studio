@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,8 +24,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { approveRequestAction, rejectRequestAction, requestMoreInfoAction } from '@/lib/actions';
-import type { ApprovalRequest, ApprovalStatus, ApprovalRequestType, PaymentInstallment } from '@/lib/types';
-import { Loader2, CheckCircle, XCircle, HelpCircle, MessageSquareWarning, PlusCircle, Trash2, CalendarIcon } from 'lucide-react';
+import type { ApprovalRequest, ApprovalStatus, ApprovalRequestType, PaymentInstallment, PaymentType } from '@/lib/types';
+import { Loader2, CheckCircle, XCircle, HelpCircle, MessageSquareWarning, PlusCircle, Trash2, CalendarIcon, CreditCard, DollarSign } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { cn } from '@/lib/utils';
@@ -40,18 +41,19 @@ const paymentInstallmentSchema = z.object({
 
 const approvalActionsFormSchema = z.object({
   comment: z.string().optional(),
+  approvedPaymentType: z.enum(['Contado', 'Cuotas']).optional(),
   approvedAmount: z.coerce.number().positive("El monto aprobado debe ser positivo.").optional(),
   installments: z.array(paymentInstallmentSchema).optional(),
 }).superRefine((data, ctx) => {
-  if (data.installments && data.installments.length > 0) {
+  if (data.approvedPaymentType === 'Cuotas') {
     if (data.approvedAmount === undefined || data.approvedAmount <= 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "El 'Monto Aprobado para Cuotas' es obligatorio si se añaden cuotas.",
+        message: "El 'Monto Aprobado para Cuotas' es obligatorio si se seleccionan cuotas.",
         path: ["approvedAmount"],
       });
-    } else {
-      const sumOfInstallments = data.installments.reduce((sum, inst) => sum + inst.amount, 0);
+    } else if (data.installments && data.installments.length > 0) {
+      const sumOfInstallments = data.installments.reduce((sum, inst) => sum + (inst.amount || 0), 0);
       if (Math.abs(sumOfInstallments - data.approvedAmount) > 0.01) { // Tolerance for float precision
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -59,6 +61,20 @@ const approvalActionsFormSchema = z.object({
           path: ["installments"],
         });
       }
+    } else { // No installments, but 'Cuotas' selected and approvedAmount is positive
+         ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Debe añadir al menos una cuota si el tipo de pago es 'Por Cuotas' y hay un monto aprobado.",
+            path: ["installments"],
+        });
+    }
+  } else if (data.approvedPaymentType === 'Contado') {
+    if (data.approvedAmount === undefined || data.approvedAmount <= 0) {
+       ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "El 'Monto Aprobado (Contado)' es obligatorio si el tipo de pago es 'Contado'.",
+        path: ["approvedAmount"],
+      });
     }
   }
 });
@@ -67,7 +83,7 @@ type ApprovalActionsFormValues = z.infer<typeof approvalActionsFormSchema>;
 
 interface ApprovalActionsPanelProps {
   requestId: string;
-  currentRequest: ApprovalRequest;
+  currentRequest: ApprovalRequest; // Cannot be null here
   requestType: ApprovalRequestType;
   onActionSuccess: () => void;
 }
@@ -83,6 +99,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
     resolver: zodResolver(approvalActionsFormSchema),
     defaultValues: {
       comment: "",
+      approvedPaymentType: 'Contado',
       approvedAmount: 0,
       installments: [],
     },
@@ -95,10 +112,12 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
 
   useEffect(() => {
     if (currentRequest) {
+      const defaultPaymentType = currentRequest.approvedPaymentType || (requestType === "PagoProveedor" ? 'Contado' : undefined);
       form.reset({
         comment: currentRequest.approverComment || "",
-        approvedAmount: requestType === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : 0,
-        installments: requestType === "PagoProveedor" && currentRequest.paymentInstallments ?
+        approvedPaymentType: defaultPaymentType,
+        approvedAmount: currentRequest.approvedAmount !== undefined ? currentRequest.approvedAmount : (requestType === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : undefined),
+        installments: (defaultPaymentType === 'Cuotas' && currentRequest.paymentInstallments) ?
             currentRequest.paymentInstallments.map(inst => ({
                 id: inst.id || crypto.randomUUID(),
                 amount: inst.amount || 0,
@@ -112,6 +131,21 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
 
   const watchedInstallments = form.watch("installments");
   const watchedApprovedAmount = form.watch("approvedAmount");
+  const watchedPaymentType = form.watch("approvedPaymentType");
+
+  useEffect(() => {
+    // When payment type changes, adjust form state
+    if (watchedPaymentType === 'Contado') {
+      form.setValue('installments', []); // Clear installments if switching to Contado
+    } else if (watchedPaymentType === 'Cuotas') {
+      // If switching to Cuotas and no installments exist, add one? Or let user do it.
+      // For now, just ensures the approvedAmount is present for cuotas.
+      if (!form.getValues('approvedAmount') && currentRequest?.totalAmountToPay) {
+        form.setValue('approvedAmount', currentRequest.totalAmountToPay);
+      }
+    }
+  }, [watchedPaymentType, form, currentRequest?.totalAmountToPay]);
+
 
   const sumOfInstallments = React.useMemo(() => {
     return watchedInstallments?.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || 0;
@@ -123,24 +157,27 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   }, [watchedApprovedAmount, sumOfInstallments]);
 
   const handleActionClick = (action: "approve" | "reject" | "requestInfo") => {
-    form.handleSubmit(
-      (data) => {
-        if ((action === 'reject' || action === 'requestInfo') && !data.comment?.trim()) {
+    form.trigger().then(isValid => { // Trigger validation before opening confirm dialog
+      if (isValid) {
+        if ((action === 'reject' || action === 'requestInfo') && !form.getValues("comment")?.trim()) {
           form.setError("comment", { type: "manual", message: "Se requiere un comentario para esta acción." });
           return;
         }
         setActionToConfirm(action);
         setIsConfirmOpen(true);
-      },
-      (errors) => {
-        console.error("Validation errors:", errors);
-        if (action === 'approve' && errors.installments) {
-            toast({ title: "Error en Cuotas", description: errors.installments.message || "Revise las cuotas.", variant: "destructive"});
-        } else if (action === 'approve' && errors.approvedAmount) {
-             toast({ title: "Error en Monto Aprobado", description: errors.approvedAmount.message || "Revise el monto aprobado.", variant: "destructive"});
-        }
+      } else {
+        // Toast or highlight errors if preferred
+        console.error("Validation errors:", form.formState.errors);
+         const errors = form.formState.errors;
+         let errorMsg = "Por favor, corrija los errores del formulario.";
+         if (errors.approvedAmount?.message) errorMsg = errors.approvedAmount.message;
+         else if (errors.installments?.message) errorMsg = errors.installments.message;
+         else if (errors.installments?.[0]?.amount?.message) errorMsg = `Cuota 1: ${errors.installments[0].amount.message}`;
+         else if (errors.installments?.[0]?.dueDate?.message) errorMsg = `Cuota 1: ${errors.installments[0].dueDate.message}`;
+
+        toast({ title: "Error de Validación", description: errorMsg, variant: "destructive"});
       }
-    )();
+    });
   };
 
   const handleConfirmAction = async () => {
@@ -150,7 +187,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
     setIsSubmitting(true);
 
     let result;
-    const baseActionData = {
+    let actionData: any = { // Use 'any' for base, specific types below
       requestId,
       approverId: user.id,
       approverName: user.name || "Usuario del Sistema",
@@ -159,24 +196,31 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
     };
 
     try {
-      switch (actionToConfirm) {
-        case 'approve':
-          const approveData = {
-            ...baseActionData,
-            approvedAmount: requestType === "PagoProveedor" ? formData.approvedAmount : undefined,
-            installments: requestType === "PagoProveedor" ? formData.installments : undefined,
-          };
-          result = await approveRequestAction(approveData);
-          break;
-        case 'reject':
-          result = await rejectRequestAction({ ...baseActionData, comment: formData.comment!.trim() });
-          break;
-        case 'requestInfo':
-          result = await requestMoreInfoAction({ ...baseActionData, comment: formData.comment!.trim() });
-          break;
-        default:
-          throw new Error("Acción desconocida.");
+      if (actionToConfirm === 'approve') {
+        if (requestType === "PagoProveedor" && isPresidente) {
+          actionData.approvedPaymentType = formData.approvedPaymentType;
+          actionData.approvedAmount = formData.approvedAmount;
+          if (formData.approvedPaymentType === 'Cuotas') {
+            actionData.installments = formData.installments;
+          } else {
+            actionData.installments = []; // Clear installments if 'Contado'
+          }
+        }
+        // For 'Compra' or non-Presidente approving 'PagoProveedor'
+        // approvedAmount and installments might not be applicable or set differently
+        else if (requestType === "Compra" && formData.approvedAmount) {
+           // For purchase, approvedAmount might be relevant if president could modify it.
+           // For now, assume only relevant for payment by president.
+        }
+         result = await approveRequestAction(actionData);
+      } else if (actionToConfirm === 'reject') {
+        result = await rejectRequestAction({ ...actionData, comment: formData.comment!.trim() });
+      } else if (actionToConfirm === 'requestInfo') {
+        result = await requestMoreInfoAction({ ...actionData, comment: formData.comment!.trim() });
+      } else {
+        throw new Error("Acción desconocida.");
       }
+
 
       if (result.success) {
         toast({ title: "Acción Completada", description: result.message });
@@ -194,7 +238,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   };
 
   if (!currentRequest) {
-    return <div className="flex items-center justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+    return <div className="flex items-center justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /> Cargando...</div>;
   }
 
   if (currentRequest.status !== 'Pendiente') {
@@ -224,93 +268,144 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
             {requestType === 'PagoProveedor' && isPresidente && (
               <Card className="p-4 border-dashed">
                 <CardHeader className="p-0 pb-4">
-                    <CardTitle className="text-md">Gestión de Pago por Cuotas</CardTitle>
-                    <CardDescription>Ajusta el monto total a aprobar y divide el pago en cuotas.</CardDescription>
+                    <CardTitle className="text-md">Gestión de Tipo de Pago</CardTitle>
+                    <CardDescription>Selecciona cómo se aprobará este pago.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0 space-y-4">
-                    <FormField
-                        control={form.control}
-                        name="approvedAmount"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Monto Aprobado para Cuotas *</FormLabel>
-                            <FormControl>
-                            <Input type="number" placeholder="Monto total a distribuir" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                            </FormControl>
-                            <FormMessage />
+                   <FormField
+                    control={form.control}
+                    name="approvedPaymentType"
+                    render={({ field }) => (
+                        <FormItem className="space-y-3">
+                        <FormLabel>Tipo de Pago Aprobado *</FormLabel>
+                        <FormControl>
+                            <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="flex flex-col sm:flex-row gap-4"
+                            >
+                            <FormItem className="flex items-center space-x-2">
+                                <FormControl>
+                                <RadioGroupItem value="Contado" id="contado" />
+                                </FormControl>
+                                <FormLabel htmlFor="contado" className="font-normal">Contado</FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-2">
+                                <FormControl>
+                                <RadioGroupItem value="Cuotas" id="cuotas" />
+                                </FormControl>
+                                <FormLabel htmlFor="cuotas" className="font-normal">Por Cuotas</FormLabel>
+                            </FormItem>
+                            </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
                         </FormItem>
-                        )}
+                    )}
                     />
 
-                    {fields.map((item, index) => (
-                        <div key={item.id} className="flex flex-col sm:flex-row items-start gap-3 p-3 border rounded-md bg-muted/30">
-                        <FormField
+                    {watchedPaymentType === 'Contado' && (
+                         <FormField
                             control={form.control}
-                            name={`installments.${index}.amount`}
+                            name="approvedAmount"
                             render={({ field }) => (
-                            <FormItem className="flex-1">
-                                <FormLabel>Monto Cuota {index + 1}</FormLabel>
+                            <FormItem>
+                                <FormLabel>Monto Aprobado (Contado) *</FormLabel>
                                 <FormControl>
-                                <Input type="number" placeholder="Monto" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                <Input type="number" placeholder="Monto total a pagar de contado" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                             )}
                         />
-                        <FormField
+                    )}
+
+                    {watchedPaymentType === 'Cuotas' && (
+                        <>
+                         <FormField
                             control={form.control}
-                            name={`installments.${index}.dueDate`}
+                            name="approvedAmount"
                             render={({ field }) => (
-                            <FormItem className="flex flex-col flex-1 mt-0 sm:mt-[6px]">
-                                <FormLabel className="mb-1.5 block sm:hidden">Fecha Cuota {index + 1}</FormLabel>
-                                <FormLabel className="mb-1.5 hidden sm:block">&nbsp;</FormLabel>
-                                <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                    variant={"outline"}
-                                    className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
-                                    type="button"
-                                    >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {field.value ? format(field.value instanceof Date ? field.value : new Date(field.value), "PPP", { locale: es }) : <span>Selecciona fecha</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 z-[51]" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={field.value instanceof Date ? field.value : (field.value ? new Date(field.value) : undefined)}
-                                        onSelect={field.onChange}
-                                        initialFocus
-                                    />
-                                </PopoverContent>
-                                </Popover>
+                            <FormItem>
+                                <FormLabel>Monto Aprobado para Distribuir en Cuotas *</FormLabel>
+                                <FormControl>
+                                <Input type="number" placeholder="Monto total a distribuir" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                </FormControl>
                                 <FormMessage />
                             </FormItem>
                             )}
                         />
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => remove(index)}
-                            className="text-destructive hover:bg-destructive/10 mt-2 sm:mt-7 shrink-0"
-                            aria-label="Eliminar cuota"
-                        >
-                            <Trash2 className="h-4 w-4" />
+                        <CardTitle className="text-sm pt-2">Definición de Cuotas</CardTitle>
+                        {fields.map((item, index) => (
+                            <div key={item.id} className="flex flex-col sm:flex-row items-start gap-3 p-3 border rounded-md bg-muted/30">
+                            <FormField
+                                control={form.control}
+                                name={`installments.${index}.amount`}
+                                render={({ field }) => (
+                                <FormItem className="flex-1">
+                                    <FormLabel>Monto Cuota {index + 1}</FormLabel>
+                                    <FormControl>
+                                    <Input type="number" placeholder="Monto" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
+                                name={`installments.${index}.dueDate`}
+                                render={({ field }) => (
+                                <FormItem className="flex flex-col flex-1 mt-0 sm:mt-[6px]">
+                                    <FormLabel className="mb-1.5 block sm:hidden">Fecha Cuota {index + 1}</FormLabel>
+                                    <FormLabel className="mb-1.5 hidden sm:block">&nbsp;</FormLabel>
+                                    <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                        variant={"outline"}
+                                        className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                                        type="button"
+                                        >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {field.value ? format(field.value instanceof Date ? field.value : new Date(field.value), "PPP", { locale: es }) : <span>Selecciona fecha</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 z-[51]" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={field.value instanceof Date ? field.value : (field.value ? new Date(field.value) : undefined)}
+                                            onSelect={field.onChange}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => remove(index)}
+                                className="text-destructive hover:bg-destructive/10 mt-2 sm:mt-7 shrink-0"
+                                aria-label="Eliminar cuota"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                            </div>
+                        ))}
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: crypto.randomUUID(), amount: 0, dueDate: new Date() })}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Cuota
                         </Button>
+                        <div className="mt-2 text-sm space-y-1">
+                            <p>Suma de Cuotas: <span className="font-semibold">{sumOfInstallments.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</span></p>
+                            <p className={cn(difference !== 0 ? "text-destructive" : "text-green-600")}>
+                                Diferencia: <span className="font-semibold">{difference.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</span>
+                                {difference !== 0 && " (La suma de cuotas debe ser igual al Monto Aprobado)"}
+                            </p>
                         </div>
-                    ))}
-                    <Button type="button" variant="outline" size="sm" onClick={() => append({ id: crypto.randomUUID(), amount: 0, dueDate: new Date() })}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Añadir Cuota
-                    </Button>
-                    <div className="mt-2 text-sm space-y-1">
-                        <p>Suma de Cuotas: <span className="font-semibold">{sumOfInstallments.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</span></p>
-                        <p className={cn(difference !== 0 ? "text-destructive" : "text-green-600")}>
-                            Diferencia: <span className="font-semibold">{difference.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</span>
-                            {difference !== 0 && " (La suma de cuotas debe ser igual al Monto Aprobado)"}
-                        </p>
-                    </div>
-                     <FormMessage>{form.formState.errors.installments?.message}</FormMessage>
+                         <FormMessage>{form.formState.errors.installments?.message || (form.formState.errors.installments && (form.formState.errors.installments as any).root?.message )}</FormMessage>
+                        </>
+                    )}
                 </CardContent>
               </Card>
             )}
@@ -322,7 +417,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
                         Funcionalidad de Pago por Cuotas/Calendario:
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                        La división de pagos y selección de fechas específicas se implementará en una futura actualización. Por ahora, "Aprobar" aceptará el monto total indicado.
+                         La división de pagos y selección de fechas específicas se implementará en una futura actualización. Por ahora, "Aprobar" aceptará el monto total indicado.
                     </p>
                 </div>
             )}
@@ -388,9 +483,14 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
               <AlertDialogTitle>{confirmationDetails.title}</AlertDialogTitle>
               <AlertDialogDescription>
                 {confirmationDetails.description}
-                {actionToConfirm === 'approve' && requestType === "PagoProveedor" && isPresidente && difference !== 0 && (
+                {actionToConfirm === 'approve' && requestType === "PagoProveedor" && isPresidente && watchedPaymentType === 'Cuotas' && difference !== 0 && (
                     <div className="mt-2 font-semibold text-destructive">
                         ¡Atención! La suma de las cuotas no coincide con el Monto Aprobado para Cuotas.
+                    </div>
+                )}
+                 {actionToConfirm === 'approve' && requestType === "PagoProveedor" && isPresidente && watchedPaymentType === 'Contado' && (!watchedApprovedAmount || watchedApprovedAmount <= 0) && (
+                    <div className="mt-2 font-semibold text-destructive">
+                        ¡Atención! El Monto Aprobado (Contado) debe ser mayor que cero.
                     </div>
                 )}
               </AlertDialogDescription>
@@ -399,7 +499,10 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
               <AlertDialogCancel onClick={() => setIsConfirmOpen(false)} disabled={isSubmitting}>Cancelar</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleConfirmAction}
-                disabled={isSubmitting || (actionToConfirm === 'approve' && requestType === "PagoProveedor" && isPresidente && difference !== 0)}
+                disabled={isSubmitting || 
+                    (actionToConfirm === 'approve' && requestType === "PagoProveedor" && isPresidente && watchedPaymentType === 'Cuotas' && (difference !== 0 || (watchedInstallments || []).length === 0)) ||
+                    (actionToConfirm === 'approve' && requestType === "PagoProveedor" && isPresidente && watchedPaymentType === 'Contado' && (!watchedApprovedAmount || watchedApprovedAmount <= 0))
+                }
               >
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                 Confirmar
