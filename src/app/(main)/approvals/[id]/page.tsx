@@ -91,12 +91,15 @@ export default function ApprovalDetailPage() {
 
   const handleActionSuccess = () => {
     fetchRequestDetails(); 
+    // router.refresh(); // Alternative to re-fetch server-side props if needed, but fetchRequestDetails should update client state.
   };
 
   const canTakeAction = user && request && (
     user.role === 'Admin' || 
     user.role === 'Presidente IEQ'
   );
+
+  const shouldShowActionsPanel = canTakeAction && request && (request.status === 'Pendiente' || request.status === 'InformacionSolicitada');
 
 
   if (isLoading) {
@@ -245,9 +248,9 @@ export default function ApprovalDetailPage() {
         </CardContent>
       </Card>
       
-      {canTakeAction && request && request.status === 'Pendiente' && (
+      {shouldShowActionsPanel && request && (
           <ApprovalActionsPanel
-            key={request.id} // Add key prop
+            key={request.id} 
             requestId={request.id}
             currentRequest={request} 
             requestType={request.type}

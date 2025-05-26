@@ -83,7 +83,7 @@ type ApprovalActionsFormValues = z.infer<typeof approvalActionsFormSchema>;
 
 interface ApprovalActionsPanelProps {
   requestId: string;
-  currentRequest: ApprovalRequest; // Cannot be null here
+  currentRequest: ApprovalRequest; 
   requestType: ApprovalRequestType;
   onActionSuccess: () => void;
 }
@@ -97,7 +97,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
 
   const form = useForm<ApprovalActionsFormValues>({
     resolver: zodResolver(approvalActionsFormSchema),
-    defaultValues: {
+    defaultValues: { // Static initial defaults
       comment: "",
       approvedPaymentType: 'Contado',
       approvedAmount: 0,
@@ -113,11 +113,15 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   useEffect(() => {
     if (currentRequest) {
       const defaultPaymentType = currentRequest.approvedPaymentType || (requestType === "PagoProveedor" ? 'Contado' : undefined);
+      const defaultApprovedAmount = currentRequest.approvedAmount !== undefined 
+          ? currentRequest.approvedAmount 
+          : (requestType === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : undefined);
+
       form.reset({
         comment: currentRequest.approverComment || "",
         approvedPaymentType: defaultPaymentType,
-        approvedAmount: currentRequest.approvedAmount !== undefined ? currentRequest.approvedAmount : (requestType === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : undefined),
-        installments: (defaultPaymentType === 'Cuotas' && currentRequest.paymentInstallments) ?
+        approvedAmount: defaultApprovedAmount,
+        installments: (defaultPaymentType === 'Cuotas' && Array.isArray(currentRequest.paymentInstallments)) ?
             currentRequest.paymentInstallments.map(inst => ({
                 id: inst.id || crypto.randomUUID(),
                 amount: inst.amount || 0,
@@ -134,12 +138,9 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   const watchedPaymentType = form.watch("approvedPaymentType");
 
   useEffect(() => {
-    // When payment type changes, adjust form state
     if (watchedPaymentType === 'Contado') {
-      form.setValue('installments', []); // Clear installments if switching to Contado
+      form.setValue('installments', []); 
     } else if (watchedPaymentType === 'Cuotas') {
-      // If switching to Cuotas and no installments exist, add one? Or let user do it.
-      // For now, just ensures the approvedAmount is present for cuotas.
       if (!form.getValues('approvedAmount') && currentRequest?.totalAmountToPay) {
         form.setValue('approvedAmount', currentRequest.totalAmountToPay);
       }
@@ -157,7 +158,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   }, [watchedApprovedAmount, sumOfInstallments]);
 
   const handleActionClick = (action: "approve" | "reject" | "requestInfo") => {
-    form.trigger().then(isValid => { // Trigger validation before opening confirm dialog
+    form.trigger().then(isValid => { 
       if (isValid) {
         if ((action === 'reject' || action === 'requestInfo') && !form.getValues("comment")?.trim()) {
           form.setError("comment", { type: "manual", message: "Se requiere un comentario para esta acción." });
@@ -166,8 +167,6 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
         setActionToConfirm(action);
         setIsConfirmOpen(true);
       } else {
-        // Toast or highlight errors if preferred
-        console.error("Validation errors:", form.formState.errors);
          const errors = form.formState.errors;
          let errorMsg = "Por favor, corrija los errores del formulario.";
          if (errors.approvedAmount?.message) errorMsg = errors.approvedAmount.message;
@@ -187,7 +186,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
     setIsSubmitting(true);
 
     let result;
-    let actionData: any = { // Use 'any' for base, specific types below
+    let actionData: any = { 
       requestId,
       approverId: user.id,
       approverName: user.name || "Usuario del Sistema",
@@ -203,14 +202,8 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
           if (formData.approvedPaymentType === 'Cuotas') {
             actionData.installments = formData.installments;
           } else {
-            actionData.installments = []; // Clear installments if 'Contado'
+            actionData.installments = []; 
           }
-        }
-        // For 'Compra' or non-Presidente approving 'PagoProveedor'
-        // approvedAmount and installments might not be applicable or set differently
-        else if (requestType === "Compra" && formData.approvedAmount) {
-           // For purchase, approvedAmount might be relevant if president could modify it.
-           // For now, assume only relevant for payment by president.
         }
          result = await approveRequestAction(actionData);
       } else if (actionToConfirm === 'reject') {
@@ -238,10 +231,11 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   };
 
   if (!currentRequest) {
-    return <div className="flex items-center justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /> Cargando...</div>;
+    return <div className="flex items-center justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /> Cargando datos del panel...</div>;
   }
 
-  if (currentRequest.status !== 'Pendiente') {
+  // This check now allows 'InformacionSolicitada' as well
+  if (currentRequest.status !== 'Pendiente' && currentRequest.status !== 'InformacionSolicitada') {
     return null;
   }
 
