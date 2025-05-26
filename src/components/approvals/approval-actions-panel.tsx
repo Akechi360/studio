@@ -67,7 +67,7 @@ type ApprovalActionsFormValues = z.infer<typeof approvalActionsFormSchema>;
 
 interface ApprovalActionsPanelProps {
   requestId: string;
-  currentRequest: ApprovalRequest; 
+  currentRequest: ApprovalRequest;
   requestType: ApprovalRequestType;
   onActionSuccess: () => void;
 }
@@ -81,10 +81,9 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
 
   const form = useForm<ApprovalActionsFormValues>({
     resolver: zodResolver(approvalActionsFormSchema),
-    // Static defaultValues, not dependent on currentRequest
     defaultValues: {
       comment: "",
-      approvedAmount: 0, // Default to 0 or undefined if preferred and handled by Zod
+      approvedAmount: 0,
       installments: [],
     },
   });
@@ -94,19 +93,17 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
     name: "installments",
   });
 
-  // Populate form with currentRequest data via useEffect
   useEffect(() => {
     if (currentRequest) {
       form.reset({
         comment: currentRequest.approverComment || "",
         approvedAmount: requestType === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : 0,
-        installments: requestType === "PagoProveedor" ? 
-            (currentRequest.paymentInstallments || []).map(inst => ({
+        installments: requestType === "PagoProveedor" && currentRequest.paymentInstallments ?
+            currentRequest.paymentInstallments.map(inst => ({
                 id: inst.id || crypto.randomUUID(),
                 amount: inst.amount || 0,
-                // Ensure dueDate is a valid Date object, default to now if invalid/missing
                 dueDate: inst.dueDate && !isNaN(new Date(inst.dueDate).getTime()) ? new Date(inst.dueDate) : new Date(),
-            })) 
+            }))
             : [],
       });
     }
@@ -148,7 +145,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
 
   const handleConfirmAction = async () => {
     if (!user || !user.email || !actionToConfirm) return;
-    
+
     const formData = form.getValues();
     setIsSubmitting(true);
 
@@ -183,7 +180,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
 
       if (result.success) {
         toast({ title: "Acción Completada", description: result.message });
-        onActionSuccess(); // Parent component will refresh data, which re-triggers useEffect to reset form
+        onActionSuccess();
       } else {
         toast({ title: "Error en la Acción", description: result.message || "Ocurrió un error desconocido.", variant: "destructive" });
       }
@@ -195,11 +192,11 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
       setActionToConfirm(null);
     }
   };
-  
-  if (!currentRequest) { // Defensive check, though parent should prevent this
+
+  if (!currentRequest) {
     return <div className="flex items-center justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
-  
+
   if (currentRequest.status !== 'Pendiente') {
     return null;
   }
@@ -279,11 +276,11 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 z-[51]" align="start">
-                                    <Calendar 
-                                        mode="single" 
-                                        selected={field.value instanceof Date ? field.value : (field.value ? new Date(field.value) : undefined)} 
-                                        onSelect={field.onChange} 
-                                        initialFocus 
+                                    <Calendar
+                                        mode="single"
+                                        selected={field.value instanceof Date ? field.value : (field.value ? new Date(field.value) : undefined)}
+                                        onSelect={field.onChange}
+                                        initialFocus
                                     />
                                 </PopoverContent>
                                 </Popover>
@@ -341,7 +338,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
                       placeholder="Añade un comentario (requerido para rechazar o solicitar más información)..."
                       className="min-h-[100px]"
                       {...field}
-                      value={field.value || ""} 
+                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormMessage />
@@ -392,9 +389,9 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
               <AlertDialogDescription>
                 {confirmationDetails.description}
                 {actionToConfirm === 'approve' && requestType === "PagoProveedor" && isPresidente && difference !== 0 && (
-                    <p className="mt-2 font-semibold text-destructive">
+                    <div className="mt-2 font-semibold text-destructive">
                         ¡Atención! La suma de las cuotas no coincide con el Monto Aprobado para Cuotas.
-                    </p>
+                    </div>
                 )}
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -414,3 +411,5 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
     </Card>
   );
 }
+
+    
