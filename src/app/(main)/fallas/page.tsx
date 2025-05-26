@@ -1,3 +1,9 @@
 
-// This file is intentionally left empty to signify its deletion as part of module removal.
-// The build system or manual cleanup should remove this file if it's no longer referenced.
+// This file is part of a module that was removed.
+// It's kept with a minimal component to prevent build/runtime errors if accessed directly.
+
+export default function FallasPage() {
+  // This page was part of a module that has been removed.
+  // Rendering null to avoid errors if accessed directly.
+  return null;
+}
