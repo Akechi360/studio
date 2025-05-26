@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus as ApprovalStatusType, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType } from "./types"; // Falla/CasoDeMantenimiento types removed
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus as ApprovalStatusType, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType, CasoDeMantenimiento, CasoMantenimientoStatus, CasoMantenimientoPriority, CasoMantenimientoLogEntry } from "./types";
 import type { AuditLogEntry as AuditLogEntryType } from "@/lib/types";
 import {
   addTicketToMock,
@@ -21,18 +21,31 @@ import {
   getAllApprovalRequestsFromMock,
   getApprovalRequestByIdFromMock,
   updateApprovalRequestInMock,
-  // addFallaToMock, // Removed
-  // getAllFallasFromMock, // Removed
-  // getFallaByIdFromMock, // Removed
-  // updateFallaInMock, // Removed
-  // addCasoMantenimientoToMock, // Removed
-  // getAllCasosMantenimientoFromMock, // Removed
-  // getCasoMantenimientoByIdFromMock, // Removed
-  // updateCasoMantenimientoInMock, // Removed
+  addCasoMantenimientoToMock,
+  getAllCasosMantenimientoFromMock,
+  getCasoMantenimientoByIdFromMock,
+  updateCasoMantenimientoInMock,
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
-import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM } from "./types"; // FALLA_PRIORITIES, FALLA_STATUSES, CASO_PRIORITIES, CASO_STATUSES removed
+import { 
+  INVENTORY_ITEM_CATEGORIES, 
+  INVENTORY_ITEM_STATUSES, 
+  RAM_OPTIONS, 
+  STORAGE_TYPES_ZOD_ENUM, 
+  CASO_STATUSES, 
+  CASO_PRIORITIES 
+} from "./types";
+import {
+  BaseInventoryItemSchema,
+  CreateApprovalRequestActionSchema,
+  ApprovePagoProveedorContadoSchema,
+  ApprovePagoProveedorCuotasSchema,
+  ApproveCompraSchema,
+  RejectOrInfoActionSchema,
+  CreateCasoMantenimientoFormSchema,
+  UpdateCasoMantenimientoFormSchema
+} from "../lib/schemas"; // Import from new schemas file
 import * as XLSX from 'xlsx';
 
 
@@ -47,6 +60,7 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     console.error("Error logging audit event:", error);
+    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
 
@@ -246,22 +260,6 @@ export async function getAllInventoryItems(): Promise<InventoryItem[]> {
   return getAllInventoryItemsFromMock();
 }
 
-const BaseInventoryItemSchema = z.object({
-  name: z.string().min(3, "El nombre debe tener al menos 3 caracteres.").max(100),
-  category: z.enum(INVENTORY_ITEM_CATEGORIES),
-  brand: z.string().max(50).optional(),
-  model: z.string().max(50).optional(),
-  serialNumber: z.string().max(100).optional(),
-  processor: z.string().max(100).optional(),
-  ram: z.enum(RAM_OPTIONS).optional(),
-  storageType: z.enum(STORAGE_TYPES_ZOD_ENUM).optional(),
-  storage: z.string().max(50).optional(),
-  quantity: z.coerce.number().int().min(1, "La cantidad debe ser al menos 1."),
-  location: z.string().max(100).optional(),
-  status: z.enum(INVENTORY_ITEM_STATUSES),
-  notes: z.string().max(500).optional(),
-});
-
 const categoryPrefixMap: Record<InventoryItemCategory, string> = {
   Computadora: "PC", Monitor: "MON", Teclado: "TEC", Mouse: "MOU", Impresora: "IMP", Escaner: "ESC",
   Router: "ROU", Switch: "SWI", Servidor: "SRV", Laptop: "LAP", Tablet: "TAB", Proyector: "PRO",
@@ -423,9 +421,9 @@ export async function importInventoryItemsAction(
 
         const data = validatedFields.data;
         const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
-         if (!prefix) { // Should not happen if Zod validation for category is correct
+         if (!prefix) { 
             errorCount++;
-            errors.push({ row: i + 2, message: `Categoría "${data.category}" no tiene un prefijo definido.`, data: rawRow });
+            errors.push({ row: i + 2, message: `Categoría "${data.category}" no tiene un prefijo definido o no es válida.`, data: rawRow });
             continue;
         }
 
@@ -458,7 +456,6 @@ export async function importInventoryItemsAction(
       } catch (e: any) {
         errorCount++;
         errors.push({ row: i + 2, message: `Error procesando fila: ${e.message || String(e)}`, data: itemDataArray[i] });
-        // console.error(`Error procesando fila ${i + 2} del Excel:`, e, "Datos de la fila:", itemDataArray[i]); // Server log
       }
     }
 
@@ -482,6 +479,7 @@ export async function importInventoryItemsAction(
     return { success: importFullySuccessful, message: finalMessage, successCount, errorCount, errors, importedItems };
   } catch (e: any) {
     const errorMsg = `Error general del servidor durante la importación: ${e.message || 'Error desconocido'}.`;
+    console.error("Error crítico en importInventoryItemsAction:", e);
     await logAuditEvent(currentUserEmail, "Error Crítico en Importación Masiva de Inventario", errorMsg);
     return { success: false, message: errorMsg, successCount: 0, errorCount: itemDataArray?.length || 0, errors: itemDataArray?.map((row, index) => ({ row: index + 2, message: "Error catastrófico del servidor.", data: row })) || [{ row: 0, message: "Error catastrófico del servidor.", data: {} }], importedItems: [] };
   }
@@ -489,42 +487,6 @@ export async function importInventoryItemsAction(
 
 
 // --- Approval Actions ---
-const AttachmentDataSchema = z.object({
-  fileName: z.string(),
-  size: z.number(),
-  type: z.string().optional(),
-});
-
-const CreateApprovalRequestBaseSchema = z.object({
-  type: z.enum(["Compra", "PagoProveedor"] as [ApprovalRequestType, ...ApprovalRequestType[]]),
-  subject: z.string().min(5, "El asunto debe tener al menos 5 caracteres.").max(100),
-  description: z.string().max(2000).optional(),
-  requesterId: z.string(),
-  requesterName: z.string(),
-  requesterEmail: z.string().email().optional(),
-  attachmentsData: z.array(AttachmentDataSchema).optional(),
-});
-
-const PurchaseRequestDataSchema = CreateApprovalRequestBaseSchema.extend({
-  type: z.literal("Compra"),
-  itemDescription: z.string().min(3, "El ítem es obligatorio.").max(200),
-  estimatedPrice: z.coerce.number({ invalid_type_error: "Debe ser un número."}).positive({ message: "El precio debe ser positivo." }).optional(),
-  supplierCompra: z.string().max(100).optional(),
-});
-
-const PaymentRequestDataSchema = CreateApprovalRequestBaseSchema.extend({
-  type: z.literal("PagoProveedor"),
-  supplierPago: z.string().min(3, "El proveedor es obligatorio.").max(100),
-  totalAmountToPay: z.coerce.number().positive("El monto debe ser positivo."),
-  description: z.string().min(10, {message: "Por favor, incluye la fecha requerida de pago en la descripción."}).max(2000).optional(),
-});
-
-const CreateApprovalRequestActionSchema = z.discriminatedUnion("type", [
-  PurchaseRequestDataSchema,
-  PaymentRequestDataSchema,
-]);
-
-
 export async function createApprovalRequestAction(
   values: z.infer<typeof CreateApprovalRequestActionSchema>
 ): Promise<{ success: boolean; message: string; approvalId?: string; errors?: any }> {
@@ -540,7 +502,7 @@ export async function createApprovalRequestAction(
     fileName: attData.fileName,
     size: attData.size,
     type: attData.type,
-    url: `/uploads/mock/${attData.fileName}`, // Placeholder URL
+    url: `/uploads/mock/${attData.fileName}`, 
   }));
 
   const newApproval: ApprovalRequest = {
@@ -573,7 +535,6 @@ export async function createApprovalRequestAction(
   } else if (data.type === "PagoProveedor") {
     newApproval.supplierPago = data.supplierPago;
     newApproval.totalAmountToPay = data.totalAmountToPay;
-    // paymentDueDate is handled in description for now
   }
 
   addApprovalRequestToMock(newApproval);
@@ -607,49 +568,6 @@ export async function getApprovalRequestDetails(id: string): Promise<ApprovalReq
     return getApprovalRequestByIdFromMock(id);
 }
 
-
-const PaymentInstallmentActionSchema = z.object({
-  id: z.string(),
-  amount: z.coerce.number().positive("El monto de la cuota debe ser positivo."),
-  dueDate: z.date({ coerce: true, required_error: "La fecha de vencimiento de la cuota es obligatoria." }),
-});
-
-const ApproveActionBaseSchema = z.object({
-  requestId: z.string(),
-  approverId: z.string(),
-  approverName: z.string(),
-  approverEmail: z.string().email(),
-  comment: z.string().optional(),
-});
-
-const ApprovePagoProveedorContadoSchema = ApproveActionBaseSchema.extend({
-  approvedPaymentType: z.literal('Contado'),
-  approvedAmount: z.coerce.number().positive("Monto (Contado) debe ser positivo."),
-  installments: z.array(PaymentInstallmentActionSchema).max(0, "No debe haber cuotas para pago de contado.").optional(),
-});
-
-const ApprovePagoProveedorCuotasSchema = ApproveActionBaseSchema.extend({
-  approvedPaymentType: z.literal('Cuotas'),
-  approvedAmount: z.coerce.number().positive("Monto total para cuotas debe ser positivo."),
-  installments: z.array(PaymentInstallmentActionSchema).min(1, "Se requiere al menos una cuota."),
-}).superRefine((data, ctx) => {
-  const sumOfInstallments = data.installments.reduce((sum, inst) => sum + inst.amount, 0);
-  if (Math.abs(sumOfInstallments - data.approvedAmount) > 0.01) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "La suma de las cuotas debe igualar el Monto Aprobado para Cuotas.",
-      path: ["installments"],
-    });
-  }
-});
-
-const ApproveCompraSchema = ApproveActionBaseSchema.extend({
-  approvedPaymentType: z.undefined().optional(),
-  approvedAmount: z.undefined().optional(),
-  installments: z.undefined().optional(),
-});
-
-
 export async function approveRequestAction(
   values: any 
 ): Promise<{ success: boolean; message: string }> {
@@ -669,7 +587,7 @@ export async function approveRequestAction(
     } else {
       return { success: false, message: "Tipo de pago para aprobación no válido." };
     }
-  } else { // Compra
+  } else { 
     const result = ApproveCompraSchema.safeParse(values);
     if (!result.success) return { success: false, message: "Error de validación de aprobación de compra." };
     validatedData = result.data;
@@ -702,11 +620,6 @@ export async function approveRequestAction(
   revalidatePath('/dashboard');
   return { success: true, message: "Solicitud aprobada." };
 }
-
-const RejectOrInfoActionSchema = ApproveActionBaseSchema.extend({
-  comment: z.string().min(1, "Se requiere un comentario para esta acción."),
-});
-
 
 export async function rejectRequestAction(
   values: z.infer<typeof RejectOrInfoActionSchema>
@@ -760,196 +673,136 @@ export async function requestMoreInfoAction(
   return { success: true, message: "Se solicitó más información." };
 }
 
+// --- Gestión de Casos de Mantenimiento Actions ---
+export async function createCasoMantenimientoAction(
+  values: z.infer<typeof CreateCasoMantenimientoFormSchema>,
+  currentUserId: string,
+  currentUserName: string,
+  currentUserEmail: string
+): Promise<{ success: boolean; message: string; casoId?: string; errors?: any }> {
+  const validatedFields = CreateCasoMantenimientoFormSchema.safeParse(values);
+  if (!validatedFields.success) {
+    return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación al crear el caso." };
+  }
+  const data = validatedFields.data;
 
-// --- Gestión de Fallas Actions --- (Removed)
-// const CreateFallaFormSchema = z.object({
-//   subject: z.string().min(5, { message: "El asunto debe tener al menos 5 caracteres." }).max(150),
-//   description: z.string().min(10, { message: "La descripción debe tener al menos 10 caracteres." }).max(2000),
-//   location: z.string().min(3, { message: "La ubicación debe tener al menos 3 caracteres." }).max(100),
-//   equipment: z.string().max(100).optional(),
-//   priority: z.enum(FALLA_PRIORITIES as [FallaPriority, ...FallaPriority[]]),
-//   reportedByUserId: z.string(),
-//   reportedByUserName: z.string(),
-// });
+  const newCaso: CasoDeMantenimiento = {
+    id: `CASO-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    title: data.title,
+    description: data.description,
+    location: data.location,
+    equipment: data.equipment,
+    priority: data.priority,
+    assignedProviderName: data.assignedProviderName,
+    registeredByUserId: currentUserId,
+    registeredByUserName: currentUserName,
+    registeredAt: new Date(),
+    currentStatus: 'Registrado',
+    log: [
+      {
+        timestamp: new Date(),
+        action: 'Caso Registrado',
+        notes: 'Caso de mantenimiento inicial registrado.',
+        userId: currentUserId,
+        userName: currentUserName,
+        statusAfterAction: 'Registrado',
+      },
+    ],
+    providerContactPerson: undefined,
+    expectedResolutionDate: undefined,
+    lastFollowUpDate: undefined,
+    nextFollowUpDate: undefined,
+    resolutionDetails: undefined,
+    cost: undefined,
+    invoicingDetails: undefined,
+    resolvedAt: undefined,
+  };
 
-// export async function createFallaAction(
-//   values: z.infer<typeof CreateFallaFormSchema>
-// ): Promise<{ success: boolean; message: string; fallaId?: string; errors?: any }> {
-//   const validatedFields = CreateFallaFormSchema.safeParse(values);
-//   if (!validatedFields.success) {
-//     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
-//   }
-//   const data = validatedFields.data;
-//   const emiliaUserEmail = "electromedicina@clinicaieq.com";
-//   const assignedToUserIdDefault = "approver-user-003"; 
-//   const assignedToUserNameDefault = "Emilia Valderrama";
+  addCasoMantenimientoToMock(newCaso);
+  await logAuditEvent(currentUserEmail, "Registro de Nuevo Caso de Mantenimiento", `ID Caso: ${newCaso.id}, Título: ${newCaso.title}`);
+  revalidatePath("/mantenimiento");
 
-//   const newFalla: Falla = {
-//     id: `FALLA-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-//     subject: data.subject,
-//     description: data.description,
-//     location: data.location,
-//     equipment: data.equipment,
-//     priority: data.priority,
-//     reportedByUserId: data.reportedByUserId,
-//     reportedByUserName: data.reportedByUserName,
-//     reportedAt: new Date(),
-//     currentStatus: 'Reportada',
-//     assignedToUserId: assignedToUserIdDefault,
-//     assignedToUserName: assignedToUserNameDefault,
-//     history: [
-//       {
-//         timestamp: new Date(),
-//         status: 'Reportada',
-//         notes: 'Falla reportada inicialmente.',
-//         userId: data.reportedByUserId,
-//         userName: data.reportedByUserName,
-//       },
-//     ],
-//   };
+  return {
+    success: true,
+    message: "Caso de mantenimiento registrado exitosamente.",
+    casoId: newCaso.id,
+  };
+}
 
-//   addFallaToMock(newFalla);
-//   await logAuditEvent(data.reportedByUserName, "Reporte de Nueva Falla", `ID Falla: ${newFalla.id}, Asunto: ${newFalla.subject}`);
-//   revalidatePath("/fallas");
+export async function getAllCasosMantenimientoAction(): Promise<CasoDeMantenimiento[]> {
+  return getAllCasosMantenimientoFromMock();
+}
 
-//   return {
-//     success: true,
-//     message: "Falla reportada exitosamente.",
-//     fallaId: newFalla.id,
-//   };
-// }
+export async function getCasoMantenimientoByIdAction(id: string): Promise<CasoDeMantenimiento | null> {
+  return getCasoMantenimientoByIdFromMock(id);
+}
 
-// export async function getAllFallasAction(): Promise<Falla[]> {
-//   return getAllFallasFromMock();
-// }
+export async function updateCasoMantenimientoAction(
+  casoId: string,
+  updates: z.infer<typeof UpdateCasoMantenimientoFormSchema>,
+  actingUserId: string,
+  actingUserName: string,
+  actingUserEmail: string
+): Promise<{ success: boolean; message: string; }> {
+   const validatedFields = UpdateCasoMantenimientoFormSchema.safeParse(updates);
+   if (!validatedFields.success) {
+     return { success: false, message: "Error de validación: " + JSON.stringify(validatedFields.error.flatten().fieldErrors) };
+   }
 
-// export async function getFallaByIdAction(id: string): Promise<Falla | null> {
-//   return getFallaByIdFromMock(id);
-// }
+   const caso = getCasoMantenimientoByIdFromMock(casoId);
+   if (!caso) {
+     return { success: false, message: "Caso de mantenimiento no encontrado." };
+   }
 
-// export async function updateFallaStatusAction(
-//   fallaId: string,
-//   newStatus: FallaStatus,
-//   notes: string,
-//   userId: string,
-//   userName: string
-// ): Promise<{ success: boolean; message: string; }> {
-//    const falla = getFallaByIdFromMock(fallaId);
-//    if (!falla) {
-//      return { success: false, message: "Falla no encontrada." };
-//    }
+   const { currentStatus, notes, assignedProviderName, nextFollowUpDate, resolutionDetails, cost, invoicingDetails, resolvedAt } = validatedFields.data;
 
-//    const oldStatus = falla.currentStatus;
-//    falla.currentStatus = newStatus;
-//    falla.history.push({
-//      timestamp: new Date(),
-//      status: newStatus,
-//      notes,
-//      userId,
-//      userName,
-//    });
-//    if (newStatus === 'Resuelta' || newStatus === 'No Reparable') {
-//      falla.resolutionDate = new Date();
-//      falla.resolutionDetails = notes; 
-//    }
+   const newLogEntry: CasoMantenimientoLogEntry = {
+     timestamp: new Date(),
+     action: `Actualización de estado a: ${currentStatus}`,
+     notes: notes,
+     userId: actingUserId,
+     userName: actingUserName,
+     statusAfterAction: currentStatus,
+   };
+
+   const updatedCasoData: Partial<CasoDeMantenimiento> = {
+     currentStatus,
+     assignedProviderName,
+     nextFollowUpDate,
+     lastFollowUpDate: new Date(),
+     log: [...caso.log, newLogEntry],
+   };
+
+   if (currentStatus === 'Resuelto') {
+     updatedCasoData.resolutionDetails = resolutionDetails;
+     updatedCasoData.cost = cost;
+     updatedCasoData.invoicingDetails = invoicingDetails;
+     updatedCasoData.resolvedAt = resolvedAt || new Date();
+     if (!resolutionDetails || !resolvedAt) {
+        return {success: false, message: "Para el estado 'Resuelto', los detalles de resolución y la fecha de resolución son obligatorios."}
+     }
+   } else {
+      updatedCasoData.resolutionDetails = undefined;
+      updatedCasoData.cost = undefined;
+      updatedCasoData.invoicingDetails = undefined;
+      updatedCasoData.resolvedAt = undefined;
+   }
    
-//    updateFallaInMock(falla);
-//    await logAuditEvent(userName, "Actualización de Estado de Falla", `ID Falla: ${fallaId}, De: ${oldStatus}, A: ${newStatus}. Notas: ${notes}`);
-//    revalidatePath(`/fallas/${fallaId}`);
-//    revalidatePath("/fallas");
-
-//    return { success: true, message: `Estado de la falla actualizado a ${newStatus}.` };
-// }
-
-// --- Gestión de Casos de Mantenimiento Actions --- (Removed, placeholders left in case)
-// const CreateCasoMantenimientoFormSchema = z.object({
-//   title: z.string().min(5, { message: "El título debe tener al menos 5 caracteres." }).max(150),
-//   description: z.string().min(10, { message: "La descripción debe tener al menos 10 caracteres." }).max(2000),
-//   location: z.string().min(3, { message: "La ubicación debe tener al menos 3 caracteres." }).max(100),
-//   equipment: z.string().max(100).optional(),
-//   priority: z.enum(CASO_PRIORITIES as [CasoMantenimientoPriority, ...CasoMantenimientoPriority[]]),
-//   assignedProviderName: z.string().min(1, "El proveedor es obligatorio.").max(100),
-//   // registeredByUserId: z.string(), // Will be set by currentUser
-//   // registeredByUserName: z.string(), // Will be set by currentUser
-// });
-
-// export async function createCasoMantenimientoAction(
-//   currentUser: Pick<User, 'id' | 'name' | 'email'>, // Added currentUser
-//   values: Omit<z.infer<typeof CreateCasoMantenimientoFormSchema>, 'registeredByUserId' | 'registeredByUserName'>
-// ): Promise<{ success: boolean; message: string; casoId?: string; errors?: any }> {
-//   const validatedFields = CreateCasoMantenimientoFormSchema.safeParse(values);
-//   if (!validatedFields.success) {
-//     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
-//   }
-//   const data = validatedFields.data;
-
-//   const newCaso: CasoDeMantenimiento = {
-//     id: `CASO-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-//     title: data.title,
-//     description: data.description,
-//     location: data.location,
-//     equipment: data.equipment,
-//     priority: data.priority,
-//     assignedProviderName: data.assignedProviderName,
-//     registeredByUserId: currentUser.id,
-//     registeredByUserName: currentUser.name,
-//     registeredAt: new Date(),
-//     currentStatus: 'Registrado',
-//     log: [
-//       {
-//         timestamp: new Date(),
-//         action: 'Caso Registrado',
-//         notes: 'Caso inicial registrado en el sistema.',
-//         userId: currentUser.id,
-//         userName: currentUser.name,
-//       },
-//     ],
-//   };
-
-//   addCasoMantenimientoToMock(newCaso);
-//   if (currentUser.email) {
-//     await logAuditEvent(currentUser.email, "Registro de Nuevo Caso de Mantenimiento", `ID Caso: ${newCaso.id}, Título: ${newCaso.title}`);
-//   }
-//   revalidatePath("/mantenimiento"); // Updated path
-
-//   return {
-//     success: true,
-//     message: "Caso de mantenimiento registrado exitosamente.",
-//     casoId: newCaso.id,
-//   };
-// }
-
-// export async function getAllCasosMantenimientoAction(): Promise<CasoDeMantenimiento[]> {
-//   return getAllCasosMantenimientoFromMock();
-// }
-
-// export async function getCasoMantenimientoByIdAction(id: string): Promise<CasoDeMantenimiento | null> {
-//   return getCasoMantenimientoByIdFromMock(id);
-// }
-
-// export async function updateCasoMantenimientoAction( // Placeholder for more detailed implementation
-//   casoId: string,
-//   updates: Partial<CasoDeMantenimiento>,
-//   logEntry: { action: string; notes: string; userId: string; userName: string; }
-// ): Promise<{ success: boolean; message: string; }> {
-//    const caso = getCasoMantenimientoByIdFromMock(casoId);
-//    if (!caso) {
-//      return { success: false, message: "Caso de mantenimiento no encontrado." };
-//    }
-
-//    const updatedCaso: CasoDeMantenimiento = {
-//      ...caso,
-//      ...updates,
-//      log: [...caso.log, { ...logEntry, timestamp: new Date(), status: updates.currentStatus || caso.currentStatus }], // Added status to logEntry
-//    };
-//    if (updates.currentStatus) updatedCaso.currentStatus = updates.currentStatus;
+   const success = updateCasoMantenimientoInMock({ ...caso, ...updatedCasoData });
    
-//    updateCasoMantenimientoInMock(updatedCaso);
-//    if (logEntry.userId) { // Assuming logEntry.userId has the email of the user performing the action
-//        await logAuditEvent(logEntry.userName, `Actualización de Caso de Mantenimiento: ${logEntry.action}`, `ID Caso: ${casoId}. Notas: ${logEntry.notes}`);
-//    }
-//    revalidatePath(`/mantenimiento/${casoId}`); // Updated path
-//    revalidatePath("/mantenimiento"); // Updated path
+   if (success) {
+       await logAuditEvent(actingUserEmail, `Actualización de Caso de Mantenimiento: ${newLogEntry.action}`, `ID Caso: ${casoId}. Notas: ${notes}`);
+       revalidatePath(`/mantenimiento/${casoId}`);
+       revalidatePath("/mantenimiento");
+       return { success: true, message: `Caso de mantenimiento actualizado: ${newLogEntry.action}.` };
+   } else {
+       return { success: false, message: "No se pudo actualizar el caso de mantenimiento."};
+   }
+}
 
-//    return { success: true, message: `Caso de mantenimiento actualizado: ${logEntry.action}.` };
-// }
+// --- AI Solution Suggestion ---
+// Removed getAISolutionSuggestion as per user request
+
+// --- GENKIT RELATED FLOWS ---
+// AI Solution Suggestion Flow (suggest-solution.ts) is expected to be removed/empty.
+// If you need to re-enable or add other Genkit flows, ensure they are correctly imported in src/ai/dev.ts.
