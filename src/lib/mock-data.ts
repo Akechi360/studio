@@ -1,5 +1,5 @@
 
-import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest, ApprovalActivityLogEntry, PaymentType } from '@/lib/types';
+import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest, ApprovalActivityLogEntry, PaymentType, ApprovalStatus } from '@/lib/types';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -141,14 +141,15 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
   if (reqIndex !== -1) {
     const originalRequest = approvalsStore_internal[reqIndex];
 
-    // Determine action based on status change or other significant updates
     let actionDescription = `Estado Cambiado a: ${updatedRequest.status}`;
-    if (originalRequest.status !== updatedRequest.status && updatedRequest.status === "Aprobado") {
-        actionDescription = `Solicitud Aprobada (${updatedRequest.approvedPaymentType || 'N/A'})`;
-    } else if (originalRequest.status !== updatedRequest.status && updatedRequest.status === "Rechazado") {
-        actionDescription = "Solicitud Rechazada";
-    } else if (originalRequest.status !== updatedRequest.status && updatedRequest.status === "InformacionSolicitada") {
-        actionDescription = "Información Adicional Solicitada";
+    if (originalRequest.status !== updatedRequest.status) {
+        if (updatedRequest.status === "Aprobado") {
+            actionDescription = `Solicitud Aprobada (${updatedRequest.approvedPaymentType || 'N/A'})`;
+        } else if (updatedRequest.status === "Rechazado") {
+            actionDescription = "Solicitud Rechazada";
+        } else if (updatedRequest.status === "InformacionSolicitada") {
+            actionDescription = "Información Adicional Solicitada";
+        }
     }
 
 
@@ -163,21 +164,31 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
 
     const currentActivityLog = Array.isArray(originalRequest.activityLog) ? originalRequest.activityLog : [];
     
+    // Initialize fields that might be undefined in originalRequest but set in updatedRequest
     const finalRequestData: ApprovalRequest = {
       ...originalRequest,
       ...updatedRequest, // This applies all fields from updatedRequest over originalRequest
       updatedAt: new Date(),
-      activityLog: [...currentActivityLog, newActivityLogEntry]
+      activityLog: [...currentActivityLog, newActivityLogEntry],
+      approvedAt: updatedRequest.status === "Aprobado" ? new Date() : originalRequest.approvedAt,
+      rejectedAt: updatedRequest.status === "Rechazado" ? new Date() : originalRequest.rejectedAt,
+      infoRequestedAt: updatedRequest.status === "InformacionSolicitada" ? new Date() : originalRequest.infoRequestedAt,
     };
 
-    // Specifically handle clearing or setting payment details based on approvedPaymentType
-    if (updatedRequest.type === "PagoProveedor") {
-        if (updatedRequest.approvedPaymentType === 'Contado') {
-            finalRequestData.paymentInstallments = []; // Clear installments
-        } else if (updatedRequest.approvedPaymentType === 'Cuotas') {
-            // installments are already set by updatedRequest spread
+    // Specifically handle clearing or setting payment details based on approvedPaymentType for "PagoProveedor"
+    if (finalRequestData.type === "PagoProveedor") {
+        if (finalRequestData.status === "Aprobado") {
+            if (finalRequestData.approvedPaymentType === 'Contado') {
+                finalRequestData.paymentInstallments = []; // Clear installments
+            }
+            // approvedAmount and paymentInstallments (for 'Cuotas') are already set by updatedRequest spread
         }
-         // approvedAmount is also set by updatedRequest spread
+    } else if (finalRequestData.type === "Compra" && finalRequestData.status === "Aprobado") {
+        // For "Compra", clear payment specific fields if they were somehow set
+        finalRequestData.approvedPaymentType = undefined;
+        finalRequestData.paymentInstallments = [];
+        // approvedAmount might still be relevant if president could modify it for purchase,
+        // but typically it's not split into installments. For now, we don't clear it if set.
     }
 
 
@@ -197,4 +208,3 @@ export const mockTickets: Ticket[] = ticketsStore_internal;
 export const mockInventory: InventoryItem[] = inventoryStore_internal;
 export const mockAuditLogs: AuditLogEntryType[] = auditLogsStore_internal;
 export const mockApprovalRequests: ApprovalRequest[] = approvalsStore_internal;
-

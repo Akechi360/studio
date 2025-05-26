@@ -136,10 +136,9 @@ export interface ApprovalActivityLogEntry {
 }
 
 export interface PaymentInstallment {
-  id: string; // client-generated UUID or similar for key prop
+  id: string; 
   amount: number;
   dueDate: Date;
-  // status?: 'Pendiente' | 'Pagado' | 'Atrasado'; // Future enhancement
 }
 
 export interface AttachmentClientData {
@@ -168,11 +167,11 @@ export interface ApprovalRequest {
   approverComment?: string;
   approvedAt?: Date;
   rejectedAt?: Date;
-  infoRequestedAt?: Date;
+  infoRequestedAt?: Date; 
   
-  approvedPaymentType?: PaymentType; // New field
-  approvedAmount?: number; // For 'Contado' OR total for 'Cuotas'
-  paymentInstallments?: PaymentInstallment[]; // Array of installments for PagoProveedor
+  approvedPaymentType?: PaymentType; 
+  approvedAmount?: number; 
+  paymentInstallments?: PaymentInstallment[]; 
 
   // Purchase specific
   itemDescription?: string;
@@ -181,14 +180,13 @@ export interface ApprovalRequest {
 
   // Payment specific
   supplierPago?: string;
-  totalAmountToPay?: number; // Original total amount requested
+  totalAmountToPay?: number; 
 }
 
 export interface AuditLogEntry {
   id: string;
-  timestamp: string;
-  user: string;
+  timestamp: string; 
+  user: string; 
   action: string;
   details?: string;
 }
-

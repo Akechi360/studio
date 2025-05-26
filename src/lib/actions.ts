@@ -2,8 +2,8 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType } from "./types";
-import type { AuditLogEntry as AuditLogEntryType } from "@/lib/types"; // Corrected path for AuditLogEntryType
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus as ApprovalStatusType, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType } from "./types";
+import type { AuditLogEntry as AuditLogEntryType } from "@/lib/types";
 import {
   addTicketToMock,
   getAllTicketsFromMock,
@@ -39,6 +39,7 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     console.error("Error logging audit event:", error);
+    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
 
@@ -621,7 +622,6 @@ const ApprovePagoProveedorCuotasSchema = ApproveActionBaseSchema.extend({
 });
 
 const ApproveCompraSchema = ApproveActionBaseSchema.extend({
-  // For 'Compra', these fields are not directly set by approver in this action
   approvedPaymentType: z.undefined().optional(),
   approvedAmount: z.undefined().optional(),
   installments: z.undefined().optional(),
@@ -629,8 +629,7 @@ const ApproveCompraSchema = ApproveActionBaseSchema.extend({
 
 
 export async function approveRequestAction(
-  values: any // Using 'any' here as discriminatedUnion with Zod in server actions can be complex
-             // We will validate internally based on request type.
+  values: any 
 ): Promise<{ success: boolean; message: string }> {
   const request = getApprovalRequestByIdFromMock(values.requestId);
   if (!request) return { success: false, message: "Solicitud no encontrada." };
@@ -669,8 +668,8 @@ export async function approveRequestAction(
     updatedRequestData.approvedAmount = validatedData.approvedAmount;
     if (validatedData.approvedPaymentType === 'Cuotas') {
       updatedRequestData.paymentInstallments = validatedData.installments;
-    } else { // Contado
-      updatedRequestData.paymentInstallments = []; // Clear any previous installments
+    } else { 
+      updatedRequestData.paymentInstallments = []; 
     }
   }
 
@@ -738,4 +737,3 @@ export async function requestMoreInfoAction(
   revalidatePath('/dashboard');
   return { success: true, message: "Se solicitó más información." };
 }
-
