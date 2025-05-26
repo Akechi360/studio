@@ -17,9 +17,9 @@ export type TicketStatus = "Open" | "In Progress" | "Resolved" | "Closed";
 export interface Attachment {
   id: string;
   fileName: string;
-  url: string; 
-  size: number; 
-  type?: string; 
+  url: string;
+  size: number;
+  type?: string;
 }
 
 export interface Comment {
@@ -127,7 +127,7 @@ export type ApprovalStatus = "Pendiente" | "Aprobado" | "Rechazado" | "Informaci
 
 export interface ApprovalActivityLogEntry {
   id: string;
-  action: string; 
+  action: string;
   userId: string;
   userName: string;
   timestamp: Date;
@@ -135,9 +135,10 @@ export interface ApprovalActivityLogEntry {
 }
 
 export interface PaymentInstallment {
-  id: string; 
+  id: string; // client-generated UUID or similar for key prop
   amount: number;
-  paymentDate: Date;
+  dueDate: Date;
+  // status?: 'Pendiente' | 'Pagado' | 'Atrasado'; // Future enhancement
 }
 
 export interface AttachmentClientData {
@@ -150,38 +151,41 @@ export interface AttachmentClientData {
 export interface ApprovalRequest {
   id: string;
   type: ApprovalRequestType;
-  subject: string; 
-  description?: string; 
+  subject: string;
+  description?: string;
   status: ApprovalStatus;
   requesterId: string;
   requesterName: string;
   requesterEmail?: string;
   createdAt: Date;
   updatedAt: Date;
-  attachments: Attachment[]; 
+  attachments: Attachment[];
   activityLog: ApprovalActivityLogEntry[];
-  
-  approverId?: string; 
+
+  approverId?: string;
   approverName?: string;
   approverComment?: string;
   approvedAt?: Date;
   rejectedAt?: Date;
   infoRequestedAt?: Date;
+  approvedAmount?: number; // Total amount approved by President for installments
+  paymentInstallments?: PaymentInstallment[]; // Array of installments for PagoProveedor
 
-  itemDescription?: string; 
-  estimatedPrice?: number; 
-  supplierCompra?: string; 
+  // Purchase specific
+  itemDescription?: string;
+  estimatedPrice?: number;
+  supplierCompra?: string;
 
-  supplierPago?: string; 
-  paymentDueDate?: Date; 
-  totalAmountToPay?: number; 
-  paymentInstallments?: PaymentInstallment[]; 
+  // Payment specific
+  supplierPago?: string;
+  // paymentDueDate?: Date; // Original due date requested, now part of description
+  totalAmountToPay?: number; // Original total amount requested
 }
 
 export interface AuditLogEntry {
   id: string;
-  timestamp: string; 
-  user: string; 
+  timestamp: string;
+  user: string;
   action: string;
   details?: string;
 }

@@ -130,9 +130,9 @@ export function getApprovalRequestByIdFromMock(id: string): ApprovalRequest | nu
 export function addApprovalRequestToMock(request: ApprovalRequest): void {
   const existingIndex = approvalsStore_internal.findIndex(r => r.id === request.id);
   if (existingIndex !== -1) {
-    approvalsStore_internal[existingIndex] = request; 
+    approvalsStore_internal[existingIndex] = request;
   } else {
-    approvalsStore_internal.unshift(request); 
+    approvalsStore_internal.unshift(request);
   }
 }
 
@@ -140,7 +140,7 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
   const reqIndex = approvalsStore_internal.findIndex(req => req.id === updatedRequest.id);
   if (reqIndex !== -1) {
     const originalRequest = approvalsStore_internal[reqIndex];
-    
+
     const newActivityLogEntry: ApprovalActivityLogEntry = {
         id: `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         action: `Estado Cambiado a: ${updatedRequest.status}`,
@@ -150,12 +150,14 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
         comment: updatedRequest.approverComment,
     };
 
-    // Update main fields
-    approvalsStore_internal[reqIndex] = { 
-        ...originalRequest, 
-        ...updatedRequest, 
+    // Ensure activityLog is always an array before pushing
+    const currentActivityLog = Array.isArray(originalRequest.activityLog) ? originalRequest.activityLog : [];
+
+    approvalsStore_internal[reqIndex] = {
+        ...originalRequest,
+        ...updatedRequest, // This will overwrite fields from originalRequest
         updatedAt: new Date(),
-        activityLog: [...originalRequest.activityLog, newActivityLogEntry] // Add to existing log
+        activityLog: [...currentActivityLog, newActivityLogEntry]
     };
     return true;
   }

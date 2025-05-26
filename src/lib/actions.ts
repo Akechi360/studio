@@ -2,8 +2,8 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole, AttachmentClientData, Attachment } from "./types"; 
-import type { AuditLogEntry as AuditLogEntryType } from "./lib/types"; // Corrected path for AuditLogEntryType
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment } from "./types";
+import type { AuditLogEntry as AuditLogEntryType } from "@/lib/types"; // Corrected path for AuditLogEntryType
 import {
   addTicketToMock,
   getAllTicketsFromMock,
@@ -14,13 +14,14 @@ import {
   getRawInventoryStore,
   updateInventoryItemInMock,
   deleteInventoryItemFromMock,
-  getInventoryItemByIdFromMock,
+  // getInventoryItemByIdFromMock, // Already imported below
   addAuditLogEntryToMock,
   getAllAuditLogsFromMock,
   addApprovalRequestToMock,
   getAllApprovalRequestsFromMock,
   getApprovalRequestByIdFromMock,
-  updateApprovalRequestInMock
+  updateApprovalRequestInMock,
+  getInventoryItemByIdFromMock, // Ensure this is imported
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
@@ -39,6 +40,7 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     console.error("Error logging audit event:", error);
+    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
 
@@ -82,14 +84,14 @@ export async function createTicketAction(
     attachments: [],
     userId,
     userName,
-    userEmail,
+    userEmail, // Storing userEmail
     createdAt: new Date(),
     updatedAt: new Date(),
     comments: [],
   };
 
   addTicketToMock(newTicket);
-  if (userEmail) {
+  if (userEmail) { // Check if userEmail is provided
     await logAuditEvent(userEmail, "Creación de Ticket", `Ticket ID: ${newTicket.id}, Asunto: ${subject}`);
   }
   revalidatePath("/tickets");
@@ -189,7 +191,7 @@ export async function updateTicketStatusAction(
 
   const { status, actingUserEmail } = validatedFields.data;
   const oldStatus = ticket.status;
-  ticket.status = status as TicketStatus;
+  ticket.status = status as TicketStatus; // Cast to ensure type correctness
   ticket.updatedAt = new Date();
 
   await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatus}, A: ${ticket.status}`);
@@ -218,7 +220,7 @@ export async function getAllTickets(): Promise<Ticket[]> {
 
 // --- Fetch Dashboard Stats ---
 export async function getDashboardStats() {
-  const currentTickets = getRawTicketsStoreForStats();
+  const currentTickets = getRawTicketsStoreForStats(); // Ensure this uses the actual store
   const total = currentTickets.length;
   const open = currentTickets.filter(t => t.status === "Open").length;
   const inProgress = currentTickets.filter(t => t.status === "In Progress").length;
@@ -414,7 +416,7 @@ export async function importInventoryItemsAction(
         if (!prefix) {
             throw new Error(`Categoría '${data.category}' no tiene un prefijo definido o no es válida. Fila: ${i + 2}`);
         }
-        
+
         const allItems = getRawInventoryStore();
         let maxNum = 0;
         allItems.forEach(item => {
@@ -449,10 +451,10 @@ export async function importInventoryItemsAction(
 
     if (successCount > 0) await logAuditEvent(currentUserEmail, "Importación Masiva de Inventario", `Se importaron ${successCount} artículos. Errores: ${errorCount}.`);
     else if (errorCount > 0 && itemDataArray.length > 0) await logAuditEvent(currentUserEmail, "Intento Fallido de Importación Masiva de Inventario", `No se importaron artículos. Errores: ${errorCount} de ${itemDataArray.length} filas.`);
-    
+
     revalidatePath("/inventory");
     const importSuccessful = successCount > 0 && errorCount === 0;
-    const finalMessage = errorCount > 0 ? 
+    const finalMessage = errorCount > 0 ?
         `Importación parcial: ${successCount} artículos importados. ${errorCount} filas con errores.` :
         `Importación completada. ${successCount} artículos importados.`;
 
@@ -486,7 +488,7 @@ const CreateApprovalRequestBaseSchema = z.object({
 const PurchaseRequestDataSchema = CreateApprovalRequestBaseSchema.extend({
   type: z.literal("Compra"),
   itemDescription: z.string().min(3, "El ítem es obligatorio.").max(200),
-  estimatedPrice: z.coerce.number().positive("El precio debe ser positivo.").optional(),
+  estimatedPrice: z.coerce.number({ invalid_type_error: "Debe ser un número."}).positive({ message: "El precio debe ser positivo." }).optional(),
   supplierCompra: z.string().max(100).optional(),
 });
 
@@ -504,7 +506,7 @@ const CreateApprovalRequestActionSchema = z.discriminatedUnion("type", [
 
 
 export async function createApprovalRequestAction(
-  values: z.infer<typeof CreateApprovalRequestActionSchema> 
+  values: z.infer<typeof CreateApprovalRequestActionSchema>
 ): Promise<{ success: boolean; message: string; approvalId?: string; errors?: any }> {
   const validatedFields = CreateApprovalRequestActionSchema.safeParse(values);
   if (!validatedFields.success) {
@@ -512,13 +514,13 @@ export async function createApprovalRequestAction(
   }
 
   const data = validatedFields.data;
-  
+
   const newAttachments: Attachment[] = (data.attachmentsData || []).map(attData => ({
     id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     fileName: attData.fileName,
     size: attData.size,
     type: attData.type,
-    url: `/uploads/mock/${attData.fileName}`, 
+    url: `/uploads/mock/${attData.fileName}`, // Placeholder URL
   }));
 
   const newApproval: ApprovalRequest = {
@@ -532,7 +534,7 @@ export async function createApprovalRequestAction(
     requesterEmail: data.requesterEmail,
     createdAt: new Date(),
     updatedAt: new Date(),
-    attachments: newAttachments, 
+    attachments: newAttachments,
     activityLog: [
       {
         id: `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -551,6 +553,7 @@ export async function createApprovalRequestAction(
   } else if (data.type === "PagoProveedor") {
     newApproval.supplierPago = data.supplierPago;
     newApproval.totalAmountToPay = data.totalAmountToPay;
+    // newApproval.paymentDueDate = data.paymentDueDate; // No longer a direct field
   }
 
   addApprovalRequestToMock(newApproval);
@@ -558,9 +561,11 @@ export async function createApprovalRequestAction(
   if (data.requesterEmail) {
     await logAuditEvent(data.requesterEmail, `Creación de Solicitud de Aprobación (${data.type})`, `ID: ${newApproval.id}, Asunto: ${data.subject}`);
   }
-  
+
   revalidatePath("/approvals");
-  revalidatePath("/dashboard"); 
+  revalidatePath("/dashboard");
+  revalidatePath("/approvals/[id]", "page");
+
 
   return {
     success: true,
@@ -584,38 +589,73 @@ export async function getApprovalRequestDetails(id: string): Promise<ApprovalReq
 
 
 // Actions for approving/rejecting requests
+const PaymentInstallmentSchema = z.object({
+  id: z.string(),
+  amount: z.coerce.number().positive("El monto de la cuota debe ser positivo."),
+  dueDate: z.date({ required_error: "La fecha de vencimiento de la cuota es obligatoria." }),
+});
+
 const BaseApprovalActionSchema = z.object({
   requestId: z.string(),
   approverId: z.string(),
   approverName: z.string(),
   approverEmail: z.string().email(),
   comment: z.string().optional(),
+  // Fields specific to PagoProveedor approval with installments
+  approvedAmount: z.coerce.number().positive("El monto aprobado debe ser positivo.").optional(),
+  installments: z.array(PaymentInstallmentSchema).optional(),
 });
+
+const ApproveActionSchema = BaseApprovalActionSchema.refine(data => {
+  if (data.installments && data.installments.length > 0) {
+    if (data.approvedAmount === undefined) return false; // approvedAmount is required if installments exist
+    const sumOfInstallments = data.installments.reduce((sum, inst) => sum + inst.amount, 0);
+    // Using a small tolerance for floating point comparisons
+    return Math.abs(sumOfInstallments - data.approvedAmount) < 0.01;
+  }
+  return true;
+}, {
+  message: "La suma de las cuotas debe ser igual al Monto Aprobado para Cuotas.",
+  path: ["installments"], // Attach error to installments field for better UI feedback
+});
+
 
 const RejectOrInfoActionSchema = BaseApprovalActionSchema.extend({
   comment: z.string().min(1, "Se requiere un comentario para esta acción."),
 });
 
+
 export async function approveRequestAction(
-  values: z.infer<typeof BaseApprovalActionSchema>
+  values: z.infer<typeof ApproveActionSchema>
 ): Promise<{ success: boolean; message: string }> {
-  const validatedFields = BaseApprovalActionSchema.safeParse(values);
+  const validatedFields = ApproveActionSchema.safeParse(values);
   if (!validatedFields.success) {
-    return { success: false, message: "Datos de aprobación inválidos." };
+     const errors = validatedFields.error.flatten();
+     const mainError = errors.formErrors.join(', ') ||
+                       (errors.fieldErrors.installments ? `Cuotas: ${errors.fieldErrors.installments.join(', ')}` : '') ||
+                       "Datos de aprobación inválidos.";
+    return { success: false, message: mainError };
   }
-  const { requestId, approverId, approverName, approverEmail, comment } = validatedFields.data;
+  const { requestId, approverId, approverName, approverEmail, comment, approvedAmount, installments } = validatedFields.data;
   const request = getApprovalRequestByIdFromMock(requestId);
   if (!request) return { success: false, message: "Solicitud no encontrada." };
 
-  const updatedRequest: Partial<ApprovalRequest> = {
+  const updatedRequestData: Partial<ApprovalRequest> = {
     status: "Aprobado",
     approverId,
     approverName,
     approverComment: comment,
     approvedAt: new Date(),
   };
-  updateApprovalRequestInMock({ ...request, ...updatedRequest } as ApprovalRequest);
-  await logAuditEvent(approverEmail, "Aprobación de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment || 'N/A'}`);
+
+  if (request.type === "PagoProveedor" && installments && installments.length > 0 && approvedAmount !== undefined) {
+    updatedRequestData.approvedAmount = approvedAmount;
+    updatedRequestData.paymentInstallments = installments;
+  }
+
+
+  updateApprovalRequestInMock({ ...request, ...updatedRequestData } as ApprovalRequest);
+  await logAuditEvent(approverEmail, "Aprobación de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment || 'N/A'}${installments && installments.length > 0 ? `. Aprobado con ${installments.length} cuotas.` : ''}`);
   revalidatePath(`/approvals/${requestId}`);
   revalidatePath('/approvals');
   revalidatePath('/dashboard');
@@ -633,14 +673,14 @@ export async function rejectRequestAction(
   const request = getApprovalRequestByIdFromMock(requestId);
   if (!request) return { success: false, message: "Solicitud no encontrada." };
 
-  const updatedRequest: Partial<ApprovalRequest> = {
+  const updatedRequestData: Partial<ApprovalRequest> = {
     status: "Rechazado",
     approverId,
     approverName,
     approverComment: comment,
     rejectedAt: new Date(),
   };
-  updateApprovalRequestInMock({ ...request, ...updatedRequest } as ApprovalRequest);
+  updateApprovalRequestInMock({ ...request, ...updatedRequestData } as ApprovalRequest);
   await logAuditEvent(approverEmail, "Rechazo de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
   revalidatePath(`/approvals/${requestId}`);
   revalidatePath('/approvals');
@@ -659,14 +699,14 @@ export async function requestMoreInfoAction(
   const request = getApprovalRequestByIdFromMock(requestId);
   if (!request) return { success: false, message: "Solicitud no encontrada." };
 
-  const updatedRequest: Partial<ApprovalRequest> = {
+  const updatedRequestData: Partial<ApprovalRequest> = {
     status: "InformacionSolicitada",
     approverId,
     approverName,
     approverComment: comment,
     infoRequestedAt: new Date(),
   };
-  updateApprovalRequestInMock({ ...request, ...updatedRequest } as ApprovalRequest);
+  updateApprovalRequestInMock({ ...request, ...updatedRequestData } as ApprovalRequest);
   await logAuditEvent(approverEmail, "Solicitud de Más Información", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
   revalidatePath(`/approvals/${requestId}`);
   revalidatePath('/approvals');
