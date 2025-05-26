@@ -27,7 +27,7 @@ import {
   CalendarDays,
   ChevronRight,
   FileCheck,
-  Wrench, // Icono para Gestión de Fallas
+  // Wrench, // Icon for Fallas/Mantenimiento removed
 } from "lucide-react";
 import { useAuth, SPECIFIC_APPROVER_EMAILS } from "@/lib/auth-context";
 import type { Role, User as UserType } from "@/lib/types";
@@ -66,16 +66,16 @@ const navItems: NavItem[] = [
       currentUser.role === "Presidente IEQ" ||
       (currentUser.email ? SPECIFIC_APPROVER_EMAILS.includes(currentUser.email) : false)),
   },
-  {
-    href: "/fallas",
-    label: "Gestión de Fallas",
-    icon: Wrench,
-    exact: true,
-    specialAccessCheck: (currentUser) =>
-      !!currentUser && (currentUser.role === "Admin" ||
-      currentUser.role === "Presidente IEQ" ||
-      currentUser.email === "electromedicina@clinicaieq.com"),
-  },
+  // {
+  //   href: "/mantenimiento", // Previously /fallas
+  //   label: "Gestión de Mantenimiento", // Previously Gestión de Fallas
+  //   icon: Wrench,
+  //   exact: true,
+  //   specialAccessCheck: (currentUser) =>
+  //     !!currentUser && (currentUser.role === "Admin" ||
+  //     currentUser.role === "Presidente IEQ" ||
+  //     currentUser.email === "electromedicina@clinicaieq.com"),
+  // }, // Removed Fallas/Mantenimiento module
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
   { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["User", "Admin"] },
   { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true, allowedRoles: ["User", "Admin"] },
@@ -190,7 +190,7 @@ export function AppSidebarNav() {
                 {sidebarState === "expanded" && (
                   <ChevronRight
                     className={cn(
-                      "h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground",
+                      "h-4 w-4 shrink-0 transition-transform duration-200",
                       isSectionOpen && "rotate-90"
                     )}
                   />

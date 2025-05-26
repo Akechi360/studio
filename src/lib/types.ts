@@ -136,9 +136,9 @@ export interface ApprovalActivityLogEntry {
 }
 
 export interface PaymentInstallment {
-  id: string;
-  amount: number;
-  dueDate: Date;
+  id: string; 
+  amount: number; 
+  dueDate: Date; 
 }
 
 export interface AttachmentClientData {
@@ -191,46 +191,92 @@ export interface AuditLogEntry {
   details?: string;
 }
 
-// --- Gestión de Fallas Types ---
-export type FallaStatus =
-  | 'Reportada'
-  | 'En Revisión'
-  | 'En Reparación'
-  | 'Pendiente Repuesto'
-  | 'Resuelta'
-  | 'No Reparable';
+// --- Gestión de Fallas Types (Now CasoDeMantenimiento) --- Removed
+// export type FallaStatus =
+//   | 'Reportada'
+//   | 'En Revisión'
+//   | 'En Reparación'
+//   | 'Pendiente Repuesto'
+//   | 'Resuelta'
+//   | 'No Reparable';
 
-export const FALLA_STATUSES: FallaStatus[] = [
-  'Reportada', 'En Revisión', 'En Reparación', 'Pendiente Repuesto', 'Resuelta', 'No Reparable'
-];
+// export const FALLA_STATUSES: FallaStatus[] = [
+//   'Reportada', 'En Revisión', 'En Reparación', 'Pendiente Repuesto', 'Resuelta', 'No Reparable'
+// ];
 
-export type FallaPriority = 'Baja' | 'Media' | 'Alta' | 'Crítica';
-export const FALLA_PRIORITIES: FallaPriority[] = ['Baja', 'Media', 'Alta', 'Crítica'];
+// export type FallaPriority = 'Baja' | 'Media' | 'Alta' | 'Crítica';
+// export const FALLA_PRIORITIES: FallaPriority[] = ['Baja', 'Media', 'Alta', 'Crítica'];
 
 
-export interface FallaHistoryEntry {
-  timestamp: Date;
-  status: FallaStatus;
-  notes: string;
-  userId: string;
-  userName: string;
-}
+// export interface FallaHistoryEntry {
+//   timestamp: Date;
+//   status: FallaStatus;
+//   notes: string;
+//   userId: string;
+//   userName: string;
+// }
 
-export interface Falla {
-  id: string;
-  subject: string;
-  description: string;
-  reportedByUserId: string;
-  reportedByUserName: string;
-  reportedAt: Date;
-  location: string; // Ubicación del equipo/falla (ej. "UCI", "Sala de Espera", "Oficina Adm.")
-  equipment?: string; // Equipo afectado (ej. "Ventilador Dräger", "Aire Acondicionado") - Opcional
-  priority: FallaPriority;
-  currentStatus: FallaStatus;
-  assignedToUserId: string; // ID del usuario asignado (por defecto, Emilia o nadie al inicio)
-  assignedToUserName: string; // Nombre del usuario asignado
-  history: FallaHistoryEntry[];
-  resolutionDetails?: string;
-  partsUsed?: string;
-  resolutionDate?: Date;
-}
+// export interface Falla {
+//   id: string;
+//   subject: string;
+//   description: string;
+//   reportedByUserId: string;
+//   reportedByUserName: string;
+//   reportedAt: Date;
+//   location: string; 
+//   equipment?: string; 
+//   priority: FallaPriority;
+//   currentStatus: FallaStatus;
+//   assignedToUserId: string; 
+//   assignedToUserName: string; 
+//   history: FallaHistoryEntry[]; 
+//   resolutionDetails?: string;
+//   partsUsed?: string;
+//   resolutionDate?: Date;
+// }
+
+// --- Gestión de Casos de Mantenimiento Types --- Removed
+// export type CasoMantenimientoStatus =
+//   | 'Registrado'
+//   | 'Pendiente Presupuesto'
+//   | 'Presupuesto Aprobado'
+//   | 'En Servicio/Reparación'
+//   | 'Pendiente Respaldo'
+//   | 'Resuelto'
+//   | 'Cancelado';
+
+// export const CASO_STATUSES: CasoMantenimientoStatus[] = [
+//   'Registrado', 'Pendiente Presupuesto', 'Presupuesto Aprobado', 'En Servicio/Reparación', 'Pendiente Respaldo', 'Resuelto', 'Cancelado'
+// ];
+
+// export type CasoMantenimientoPriority = 'Baja' | 'Media' | 'Alta' | 'Crítica';
+// export const CASO_PRIORITIES: CasoMantenimientoPriority[] = ['Baja', 'Media', 'Alta', 'Crítica'];
+
+// export interface CasoMantenimientoLogEntry {
+//   timestamp: Date;
+//   action: string; // e.g., "Estado Cambiado a X", "Comentario Añadido"
+//   notes: string;
+//   userId: string;
+//   userName: string;
+// }
+
+// export interface CasoDeMantenimiento {
+//   id: string;
+//   title: string;
+//   description: string;
+//   registeredByUserId: string;
+//   registeredByUserName: string;
+//   registeredAt: Date;
+//   location: string;
+//   equipment?: string;
+//   priority: CasoMantenimientoPriority;
+//   currentStatus: CasoMantenimientoStatus;
+//   assignedProviderName: string;
+//   lastFollowUpDate?: Date;
+//   nextFollowUpDate?: Date;
+//   log: CasoMantenimientoLogEntry[];
+//   resolutionDetails?: string;
+//   cost?: number;
+//   invoicingDetails?: string;
+//   resolvedAt?: Date;
+// }

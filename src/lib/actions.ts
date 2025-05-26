@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus as ApprovalStatusType, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType, Falla, FallaStatus, FallaPriority, FallaHistoryEntry } from "./types";
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus as ApprovalStatusType, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType } from "./types"; // Falla/CasoDeMantenimiento types removed
 import type { AuditLogEntry as AuditLogEntryType } from "@/lib/types";
 import {
   addTicketToMock,
@@ -14,21 +14,25 @@ import {
   getRawInventoryStore,
   updateInventoryItemInMock,
   deleteInventoryItemFromMock,
+  getInventoryItemByIdFromMock,
   addAuditLogEntryToMock,
   getAllAuditLogsFromMock,
   addApprovalRequestToMock,
   getAllApprovalRequestsFromMock,
   getApprovalRequestByIdFromMock,
   updateApprovalRequestInMock,
-  getInventoryItemByIdFromMock,
-  addFallaToMock, // New mock data function
-  getAllFallasFromMock, // New mock data function
-  getFallaByIdFromMock, // New mock data function
-  updateFallaInMock, // New mock data function
+  // addFallaToMock, // Removed
+  // getAllFallasFromMock, // Removed
+  // getFallaByIdFromMock, // Removed
+  // updateFallaInMock, // Removed
+  // addCasoMantenimientoToMock, // Removed
+  // getAllCasosMantenimientoFromMock, // Removed
+  // getCasoMantenimientoByIdFromMock, // Removed
+  // updateCasoMantenimientoInMock, // Removed
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
-import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM, FALLA_PRIORITIES, FALLA_STATUSES } from "./types";
+import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM } from "./types"; // FALLA_PRIORITIES, FALLA_STATUSES, CASO_PRIORITIES, CASO_STATUSES removed
 import * as XLSX from 'xlsx';
 
 
@@ -43,7 +47,6 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     console.error("Error logging audit event:", error);
-    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
 
@@ -407,13 +410,12 @@ export async function importInventoryItemsAction(
         if (!validatedFields.success) {
           errorCount++;
           const fieldErrors = validatedFields.error.flatten().fieldErrors as Record<string, string[] | undefined>;
-          let errorMessage = Object.entries(fieldErrors)
+           let errorMessage = Object.entries(fieldErrors)
             .map(([field, messages]) => `${field}: ${(messages || ['Error desconocido']).join(', ')}`)
             .join('; ') || "Error desconocido en validación.";
-
-          // Make error messages more specific if possible
-          if (fieldErrors.category && mappedData.category) errorMessage = `Categoría "${mappedData.category}" no es válida. Valores permitidos: ${INVENTORY_ITEM_CATEGORIES.join(', ')}.`;
-          else if (fieldErrors.status && mappedData.status) errorMessage = `Estado "${mappedData.status}" no es válido. Valores permitidos: ${INVENTORY_ITEM_STATUSES.join(', ')}.`;
+          
+          if (fieldErrors.category && mappedData.category && !INVENTORY_ITEM_CATEGORIES.includes(mappedData.category as InventoryItemCategory) ) errorMessage = `Categoría "${mappedData.category}" no es válida. Valores permitidos: ${INVENTORY_ITEM_CATEGORIES.join(', ')}.`;
+          else if (fieldErrors.status && mappedData.status && !INVENTORY_ITEM_STATUSES.includes(mappedData.status as InventoryItemStatus)) errorMessage = `Estado "${mappedData.status}" no es válido. Valores permitidos: ${INVENTORY_ITEM_STATUSES.join(', ')}.`;
 
           errors.push({ row: i + 2, message: `Error de validación: ${errorMessage}`, data: rawRow });
           continue;
@@ -421,11 +423,12 @@ export async function importInventoryItemsAction(
 
         const data = validatedFields.data;
         const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
-        if (!prefix) {
+         if (!prefix) { // Should not happen if Zod validation for category is correct
             errorCount++;
-            errors.push({ row: i + 2, message: `Categoría "${data.category}" no tiene un prefijo definido o no es válida.`, data: rawRow });
+            errors.push({ row: i + 2, message: `Categoría "${data.category}" no tiene un prefijo definido.`, data: rawRow });
             continue;
         }
+
 
         const allItems = getRawInventoryStore();
         let maxNum = 0;
@@ -455,7 +458,7 @@ export async function importInventoryItemsAction(
       } catch (e: any) {
         errorCount++;
         errors.push({ row: i + 2, message: `Error procesando fila: ${e.message || String(e)}`, data: itemDataArray[i] });
-        console.error(`Error procesando fila ${i + 2} del Excel:`, e, "Datos de la fila:", itemDataArray[i]);
+        // console.error(`Error procesando fila ${i + 2} del Excel:`, e, "Datos de la fila:", itemDataArray[i]); // Server log
       }
     }
 
@@ -463,17 +466,24 @@ export async function importInventoryItemsAction(
     else if (errorCount > 0 && itemDataArray.length > 0) await logAuditEvent(currentUserEmail, "Intento Fallido de Importación Masiva de Inventario", `No se importaron artículos. Errores: ${errorCount} de ${itemDataArray.length} filas.`);
 
     revalidatePath("/inventory");
-    const importSuccessful = successCount > 0 && errorCount === 0;
-    const finalMessage = errorCount > 0 ?
-        `Importación parcial: ${successCount} artículos importados. ${errorCount} filas con errores.` :
-        `Importación completada. ${successCount} artículos importados.`;
+    
+    const importFullySuccessful = successCount > 0 && errorCount === 0;
+    let finalMessage = "";
+    if (successCount > 0 && errorCount > 0) {
+        finalMessage = `Importación parcial: ${successCount} artículos importados. ${errorCount} filas con errores.`;
+    } else if (errorCount > 0) {
+        finalMessage = `Importación fallida: ${errorCount} filas con errores. No se importaron artículos.`;
+    } else if (successCount > 0) {
+        finalMessage = `Importación completada: ${successCount} artículos importados exitosamente.`;
+    } else {
+        finalMessage = "No se procesaron datos. El archivo podría estar vacío o mal formateado.";
+    }
 
-    return { success: importSuccessful, message: finalMessage, successCount, errorCount, errors, importedItems };
+    return { success: importFullySuccessful, message: finalMessage, successCount, errorCount, errors, importedItems };
   } catch (e: any) {
-    console.error("Error catastrófico durante la importación de inventario:", e);
-    const errorMsg = `Error general del servidor durante la importación: ${e.message || 'Error desconocido'}. Revise los logs del servidor.`;
+    const errorMsg = `Error general del servidor durante la importación: ${e.message || 'Error desconocido'}.`;
     await logAuditEvent(currentUserEmail, "Error Crítico en Importación Masiva de Inventario", errorMsg);
-    return { success: false, message: errorMsg, successCount: 0, errorCount: itemDataArray?.length || 0, errors: itemDataArray?.map((row, index) => ({ row: index + 2, message: errorMsg, data: row })) || [{ row: 0, message: errorMsg, data: {} }], importedItems: [] };
+    return { success: false, message: errorMsg, successCount: 0, errorCount: itemDataArray?.length || 0, errors: itemDataArray?.map((row, index) => ({ row: index + 2, message: "Error catastrófico del servidor.", data: row })) || [{ row: 0, message: "Error catastrófico del servidor.", data: {} }], importedItems: [] };
   }
 }
 
@@ -530,7 +540,7 @@ export async function createApprovalRequestAction(
     fileName: attData.fileName,
     size: attData.size,
     type: attData.type,
-    url: `/uploads/mock/${attData.fileName}`,
+    url: `/uploads/mock/${attData.fileName}`, // Placeholder URL
   }));
 
   const newApproval: ApprovalRequest = {
@@ -563,6 +573,7 @@ export async function createApprovalRequestAction(
   } else if (data.type === "PagoProveedor") {
     newApproval.supplierPago = data.supplierPago;
     newApproval.totalAmountToPay = data.totalAmountToPay;
+    // paymentDueDate is handled in description for now
   }
 
   addApprovalRequestToMock(newApproval);
@@ -587,10 +598,8 @@ export async function createApprovalRequestAction(
 export async function getApprovalRequestsForUser(userId: string, userRole: UserRole): Promise<ApprovalRequest[]> {
   const allRequests = getAllApprovalRequestsFromMock();
   if (userRole === "Presidente IEQ") {
-    return allRequests.filter(req => req.status === "Pendiente");
+    return allRequests.filter(req => req.status === "Pendiente" || req.status === "InformacionSolicitada");
   }
-  // For Admins and specific approvers, show requests they submitted.
-  // This can be refined if Admins also need to see all pending, but for now, this is for "Mis Solicitudes Enviadas"
   return allRequests.filter(req => req.requesterId === userId);
 }
 
@@ -642,7 +651,7 @@ const ApproveCompraSchema = ApproveActionBaseSchema.extend({
 
 
 export async function approveRequestAction(
-  values: any
+  values: any 
 ): Promise<{ success: boolean; message: string }> {
   const request = getApprovalRequestByIdFromMock(values.requestId);
   if (!request) return { success: false, message: "Solicitud no encontrada." };
@@ -682,7 +691,7 @@ export async function approveRequestAction(
     if (validatedData.approvedPaymentType === 'Cuotas') {
       updatedRequestData.paymentInstallments = validatedData.installments;
     } else {
-      updatedRequestData.paymentInstallments = [];
+      updatedRequestData.paymentInstallments = []; 
     }
   }
 
@@ -752,110 +761,195 @@ export async function requestMoreInfoAction(
 }
 
 
-// --- Gestión de Fallas Actions ---
-const CreateFallaFormSchema = z.object({
-  subject: z.string().min(5, { message: "El asunto debe tener al menos 5 caracteres." }).max(150),
-  description: z.string().min(10, { message: "La descripción debe tener al menos 10 caracteres." }).max(2000),
-  location: z.string().min(3, { message: "La ubicación debe tener al menos 3 caracteres." }).max(100),
-  equipment: z.string().max(100).optional(),
-  priority: z.enum(FALLA_PRIORITIES as [FallaPriority, ...FallaPriority[]]),
-  reportedByUserId: z.string(),
-  reportedByUserName: z.string(),
-  // assignedToUserId will be set to Emilia by default or based on logic
-  // assignedToUserName will be set based on assignedToUserId
-});
+// --- Gestión de Fallas Actions --- (Removed)
+// const CreateFallaFormSchema = z.object({
+//   subject: z.string().min(5, { message: "El asunto debe tener al menos 5 caracteres." }).max(150),
+//   description: z.string().min(10, { message: "La descripción debe tener al menos 10 caracteres." }).max(2000),
+//   location: z.string().min(3, { message: "La ubicación debe tener al menos 3 caracteres." }).max(100),
+//   equipment: z.string().max(100).optional(),
+//   priority: z.enum(FALLA_PRIORITIES as [FallaPriority, ...FallaPriority[]]),
+//   reportedByUserId: z.string(),
+//   reportedByUserName: z.string(),
+// });
 
-export async function createFallaAction(
-  values: z.infer<typeof CreateFallaFormSchema>
-): Promise<{ success: boolean; message: string; fallaId?: string; errors?: any }> {
-  const validatedFields = CreateFallaFormSchema.safeParse(values);
-  if (!validatedFields.success) {
-    return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
-  }
-  const data = validatedFields.data;
+// export async function createFallaAction(
+//   values: z.infer<typeof CreateFallaFormSchema>
+// ): Promise<{ success: boolean; message: string; fallaId?: string; errors?: any }> {
+//   const validatedFields = CreateFallaFormSchema.safeParse(values);
+//   if (!validatedFields.success) {
+//     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
+//   }
+//   const data = validatedFields.data;
+//   const emiliaUserEmail = "electromedicina@clinicaieq.com";
+//   const assignedToUserIdDefault = "approver-user-003"; 
+//   const assignedToUserNameDefault = "Emilia Valderrama";
 
-  // Default assignment to Emilia Valderrama
-  const emiliaUserEmail = "electromedicina@clinicaieq.com";
-  // In a real app, you'd fetch Emilia's user ID and name. For mock, we'll use placeholder if not found, or hardcode.
-  // Let's assume we have a way to get Emilia's ID, or we just use a placeholder.
-  // For this mock, let's assume we hardcode/find Emilia's details.
-  const assignedToUserIdDefault = "approver-user-003"; // Emilia's ID from auth-context
-  const assignedToUserNameDefault = "Emilia Valderrama";
+//   const newFalla: Falla = {
+//     id: `FALLA-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+//     subject: data.subject,
+//     description: data.description,
+//     location: data.location,
+//     equipment: data.equipment,
+//     priority: data.priority,
+//     reportedByUserId: data.reportedByUserId,
+//     reportedByUserName: data.reportedByUserName,
+//     reportedAt: new Date(),
+//     currentStatus: 'Reportada',
+//     assignedToUserId: assignedToUserIdDefault,
+//     assignedToUserName: assignedToUserNameDefault,
+//     history: [
+//       {
+//         timestamp: new Date(),
+//         status: 'Reportada',
+//         notes: 'Falla reportada inicialmente.',
+//         userId: data.reportedByUserId,
+//         userName: data.reportedByUserName,
+//       },
+//     ],
+//   };
 
-  const newFalla: Falla = {
-    id: `FALLA-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    subject: data.subject,
-    description: data.description,
-    location: data.location,
-    equipment: data.equipment,
-    priority: data.priority,
-    reportedByUserId: data.reportedByUserId,
-    reportedByUserName: data.reportedByUserName,
-    reportedAt: new Date(),
-    currentStatus: 'Reportada',
-    assignedToUserId: assignedToUserIdDefault,
-    assignedToUserName: assignedToUserNameDefault,
-    history: [
-      {
-        timestamp: new Date(),
-        status: 'Reportada',
-        notes: 'Falla reportada inicialmente.',
-        userId: data.reportedByUserId,
-        userName: data.reportedByUserName,
-      },
-    ],
-  };
+//   addFallaToMock(newFalla);
+//   await logAuditEvent(data.reportedByUserName, "Reporte de Nueva Falla", `ID Falla: ${newFalla.id}, Asunto: ${newFalla.subject}`);
+//   revalidatePath("/fallas");
 
-  addFallaToMock(newFalla);
-  await logAuditEvent(data.reportedByUserName, "Reporte de Nueva Falla", `ID Falla: ${newFalla.id}, Asunto: ${newFalla.subject}`);
-  revalidatePath("/fallas");
+//   return {
+//     success: true,
+//     message: "Falla reportada exitosamente.",
+//     fallaId: newFalla.id,
+//   };
+// }
 
-  return {
-    success: true,
-    message: "Falla reportada exitosamente.",
-    fallaId: newFalla.id,
-  };
-}
+// export async function getAllFallasAction(): Promise<Falla[]> {
+//   return getAllFallasFromMock();
+// }
 
-export async function getAllFallasAction(): Promise<Falla[]> {
-  return getAllFallasFromMock();
-}
+// export async function getFallaByIdAction(id: string): Promise<Falla | null> {
+//   return getFallaByIdFromMock(id);
+// }
 
-// Placeholder for future actions
-export async function getFallaByIdAction(id: string): Promise<Falla | null> {
-  return getFallaByIdFromMock(id); // Assuming this function exists in mock-data
-}
+// export async function updateFallaStatusAction(
+//   fallaId: string,
+//   newStatus: FallaStatus,
+//   notes: string,
+//   userId: string,
+//   userName: string
+// ): Promise<{ success: boolean; message: string; }> {
+//    const falla = getFallaByIdFromMock(fallaId);
+//    if (!falla) {
+//      return { success: false, message: "Falla no encontrada." };
+//    }
 
-export async function updateFallaStatusAction(
-  fallaId: string,
-  newStatus: FallaStatus,
-  notes: string,
-  userId: string,
-  userName: string
-): Promise<{ success: boolean; message: string; }> {
-   const falla = getFallaByIdFromMock(fallaId);
-   if (!falla) {
-     return { success: false, message: "Falla no encontrada." };
-   }
-
-   const oldStatus = falla.currentStatus;
-   falla.currentStatus = newStatus;
-   falla.history.push({
-     timestamp: new Date(),
-     status: newStatus,
-     notes,
-     userId,
-     userName,
-   });
-   if (newStatus === 'Resuelta' || newStatus === 'No Reparable') {
-     falla.resolutionDate = new Date();
-     falla.resolutionDetails = notes; // Or a more specific field if you add one
-   }
+//    const oldStatus = falla.currentStatus;
+//    falla.currentStatus = newStatus;
+//    falla.history.push({
+//      timestamp: new Date(),
+//      status: newStatus,
+//      notes,
+//      userId,
+//      userName,
+//    });
+//    if (newStatus === 'Resuelta' || newStatus === 'No Reparable') {
+//      falla.resolutionDate = new Date();
+//      falla.resolutionDetails = notes; 
+//    }
    
-   updateFallaInMock(falla);
-   await logAuditEvent(userName, "Actualización de Estado de Falla", `ID Falla: ${fallaId}, De: ${oldStatus}, A: ${newStatus}. Notas: ${notes}`);
-   revalidatePath(`/fallas/${fallaId}`);
-   revalidatePath("/fallas");
+//    updateFallaInMock(falla);
+//    await logAuditEvent(userName, "Actualización de Estado de Falla", `ID Falla: ${fallaId}, De: ${oldStatus}, A: ${newStatus}. Notas: ${notes}`);
+//    revalidatePath(`/fallas/${fallaId}`);
+//    revalidatePath("/fallas");
 
-   return { success: true, message: `Estado de la falla actualizado a ${newStatus}.` };
-}
+//    return { success: true, message: `Estado de la falla actualizado a ${newStatus}.` };
+// }
+
+// --- Gestión de Casos de Mantenimiento Actions --- (Removed, placeholders left in case)
+// const CreateCasoMantenimientoFormSchema = z.object({
+//   title: z.string().min(5, { message: "El título debe tener al menos 5 caracteres." }).max(150),
+//   description: z.string().min(10, { message: "La descripción debe tener al menos 10 caracteres." }).max(2000),
+//   location: z.string().min(3, { message: "La ubicación debe tener al menos 3 caracteres." }).max(100),
+//   equipment: z.string().max(100).optional(),
+//   priority: z.enum(CASO_PRIORITIES as [CasoMantenimientoPriority, ...CasoMantenimientoPriority[]]),
+//   assignedProviderName: z.string().min(1, "El proveedor es obligatorio.").max(100),
+//   // registeredByUserId: z.string(), // Will be set by currentUser
+//   // registeredByUserName: z.string(), // Will be set by currentUser
+// });
+
+// export async function createCasoMantenimientoAction(
+//   currentUser: Pick<User, 'id' | 'name' | 'email'>, // Added currentUser
+//   values: Omit<z.infer<typeof CreateCasoMantenimientoFormSchema>, 'registeredByUserId' | 'registeredByUserName'>
+// ): Promise<{ success: boolean; message: string; casoId?: string; errors?: any }> {
+//   const validatedFields = CreateCasoMantenimientoFormSchema.safeParse(values);
+//   if (!validatedFields.success) {
+//     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
+//   }
+//   const data = validatedFields.data;
+
+//   const newCaso: CasoDeMantenimiento = {
+//     id: `CASO-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+//     title: data.title,
+//     description: data.description,
+//     location: data.location,
+//     equipment: data.equipment,
+//     priority: data.priority,
+//     assignedProviderName: data.assignedProviderName,
+//     registeredByUserId: currentUser.id,
+//     registeredByUserName: currentUser.name,
+//     registeredAt: new Date(),
+//     currentStatus: 'Registrado',
+//     log: [
+//       {
+//         timestamp: new Date(),
+//         action: 'Caso Registrado',
+//         notes: 'Caso inicial registrado en el sistema.',
+//         userId: currentUser.id,
+//         userName: currentUser.name,
+//       },
+//     ],
+//   };
+
+//   addCasoMantenimientoToMock(newCaso);
+//   if (currentUser.email) {
+//     await logAuditEvent(currentUser.email, "Registro de Nuevo Caso de Mantenimiento", `ID Caso: ${newCaso.id}, Título: ${newCaso.title}`);
+//   }
+//   revalidatePath("/mantenimiento"); // Updated path
+
+//   return {
+//     success: true,
+//     message: "Caso de mantenimiento registrado exitosamente.",
+//     casoId: newCaso.id,
+//   };
+// }
+
+// export async function getAllCasosMantenimientoAction(): Promise<CasoDeMantenimiento[]> {
+//   return getAllCasosMantenimientoFromMock();
+// }
+
+// export async function getCasoMantenimientoByIdAction(id: string): Promise<CasoDeMantenimiento | null> {
+//   return getCasoMantenimientoByIdFromMock(id);
+// }
+
+// export async function updateCasoMantenimientoAction( // Placeholder for more detailed implementation
+//   casoId: string,
+//   updates: Partial<CasoDeMantenimiento>,
+//   logEntry: { action: string; notes: string; userId: string; userName: string; }
+// ): Promise<{ success: boolean; message: string; }> {
+//    const caso = getCasoMantenimientoByIdFromMock(casoId);
+//    if (!caso) {
+//      return { success: false, message: "Caso de mantenimiento no encontrado." };
+//    }
+
+//    const updatedCaso: CasoDeMantenimiento = {
+//      ...caso,
+//      ...updates,
+//      log: [...caso.log, { ...logEntry, timestamp: new Date(), status: updates.currentStatus || caso.currentStatus }], // Added status to logEntry
+//    };
+//    if (updates.currentStatus) updatedCaso.currentStatus = updates.currentStatus;
+   
+//    updateCasoMantenimientoInMock(updatedCaso);
+//    if (logEntry.userId) { // Assuming logEntry.userId has the email of the user performing the action
+//        await logAuditEvent(logEntry.userName, `Actualización de Caso de Mantenimiento: ${logEntry.action}`, `ID Caso: ${casoId}. Notas: ${logEntry.notes}`);
+//    }
+//    revalidatePath(`/mantenimiento/${casoId}`); // Updated path
+//    revalidatePath("/mantenimiento"); // Updated path
+
+//    return { success: true, message: `Caso de mantenimiento actualizado: ${logEntry.action}.` };
+// }

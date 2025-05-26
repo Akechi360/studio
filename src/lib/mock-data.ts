@@ -1,5 +1,5 @@
 
-import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest, Falla } from '@/lib/types';
+import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest } from '@/lib/types'; // Falla/CasoDeMantenimiento removed
 
 declare global {
   // eslint-disable-next-line no-var
@@ -11,14 +11,16 @@ declare global {
   // eslint-disable-next-line no-var
   var __mock_approvals_store__: ApprovalRequest[] | undefined;
   // eslint-disable-next-line no-var
-  var __mock_fallas_store__: Falla[] | undefined;
+  // var __mock_fallas_store__: Falla[] | undefined; // Removed
+  // var __mock_casos_mantenimiento_store__: CasoDeMantenimiento[] | undefined; // Removed
 }
 
 let ticketsStore_internal: Ticket[];
 let inventoryStore_internal: InventoryItem[];
 let auditLogsStore_internal: AuditLogEntryType[];
 let approvalsStore_internal: ApprovalRequest[];
-let fallasStore_internal: Falla[];
+// let fallasStore_internal: Falla[]; // Removed
+// let casosMantenimientoStore_internal: CasoDeMantenimiento[]; // Removed
 
 
 if (process.env.NODE_ENV === 'production') {
@@ -26,7 +28,8 @@ if (process.env.NODE_ENV === 'production') {
   inventoryStore_internal = [];
   auditLogsStore_internal = [];
   approvalsStore_internal = [];
-  fallasStore_internal = [];
+  // fallasStore_internal = []; // Removed
+  // casosMantenimientoStore_internal = []; // Removed
 } else {
   if (!global.__mock_tickets_store__) {
     global.__mock_tickets_store__ = [];
@@ -48,10 +51,15 @@ if (process.env.NODE_ENV === 'production') {
   }
   approvalsStore_internal = global.__mock_approvals_store__;
 
-  if (!global.__mock_fallas_store__) {
-    global.__mock_fallas_store__ = [];
-  }
-  fallasStore_internal = global.__mock_fallas_store__;
+  // if (!global.__mock_fallas_store__) { // Removed
+  //   global.__mock_fallas_store__ = [];
+  // }
+  // fallasStore_internal = global.__mock_fallas_store__; // Removed
+
+  // if (!global.__mock_casos_mantenimiento_store__) { // Removed
+  //   global.__mock_casos_mantenimiento_store__ = [];
+  // }
+  // casosMantenimientoStore_internal = global.__mock_casos_mantenimiento_store__; // Removed
 }
 
 // --- Funciones para Tickets ---
@@ -162,19 +170,7 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
         }
     }
 
-
-    const newActivityLogEntry: AuditLogEntryType = {
-        id: `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        action: actionDescription,
-        user: updatedRequest.approverName || originalRequest.requesterName || "Sistema", // Use approverName here
-        timestamp: new Date().toISOString(),
-        details: `Comentario: ${updatedRequest.approverComment || 'N/A'}`, // Example details
-    };
-    
-    // Assuming activityLog should be an array of strings or a more structured log object.
-    // For now, let's ensure it's an array of ApprovalActivityLogEntry
     const currentActivityLog = Array.isArray(originalRequest.activityLog) ? originalRequest.activityLog : [];
-
 
     const finalRequestData: ApprovalRequest = {
       ...originalRequest,
@@ -182,12 +178,12 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
       updatedAt: new Date(),
       activityLog: [
           ...currentActivityLog,
-          { // Adapt newActivityLogEntry to ApprovalActivityLogEntry structure
-            id: newActivityLogEntry.id,
-            action: newActivityLogEntry.action,
+          { 
+            id: `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            action: actionDescription,
             userId: updatedRequest.approverId || originalRequest.requesterId,
-            userName: newActivityLogEntry.user, // This now correctly refers to approverName or requesterName
-            timestamp: new Date(newActivityLogEntry.timestamp),
+            userName: updatedRequest.approverName || originalRequest.requesterName || "Sistema",
+            timestamp: new Date(),
             comment: updatedRequest.approverComment,
           }
       ],
@@ -205,8 +201,8 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
     } else if (finalRequestData.type === "Compra" && finalRequestData.status === "Aprobado") {
         finalRequestData.approvedPaymentType = undefined;
         finalRequestData.paymentInstallments = [];
+        finalRequestData.approvedAmount = undefined;
     }
-
 
     approvalsStore_internal[reqIndex] = finalRequestData;
     return true;
@@ -218,36 +214,66 @@ export function getRawApprovalsStore(): ApprovalRequest[] {
     return approvalsStore_internal;
 }
 
-// --- Funciones para Gestión de Fallas ---
-export function getAllFallasFromMock(): Falla[] {
-  return [...fallasStore_internal].sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
-}
+// --- Funciones para Gestión de Fallas/Casos de Mantenimiento --- Removed
+// export function getAllFallasFromMock(): Falla[] {
+//   return [...fallasStore_internal].sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
+// }
 
-export function getFallaByIdFromMock(id: string): Falla | null {
-  return fallasStore_internal.find(falla => falla.id === id) || null;
-}
+// export function getFallaByIdFromMock(id: string): Falla | null {
+//   return fallasStore_internal.find(falla => falla.id === id) || null;
+// }
 
-export function addFallaToMock(falla: Falla): void {
-  const existingIndex = fallasStore_internal.findIndex(f => f.id === falla.id);
-  if (existingIndex !== -1) {
-    fallasStore_internal[existingIndex] = falla;
-  } else {
-    fallasStore_internal.unshift(falla);
-  }
-}
+// export function addFallaToMock(falla: Falla): void {
+//   const existingIndex = fallasStore_internal.findIndex(f => f.id === falla.id);
+//   if (existingIndex !== -1) {
+//     fallasStore_internal[existingIndex] = falla;
+//   } else {
+//     fallasStore_internal.unshift(falla);
+//   }
+// }
 
-export function updateFallaInMock(updatedFalla: Falla): boolean {
-  const fallaIndex = fallasStore_internal.findIndex(f => f.id === updatedFalla.id);
-  if (fallaIndex !== -1) {
-    fallasStore_internal[fallaIndex] = { ...fallasStore_internal[fallaIndex], ...updatedFalla };
-    return true;
-  }
-  return false;
-}
+// export function updateFallaInMock(updatedFalla: Falla): boolean {
+//   const fallaIndex = fallasStore_internal.findIndex(f => f.id === updatedFalla.id);
+//   if (fallaIndex !== -1) {
+//     fallasStore_internal[fallaIndex] = { ...fallasStore_internal[fallaIndex], ...updatedFalla };
+//     return true;
+//   }
+//   return false;
+// }
 
-export function getRawFallasStore(): Falla[] {
-  return fallasStore_internal;
-}
+// export function getRawFallasStore(): Falla[] {
+//   return fallasStore_internal;
+// }
+
+// export function getAllCasosMantenimientoFromMock(): CasoDeMantenimiento[] { // Renamed
+//   return [...casosMantenimientoStore_internal].sort((a, b) => b.registeredAt.getTime() - a.registeredAt.getTime());
+// }
+
+// export function getCasoMantenimientoByIdFromMock(id: string): CasoDeMantenimiento | null { // Renamed
+//   return casosMantenimientoStore_internal.find(caso => caso.id === id) || null;
+// }
+
+// export function addCasoMantenimientoToMock(caso: CasoDeMantenimiento): void { // Renamed
+//   const existingIndex = casosMantenimientoStore_internal.findIndex(c => c.id === caso.id);
+//   if (existingIndex !== -1) {
+//     casosMantenimientoStore_internal[existingIndex] = caso;
+//   } else {
+//     casosMantenimientoStore_internal.unshift(caso);
+//   }
+// }
+
+// export function updateCasoMantenimientoInMock(updatedCaso: CasoDeMantenimiento): boolean { // Renamed
+//   const casoIndex = casosMantenimientoStore_internal.findIndex(c => c.id === updatedCaso.id);
+//   if (casoIndex !== -1) {
+//     casosMantenimientoStore_internal[casoIndex] = { ...casosMantenimientoStore_internal[casoIndex], ...updatedCaso };
+//     return true;
+//   }
+//   return false;
+// }
+
+// export function getRawCasosMantenimientoStore(): CasoDeMantenimiento[] { // Renamed
+//   return casosMantenimientoStore_internal;
+// }
 
 
 // Para compatibilidad con código antiguo (debería refactorizarse)
@@ -255,4 +281,5 @@ export const mockTickets: Ticket[] = ticketsStore_internal;
 export const mockInventory: InventoryItem[] = inventoryStore_internal;
 export const mockAuditLogs: AuditLogEntryType[] = auditLogsStore_internal;
 export const mockApprovalRequests: ApprovalRequest[] = approvalsStore_internal;
-export const mockFallas: Falla[] = fallasStore_internal;
+// export const mockFallas: Falla[] = fallasStore_internal; // Removed
+// export const mockCasosMantenimiento: CasoDeMantenimiento[] = casosMantenimientoStore_internal; // Removed
