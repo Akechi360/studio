@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Added React import
+import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -33,7 +33,7 @@ import { es } from 'date-fns/locale';
 
 
 const paymentInstallmentSchema = z.object({
-  id: z.string(), // For useFieldArray key
+  id: z.string(),
   amount: z.coerce.number().positive("El monto debe ser positivo."),
   dueDate: z.date({ required_error: "La fecha de vencimiento es obligatoria." }),
 });
@@ -67,12 +67,12 @@ type ApprovalActionsFormValues = z.infer<typeof approvalActionsFormSchema>;
 
 interface ApprovalActionsPanelProps {
   requestId: string;
-  currentRequestStatus: ApprovalStatus;
-  currentRequest: ApprovalRequest; // Pass the full request object
+  currentRequest: ApprovalRequest; 
+  requestType: ApprovalRequestType;
   onActionSuccess: () => void;
 }
 
-export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentRequest, onActionSuccess }: ApprovalActionsPanelProps) {
+export function ApprovalActionsPanel({ requestId, currentRequest, requestType, onActionSuccess }: ApprovalActionsPanelProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,10 +81,11 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
 
   const form = useForm<ApprovalActionsFormValues>({
     resolver: zodResolver(approvalActionsFormSchema),
+    // Static defaultValues, not dependent on currentRequest
     defaultValues: {
-      comment: currentRequest.approverComment || "",
-      approvedAmount: currentRequest.type === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : undefined,
-      installments: currentRequest.type === "PagoProveedor" ? [] : undefined,
+      comment: "",
+      approvedAmount: 0, // Default to 0 or undefined if preferred and handled by Zod
+      installments: [],
     },
   });
 
@@ -92,6 +93,25 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
     control: form.control,
     name: "installments",
   });
+
+  // Populate form with currentRequest data via useEffect
+  useEffect(() => {
+    if (currentRequest) {
+      form.reset({
+        comment: currentRequest.approverComment || "",
+        approvedAmount: requestType === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : 0,
+        installments: requestType === "PagoProveedor" ? 
+            (currentRequest.paymentInstallments || []).map(inst => ({
+                id: inst.id || crypto.randomUUID(),
+                amount: inst.amount || 0,
+                // Ensure dueDate is a valid Date object, default to now if invalid/missing
+                dueDate: inst.dueDate && !isNaN(new Date(inst.dueDate).getTime()) ? new Date(inst.dueDate) : new Date(),
+            })) 
+            : [],
+      });
+    }
+  }, [currentRequest, requestType, form.reset]);
+
 
   const watchedInstallments = form.watch("installments");
   const watchedApprovedAmount = form.watch("approvedAmount");
@@ -105,16 +125,6 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
     return approved - sumOfInstallments;
   }, [watchedApprovedAmount, sumOfInstallments]);
 
-
-  useEffect(() => {
-    form.reset({
-        comment: currentRequest.approverComment || "",
-        approvedAmount: currentRequest.type === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : undefined,
-        installments: currentRequest.type === "PagoProveedor" ? [] : undefined,
-    });
-  }, [currentRequest, form]);
-
-
   const handleActionClick = (action: "approve" | "reject" | "requestInfo") => {
     form.handleSubmit(
       (data) => {
@@ -126,7 +136,6 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
         setIsConfirmOpen(true);
       },
       (errors) => {
-        // If validation fails (e.g. installment sum doesn't match approved amount for approval action)
         console.error("Validation errors:", errors);
         if (action === 'approve' && errors.installments) {
             toast({ title: "Error en Cuotas", description: errors.installments.message || "Revise las cuotas.", variant: "destructive"});
@@ -141,7 +150,6 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
     if (!user || !user.email || !actionToConfirm) return;
     
     const formData = form.getValues();
-
     setIsSubmitting(true);
 
     let result;
@@ -158,8 +166,8 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
         case 'approve':
           const approveData = {
             ...baseActionData,
-            approvedAmount: currentRequest.type === "PagoProveedor" ? formData.approvedAmount : undefined,
-            installments: currentRequest.type === "PagoProveedor" ? formData.installments : undefined,
+            approvedAmount: requestType === "PagoProveedor" ? formData.approvedAmount : undefined,
+            installments: requestType === "PagoProveedor" ? formData.installments : undefined,
           };
           result = await approveRequestAction(approveData);
           break;
@@ -175,8 +183,7 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
 
       if (result.success) {
         toast({ title: "Acción Completada", description: result.message });
-        form.reset();
-        onActionSuccess();
+        onActionSuccess(); // Parent component will refresh data, which re-triggers useEffect to reset form
       } else {
         toast({ title: "Error en la Acción", description: result.message || "Ocurrió un error desconocido.", variant: "destructive" });
       }
@@ -188,8 +195,12 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
       setActionToConfirm(null);
     }
   };
-
-  if (currentRequestStatus !== 'Pendiente') {
+  
+  if (!currentRequest) { // Defensive check, though parent should prevent this
+    return <div className="flex items-center justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+  }
+  
+  if (currentRequest.status !== 'Pendiente') {
     return null;
   }
 
@@ -205,7 +216,6 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
   const confirmationDetails = getConfirmationDetails();
   const isPresidente = user?.role === 'Presidente IEQ';
 
-
   return (
     <Card className="w-full shadow-lg border-primary/30">
       <CardHeader>
@@ -214,7 +224,7 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
       <CardContent>
         <Form {...form}>
           <form className="space-y-6">
-            {currentRequest.type === 'PagoProveedor' && isPresidente && (
+            {requestType === 'PagoProveedor' && isPresidente && (
               <Card className="p-4 border-dashed">
                 <CardHeader className="p-0 pb-4">
                     <CardTitle className="text-md">Gestión de Pago por Cuotas</CardTitle>
@@ -256,7 +266,7 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
                             render={({ field }) => (
                             <FormItem className="flex flex-col flex-1 mt-0 sm:mt-[6px]">
                                 <FormLabel className="mb-1.5 block sm:hidden">Fecha Cuota {index + 1}</FormLabel>
-                                <FormLabel className="mb-1.5 hidden sm:block">&nbsp;</FormLabel> {/* Spacer for alignment */}
+                                <FormLabel className="mb-1.5 hidden sm:block">&nbsp;</FormLabel>
                                 <Popover>
                                 <PopoverTrigger asChild>
                                     <Button
@@ -265,11 +275,16 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
                                     type="button"
                                     >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {field.value ? format(field.value, "PPP", { locale: es }) : <span>Selecciona fecha</span>}
+                                    {field.value ? format(field.value instanceof Date ? field.value : new Date(field.value), "PPP", { locale: es }) : <span>Selecciona fecha</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 z-[51]" align="start">
-                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                                    <Calendar 
+                                        mode="single" 
+                                        selected={field.value instanceof Date ? field.value : (field.value ? new Date(field.value) : undefined)} 
+                                        onSelect={field.onChange} 
+                                        initialFocus 
+                                    />
                                 </PopoverContent>
                                 </Popover>
                                 <FormMessage />
@@ -303,7 +318,7 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
               </Card>
             )}
 
-            {!(currentRequest.type === 'PagoProveedor' && isPresidente) && currentRequest.type === 'PagoProveedor' && (
+            {!(requestType === 'PagoProveedor' && isPresidente) && requestType === 'PagoProveedor' && (
                  <div className="p-4 bg-muted/50 rounded-md border border-dashed">
                     <p className="text-sm text-muted-foreground font-semibold">
                         <MessageSquareWarning className="inline-block mr-2 h-4 w-4 text-yellow-600" />
@@ -326,7 +341,7 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
                       placeholder="Añade un comentario (requerido para rechazar o solicitar más información)..."
                       className="min-h-[100px]"
                       {...field}
-                      value={field.value || ""} // Ensure value is not undefined
+                      value={field.value || ""} 
                     />
                   </FormControl>
                   <FormMessage />
@@ -376,7 +391,7 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
               <AlertDialogTitle>{confirmationDetails.title}</AlertDialogTitle>
               <AlertDialogDescription>
                 {confirmationDetails.description}
-                {actionToConfirm === 'approve' && currentRequest.type === "PagoProveedor" && isPresidente && difference !== 0 && (
+                {actionToConfirm === 'approve' && requestType === "PagoProveedor" && isPresidente && difference !== 0 && (
                     <p className="mt-2 font-semibold text-destructive">
                         ¡Atención! La suma de las cuotas no coincide con el Monto Aprobado para Cuotas.
                     </p>
@@ -387,7 +402,7 @@ export function ApprovalActionsPanel({ requestId, currentRequestStatus, currentR
               <AlertDialogCancel onClick={() => setIsConfirmOpen(false)} disabled={isSubmitting}>Cancelar</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleConfirmAction}
-                disabled={isSubmitting || (actionToConfirm === 'approve' && currentRequest.type === "PagoProveedor" && isPresidente && difference !== 0)}
+                disabled={isSubmitting || (actionToConfirm === 'approve' && requestType === "PagoProveedor" && isPresidente && difference !== 0)}
               >
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                 Confirmar

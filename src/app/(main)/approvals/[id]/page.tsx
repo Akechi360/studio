@@ -1,5 +1,5 @@
 
-"use client"; // Required for hooks like useRouter and useState, and for useAuth
+"use client"; 
 
 import { getApprovalRequestDetails } from '@/lib/actions';
 import type { ApprovalRequest, ApprovalActivityLogEntry } from '@/lib/types';
@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, AlertTriangle, FileText, UserCircle, CalendarDays, Tag, Info, MessageSquare, Paperclip, ShoppingCart, CreditCard, CheckCircle, XCircle, HelpCircle, ListCollapse, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter, useParams } from 'next/navigation'; // Import useParams
+import { useRouter, useParams } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -16,12 +16,7 @@ import { cn } from "@/lib/utils";
 import { ApprovalActionsPanel } from '@/components/approvals/approval-actions-panel'; 
 import { useAuth } from '@/lib/auth-context';
 import { SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context';
-import React, { useEffect, useState, useCallback } from 'react'; // Import useCallback
-
-// The params prop is no longer the primary way to get the ID here
-// interface ApprovalDetailPageProps {
-//   params: { id: string };
-// }
+import React, { useEffect, useState, useCallback } from 'react';
 
 const typeDisplayMap: Record<ApprovalRequest["type"], string> = {
   Compra: "Solicitud de Compra",
@@ -71,35 +66,38 @@ const DetailRow = ({ label, value, icon: Icon }: { label: string; value?: string
 
 export default function ApprovalDetailPage() {
   const router = useRouter();
-  const pageParams = useParams<{ id: string }>(); // Use useParams to get route parameters
-  const id = pageParams.id; // Extract the id
+  const pageParams = useParams<{ id: string }>(); 
+  const id = pageParams.id; 
 
   const { user } = useAuth();
   const [request, setRequest] = useState<ApprovalRequest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchRequestDetails = useCallback(async () => {
-    if (!id) { // Check if id is available
+    if (!id) { 
       setIsLoading(false);
-      setRequest(null); // Ensure request is null if id is missing
+      setRequest(null); 
       return;
     }
     setIsLoading(true);
-    const fetchedRequest = await getApprovalRequestDetails(id); // Use id from useParams
+    const fetchedRequest = await getApprovalRequestDetails(id); 
     setRequest(fetchedRequest);
     setIsLoading(false);
-  }, [id]); // Depend on id from useParams
+  }, [id]); 
   
   useEffect(() => {
     fetchRequestDetails();
-  }, [fetchRequestDetails]); // useEffect depends on the stable fetchRequestDetails
+  }, [fetchRequestDetails]); 
 
   const handleActionSuccess = () => {
     fetchRequestDetails(); 
-    router.refresh(); 
   };
 
-  const canTakeAction = user && request && (user.role === 'Admin' || user.role === 'Presidente IEQ');
+  const canTakeAction = user && request && (
+    user.role === 'Admin' || 
+    user.role === 'Presidente IEQ'
+  );
+
 
   if (isLoading) {
     return (
@@ -109,7 +107,6 @@ export default function ApprovalDetailPage() {
       </div>
     );
   }
-
 
   if (!request) {
     return (
@@ -174,7 +171,10 @@ export default function ApprovalDetailPage() {
           {request.type === "PagoProveedor" && (
             <>
               <DetailRow label="Proveedor" value={request.supplierPago} icon={Info} />
-              <DetailRow label="Monto Total a Pagar" value={request.totalAmountToPay?.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })} icon={Tag} />
+              <DetailRow label="Monto Total a Pagar (Solicitado)" value={request.totalAmountToPay?.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })} icon={Tag} />
+               {request.approvedAmount !== undefined && (
+                <DetailRow label="Monto Total Aprobado" value={request.approvedAmount.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })} icon={Tag} />
+              )}
             </>
           )}
           
@@ -184,6 +184,23 @@ export default function ApprovalDetailPage() {
                 <p className="text-sm text-foreground bg-muted/30 p-3 rounded-md whitespace-pre-wrap">{request.description}</p>
             </div>
           )}
+
+          {request.paymentInstallments && request.paymentInstallments.length > 0 && (
+            <div className="space-y-2 mt-4">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center">
+                <CreditCard className="h-5 w-5 text-primary mr-2 shrink-0" />Cuotas de Pago Aprobadas
+              </h4>
+              <ul className="list-none p-0 space-y-2">
+                {request.paymentInstallments.map(installment => (
+                  <li key={installment.id} className="p-2 border rounded-md bg-muted/30 text-sm">
+                    Monto: <span className="font-semibold">{installment.amount.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</span> - 
+                    Fecha de Vencimiento: <span className="font-semibold">{format(new Date(installment.dueDate), "PPP", { locale: es })}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
 
           {request.attachments && request.attachments.length > 0 && (
             <div className="space-y-1">
@@ -228,10 +245,11 @@ export default function ApprovalDetailPage() {
         </CardContent>
       </Card>
       
-      {canTakeAction && request.status === 'Pendiente' && (
+      {canTakeAction && request && request.status === 'Pendiente' && (
           <ApprovalActionsPanel
+            key={request.id} // Add key prop
             requestId={request.id}
-            currentRequestStatus={request.status}
+            currentRequest={request} 
             requestType={request.type}
             onActionSuccess={handleActionSuccess}
           />
@@ -239,15 +257,3 @@ export default function ApprovalDetailPage() {
     </div>
   );
 }
-// Metadata generation can remain a server-side aspect or be simplified if errors occur.
-// For now, keeping it to illustrate the full structure.
-// export async function generateMetadata({ params }: ApprovalDetailPageProps) {
-//   const request = await getApprovalRequestDetails(params.id);
-//   if (!request) {
-//     return { title: "Solicitud No Encontrada" };
-//   }
-//   return {
-//     title: `Solicitud #${request.id}: ${request.subject}`,
-//     description: `Detalles de la solicitud de aprobación ${request.subject.substring(0, 100)}...`,
-//   };
-// }
