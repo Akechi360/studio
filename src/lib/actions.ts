@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus as ApprovalStatusType, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType } from "./types";
+import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus as ApprovalStatusType, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType, Falla, FallaStatus, FallaPriority, FallaHistoryEntry } from "./types";
 import type { AuditLogEntry as AuditLogEntryType } from "@/lib/types";
 import {
   addTicketToMock,
@@ -20,11 +20,15 @@ import {
   getAllApprovalRequestsFromMock,
   getApprovalRequestByIdFromMock,
   updateApprovalRequestInMock,
-  getInventoryItemByIdFromMock, 
+  getInventoryItemByIdFromMock,
+  addFallaToMock, // New mock data function
+  getAllFallasFromMock, // New mock data function
+  getFallaByIdFromMock, // New mock data function
+  updateFallaInMock, // New mock data function
 } from "./mock-data";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
-import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM } from "./types";
+import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM, FALLA_PRIORITIES, FALLA_STATUSES } from "./types";
 import * as XLSX from 'xlsx';
 
 
@@ -83,14 +87,14 @@ export async function createTicketAction(
     attachments: [],
     userId,
     userName,
-    userEmail, 
+    userEmail,
     createdAt: new Date(),
     updatedAt: new Date(),
     comments: [],
   };
 
   addTicketToMock(newTicket);
-  if (userEmail) { 
+  if (userEmail) {
     await logAuditEvent(userEmail, "Creación de Ticket", `Ticket ID: ${newTicket.id}, Asunto: ${subject}`);
   }
   revalidatePath("/tickets");
@@ -190,7 +194,7 @@ export async function updateTicketStatusAction(
 
   const { status, actingUserEmail } = validatedFields.data;
   const oldStatus = ticket.status;
-  ticket.status = status as TicketStatus; 
+  ticket.status = status as TicketStatus;
   ticket.updatedAt = new Date();
 
   await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatus}, A: ${ticket.status}`);
@@ -219,7 +223,7 @@ export async function getAllTickets(): Promise<Ticket[]> {
 
 // --- Fetch Dashboard Stats ---
 export async function getDashboardStats() {
-  const currentTickets = getRawTicketsStoreForStats(); 
+  const currentTickets = getRawTicketsStoreForStats();
   const total = currentTickets.length;
   const open = currentTickets.filter(t => t.status === "Open").length;
   const inProgress = currentTickets.filter(t => t.status === "In Progress").length;
@@ -403,9 +407,14 @@ export async function importInventoryItemsAction(
         if (!validatedFields.success) {
           errorCount++;
           const fieldErrors = validatedFields.error.flatten().fieldErrors as Record<string, string[] | undefined>;
-          const errorMessage = Object.entries(fieldErrors)
+          let errorMessage = Object.entries(fieldErrors)
             .map(([field, messages]) => `${field}: ${(messages || ['Error desconocido']).join(', ')}`)
             .join('; ') || "Error desconocido en validación.";
+
+          // Make error messages more specific if possible
+          if (fieldErrors.category && mappedData.category) errorMessage = `Categoría "${mappedData.category}" no es válida. Valores permitidos: ${INVENTORY_ITEM_CATEGORIES.join(', ')}.`;
+          else if (fieldErrors.status && mappedData.status) errorMessage = `Estado "${mappedData.status}" no es válido. Valores permitidos: ${INVENTORY_ITEM_STATUSES.join(', ')}.`;
+
           errors.push({ row: i + 2, message: `Error de validación: ${errorMessage}`, data: rawRow });
           continue;
         }
@@ -413,7 +422,9 @@ export async function importInventoryItemsAction(
         const data = validatedFields.data;
         const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
         if (!prefix) {
-            throw new Error(`Categoría '${data.category}' no tiene un prefijo definido o no es válida. Fila: ${i + 2}`);
+            errorCount++;
+            errors.push({ row: i + 2, message: `Categoría "${data.category}" no tiene un prefijo definido o no es válida.`, data: rawRow });
+            continue;
         }
 
         const allItems = getRawInventoryStore();
@@ -519,7 +530,7 @@ export async function createApprovalRequestAction(
     fileName: attData.fileName,
     size: attData.size,
     type: attData.type,
-    url: `/uploads/mock/${attData.fileName}`, 
+    url: `/uploads/mock/${attData.fileName}`,
   }));
 
   const newApproval: ApprovalRequest = {
@@ -578,6 +589,8 @@ export async function getApprovalRequestsForUser(userId: string, userRole: UserR
   if (userRole === "Presidente IEQ") {
     return allRequests.filter(req => req.status === "Pendiente");
   }
+  // For Admins and specific approvers, show requests they submitted.
+  // This can be refined if Admins also need to see all pending, but for now, this is for "Mis Solicitudes Enviadas"
   return allRequests.filter(req => req.requesterId === userId);
 }
 
@@ -629,7 +642,7 @@ const ApproveCompraSchema = ApproveActionBaseSchema.extend({
 
 
 export async function approveRequestAction(
-  values: any 
+  values: any
 ): Promise<{ success: boolean; message: string }> {
   const request = getApprovalRequestByIdFromMock(values.requestId);
   if (!request) return { success: false, message: "Solicitud no encontrada." };
@@ -652,7 +665,7 @@ export async function approveRequestAction(
     if (!result.success) return { success: false, message: "Error de validación de aprobación de compra." };
     validatedData = result.data;
   }
-  
+
   const { requestId, approverId, approverName, approverEmail, comment } = validatedData;
 
   const updatedRequestData: Partial<ApprovalRequest> = {
@@ -668,8 +681,8 @@ export async function approveRequestAction(
     updatedRequestData.approvedAmount = validatedData.approvedAmount;
     if (validatedData.approvedPaymentType === 'Cuotas') {
       updatedRequestData.paymentInstallments = validatedData.installments;
-    } else { 
-      updatedRequestData.paymentInstallments = []; 
+    } else {
+      updatedRequestData.paymentInstallments = [];
     }
   }
 
@@ -736,4 +749,113 @@ export async function requestMoreInfoAction(
   revalidatePath('/approvals');
   revalidatePath('/dashboard');
   return { success: true, message: "Se solicitó más información." };
+}
+
+
+// --- Gestión de Fallas Actions ---
+const CreateFallaFormSchema = z.object({
+  subject: z.string().min(5, { message: "El asunto debe tener al menos 5 caracteres." }).max(150),
+  description: z.string().min(10, { message: "La descripción debe tener al menos 10 caracteres." }).max(2000),
+  location: z.string().min(3, { message: "La ubicación debe tener al menos 3 caracteres." }).max(100),
+  equipment: z.string().max(100).optional(),
+  priority: z.enum(FALLA_PRIORITIES as [FallaPriority, ...FallaPriority[]]),
+  reportedByUserId: z.string(),
+  reportedByUserName: z.string(),
+  // assignedToUserId will be set to Emilia by default or based on logic
+  // assignedToUserName will be set based on assignedToUserId
+});
+
+export async function createFallaAction(
+  values: z.infer<typeof CreateFallaFormSchema>
+): Promise<{ success: boolean; message: string; fallaId?: string; errors?: any }> {
+  const validatedFields = CreateFallaFormSchema.safeParse(values);
+  if (!validatedFields.success) {
+    return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
+  }
+  const data = validatedFields.data;
+
+  // Default assignment to Emilia Valderrama
+  const emiliaUserEmail = "electromedicina@clinicaieq.com";
+  // In a real app, you'd fetch Emilia's user ID and name. For mock, we'll use placeholder if not found, or hardcode.
+  // Let's assume we have a way to get Emilia's ID, or we just use a placeholder.
+  // For this mock, let's assume we hardcode/find Emilia's details.
+  const assignedToUserIdDefault = "approver-user-003"; // Emilia's ID from auth-context
+  const assignedToUserNameDefault = "Emilia Valderrama";
+
+  const newFalla: Falla = {
+    id: `FALLA-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    subject: data.subject,
+    description: data.description,
+    location: data.location,
+    equipment: data.equipment,
+    priority: data.priority,
+    reportedByUserId: data.reportedByUserId,
+    reportedByUserName: data.reportedByUserName,
+    reportedAt: new Date(),
+    currentStatus: 'Reportada',
+    assignedToUserId: assignedToUserIdDefault,
+    assignedToUserName: assignedToUserNameDefault,
+    history: [
+      {
+        timestamp: new Date(),
+        status: 'Reportada',
+        notes: 'Falla reportada inicialmente.',
+        userId: data.reportedByUserId,
+        userName: data.reportedByUserName,
+      },
+    ],
+  };
+
+  addFallaToMock(newFalla);
+  await logAuditEvent(data.reportedByUserName, "Reporte de Nueva Falla", `ID Falla: ${newFalla.id}, Asunto: ${newFalla.subject}`);
+  revalidatePath("/fallas");
+
+  return {
+    success: true,
+    message: "Falla reportada exitosamente.",
+    fallaId: newFalla.id,
+  };
+}
+
+export async function getAllFallasAction(): Promise<Falla[]> {
+  return getAllFallasFromMock();
+}
+
+// Placeholder for future actions
+export async function getFallaByIdAction(id: string): Promise<Falla | null> {
+  return getFallaByIdFromMock(id); // Assuming this function exists in mock-data
+}
+
+export async function updateFallaStatusAction(
+  fallaId: string,
+  newStatus: FallaStatus,
+  notes: string,
+  userId: string,
+  userName: string
+): Promise<{ success: boolean; message: string; }> {
+   const falla = getFallaByIdFromMock(fallaId);
+   if (!falla) {
+     return { success: false, message: "Falla no encontrada." };
+   }
+
+   const oldStatus = falla.currentStatus;
+   falla.currentStatus = newStatus;
+   falla.history.push({
+     timestamp: new Date(),
+     status: newStatus,
+     notes,
+     userId,
+     userName,
+   });
+   if (newStatus === 'Resuelta' || newStatus === 'No Reparable') {
+     falla.resolutionDate = new Date();
+     falla.resolutionDetails = notes; // Or a more specific field if you add one
+   }
+   
+   updateFallaInMock(falla);
+   await logAuditEvent(userName, "Actualización de Estado de Falla", `ID Falla: ${fallaId}, De: ${oldStatus}, A: ${newStatus}. Notas: ${notes}`);
+   revalidatePath(`/fallas/${fallaId}`);
+   revalidatePath("/fallas");
+
+   return { success: true, message: `Estado de la falla actualizado a ${newStatus}.` };
 }

@@ -1,5 +1,5 @@
 
-import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest, ApprovalActivityLogEntry, PaymentType, ApprovalStatus } from '@/lib/types';
+import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest, Falla } from '@/lib/types';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -10,18 +10,23 @@ declare global {
   var __mock_audit_logs_store__: AuditLogEntryType[] | undefined;
   // eslint-disable-next-line no-var
   var __mock_approvals_store__: ApprovalRequest[] | undefined;
+  // eslint-disable-next-line no-var
+  var __mock_fallas_store__: Falla[] | undefined;
 }
 
 let ticketsStore_internal: Ticket[];
 let inventoryStore_internal: InventoryItem[];
 let auditLogsStore_internal: AuditLogEntryType[];
 let approvalsStore_internal: ApprovalRequest[];
+let fallasStore_internal: Falla[];
+
 
 if (process.env.NODE_ENV === 'production') {
   ticketsStore_internal = [];
   inventoryStore_internal = [];
   auditLogsStore_internal = [];
   approvalsStore_internal = [];
+  fallasStore_internal = [];
 } else {
   if (!global.__mock_tickets_store__) {
     global.__mock_tickets_store__ = [];
@@ -42,6 +47,11 @@ if (process.env.NODE_ENV === 'production') {
     global.__mock_approvals_store__ = [];
   }
   approvalsStore_internal = global.__mock_approvals_store__;
+
+  if (!global.__mock_fallas_store__) {
+    global.__mock_fallas_store__ = [];
+  }
+  fallasStore_internal = global.__mock_fallas_store__;
 }
 
 // --- Funciones para Tickets ---
@@ -142,7 +152,7 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
     const originalRequest = approvalsStore_internal[reqIndex];
 
     let actionDescription = `Estado Cambiado a: ${updatedRequest.status}`;
-    if (originalRequest.status !== updatedRequest.status) {
+     if (originalRequest.status !== updatedRequest.status) {
         if (updatedRequest.status === "Aprobado") {
             actionDescription = `Solicitud Aprobada (${updatedRequest.approvedPaymentType || 'N/A'})`;
         } else if (updatedRequest.status === "Rechazado") {
@@ -153,42 +163,48 @@ export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): bo
     }
 
 
-    const newActivityLogEntry: ApprovalActivityLogEntry = {
+    const newActivityLogEntry: AuditLogEntryType = {
         id: `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         action: actionDescription,
-        userId: updatedRequest.approverId || originalRequest.requesterId,
-        userName: updatedRequest.approverName || originalRequest.requesterName || "Sistema",
-        timestamp: new Date(),
-        comment: updatedRequest.approverComment,
+        user: updatedRequest.approverName || originalRequest.requesterName || "Sistema", // Use approverName here
+        timestamp: new Date().toISOString(),
+        details: `Comentario: ${updatedRequest.approverComment || 'N/A'}`, // Example details
     };
-
-    const currentActivityLog = Array.isArray(originalRequest.activityLog) ? originalRequest.activityLog : [];
     
-    // Initialize fields that might be undefined in originalRequest but set in updatedRequest
+    // Assuming activityLog should be an array of strings or a more structured log object.
+    // For now, let's ensure it's an array of ApprovalActivityLogEntry
+    const currentActivityLog = Array.isArray(originalRequest.activityLog) ? originalRequest.activityLog : [];
+
+
     const finalRequestData: ApprovalRequest = {
       ...originalRequest,
-      ...updatedRequest, // This applies all fields from updatedRequest over originalRequest
+      ...updatedRequest,
       updatedAt: new Date(),
-      activityLog: [...currentActivityLog, newActivityLogEntry],
+      activityLog: [
+          ...currentActivityLog,
+          { // Adapt newActivityLogEntry to ApprovalActivityLogEntry structure
+            id: newActivityLogEntry.id,
+            action: newActivityLogEntry.action,
+            userId: updatedRequest.approverId || originalRequest.requesterId,
+            userName: newActivityLogEntry.user, // This now correctly refers to approverName or requesterName
+            timestamp: new Date(newActivityLogEntry.timestamp),
+            comment: updatedRequest.approverComment,
+          }
+      ],
       approvedAt: updatedRequest.status === "Aprobado" ? new Date() : originalRequest.approvedAt,
       rejectedAt: updatedRequest.status === "Rechazado" ? new Date() : originalRequest.rejectedAt,
       infoRequestedAt: updatedRequest.status === "InformacionSolicitada" ? new Date() : originalRequest.infoRequestedAt,
     };
-
-    // Specifically handle clearing or setting payment details based on approvedPaymentType for "PagoProveedor"
+    
     if (finalRequestData.type === "PagoProveedor") {
         if (finalRequestData.status === "Aprobado") {
             if (finalRequestData.approvedPaymentType === 'Contado') {
-                finalRequestData.paymentInstallments = []; // Clear installments
+                finalRequestData.paymentInstallments = []; 
             }
-            // approvedAmount and paymentInstallments (for 'Cuotas') are already set by updatedRequest spread
         }
     } else if (finalRequestData.type === "Compra" && finalRequestData.status === "Aprobado") {
-        // For "Compra", clear payment specific fields if they were somehow set
         finalRequestData.approvedPaymentType = undefined;
         finalRequestData.paymentInstallments = [];
-        // approvedAmount might still be relevant if president could modify it for purchase,
-        // but typically it's not split into installments. For now, we don't clear it if set.
     }
 
 
@@ -202,9 +218,41 @@ export function getRawApprovalsStore(): ApprovalRequest[] {
     return approvalsStore_internal;
 }
 
+// --- Funciones para Gestión de Fallas ---
+export function getAllFallasFromMock(): Falla[] {
+  return [...fallasStore_internal].sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime());
+}
+
+export function getFallaByIdFromMock(id: string): Falla | null {
+  return fallasStore_internal.find(falla => falla.id === id) || null;
+}
+
+export function addFallaToMock(falla: Falla): void {
+  const existingIndex = fallasStore_internal.findIndex(f => f.id === falla.id);
+  if (existingIndex !== -1) {
+    fallasStore_internal[existingIndex] = falla;
+  } else {
+    fallasStore_internal.unshift(falla);
+  }
+}
+
+export function updateFallaInMock(updatedFalla: Falla): boolean {
+  const fallaIndex = fallasStore_internal.findIndex(f => f.id === updatedFalla.id);
+  if (fallaIndex !== -1) {
+    fallasStore_internal[fallaIndex] = { ...fallasStore_internal[fallaIndex], ...updatedFalla };
+    return true;
+  }
+  return false;
+}
+
+export function getRawFallasStore(): Falla[] {
+  return fallasStore_internal;
+}
+
 
 // Para compatibilidad con código antiguo (debería refactorizarse)
 export const mockTickets: Ticket[] = ticketsStore_internal;
 export const mockInventory: InventoryItem[] = inventoryStore_internal;
 export const mockAuditLogs: AuditLogEntryType[] = auditLogsStore_internal;
 export const mockApprovalRequests: ApprovalRequest[] = approvalsStore_internal;
+export const mockFallas: Falla[] = fallasStore_internal;

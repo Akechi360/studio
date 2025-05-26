@@ -136,7 +136,7 @@ export interface ApprovalActivityLogEntry {
 }
 
 export interface PaymentInstallment {
-  id: string; 
+  id: string;
   amount: number;
   dueDate: Date;
 }
@@ -167,11 +167,11 @@ export interface ApprovalRequest {
   approverComment?: string;
   approvedAt?: Date;
   rejectedAt?: Date;
-  infoRequestedAt?: Date; 
-  
-  approvedPaymentType?: PaymentType; 
-  approvedAmount?: number; 
-  paymentInstallments?: PaymentInstallment[]; 
+  infoRequestedAt?: Date;
+
+  approvedPaymentType?: PaymentType;
+  approvedAmount?: number;
+  paymentInstallments?: PaymentInstallment[];
 
   // Purchase specific
   itemDescription?: string;
@@ -180,13 +180,57 @@ export interface ApprovalRequest {
 
   // Payment specific
   supplierPago?: string;
-  totalAmountToPay?: number; 
+  totalAmountToPay?: number;
 }
 
 export interface AuditLogEntry {
   id: string;
-  timestamp: string; 
-  user: string; 
+  timestamp: string;
+  user: string;
   action: string;
   details?: string;
+}
+
+// --- Gestión de Fallas Types ---
+export type FallaStatus =
+  | 'Reportada'
+  | 'En Revisión'
+  | 'En Reparación'
+  | 'Pendiente Repuesto'
+  | 'Resuelta'
+  | 'No Reparable';
+
+export const FALLA_STATUSES: FallaStatus[] = [
+  'Reportada', 'En Revisión', 'En Reparación', 'Pendiente Repuesto', 'Resuelta', 'No Reparable'
+];
+
+export type FallaPriority = 'Baja' | 'Media' | 'Alta' | 'Crítica';
+export const FALLA_PRIORITIES: FallaPriority[] = ['Baja', 'Media', 'Alta', 'Crítica'];
+
+
+export interface FallaHistoryEntry {
+  timestamp: Date;
+  status: FallaStatus;
+  notes: string;
+  userId: string;
+  userName: string;
+}
+
+export interface Falla {
+  id: string;
+  subject: string;
+  description: string;
+  reportedByUserId: string;
+  reportedByUserName: string;
+  reportedAt: Date;
+  location: string; // Ubicación del equipo/falla (ej. "UCI", "Sala de Espera", "Oficina Adm.")
+  equipment?: string; // Equipo afectado (ej. "Ventilador Dräger", "Aire Acondicionado") - Opcional
+  priority: FallaPriority;
+  currentStatus: FallaStatus;
+  assignedToUserId: string; // ID del usuario asignado (por defecto, Emilia o nadie al inicio)
+  assignedToUserName: string; // Nombre del usuario asignado
+  history: FallaHistoryEntry[];
+  resolutionDetails?: string;
+  partsUsed?: string;
+  resolutionDate?: Date;
 }

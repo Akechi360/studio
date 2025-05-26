@@ -27,8 +27,9 @@ import {
   CalendarDays,
   ChevronRight,
   FileCheck,
+  Wrench, // Icono para Gestión de Fallas
 } from "lucide-react";
-import { useAuth, SPECIFIC_APPROVER_EMAILS } from "@/lib/auth-context"; // Import SPECIFIC_APPROVER_EMAILS
+import { useAuth, SPECIFIC_APPROVER_EMAILS } from "@/lib/auth-context";
 import type { Role, User as UserType } from "@/lib/types";
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -61,9 +62,19 @@ const navItems: NavItem[] = [
     icon: FileCheck,
     exact: true,
     specialAccessCheck: (currentUser) =>
-      currentUser?.role === "Admin" ||
-      currentUser?.role === "Presidente IEQ" ||
-      (currentUser?.email ? SPECIFIC_APPROVER_EMAILS.includes(currentUser.email) : false),
+      !!currentUser && (currentUser.role === "Admin" ||
+      currentUser.role === "Presidente IEQ" ||
+      (currentUser.email ? SPECIFIC_APPROVER_EMAILS.includes(currentUser.email) : false)),
+  },
+  {
+    href: "/fallas",
+    label: "Gestión de Fallas",
+    icon: Wrench,
+    exact: true,
+    specialAccessCheck: (currentUser) =>
+      !!currentUser && (currentUser.role === "Admin" ||
+      currentUser.role === "Presidente IEQ" ||
+      currentUser.email === "electromedicina@clinicaieq.com"),
   },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
   { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["User", "Admin"] },
@@ -107,8 +118,7 @@ export function AppSidebarNav() {
           newOpenStates[item.label] = true;
           pathChanged = true;
         } else if (isParentActiveDueToChild && currentOpenState) {
-          // Keep it open if already open and active
-           newOpenStates[item.label] = true;
+          newOpenStates[item.label] = true;
         }
          else {
           newOpenStates[item.label] = currentOpenState;
@@ -169,7 +179,7 @@ export function AppSidebarNav() {
                 isActive={isAnySubItemActive && isSectionOpen}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-expanded={isSectionOpen}
-                className="justify-between w-full"
+                className="justify-between w-full cursor-default"
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   <Icon className="shrink-0" />
