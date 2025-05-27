@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CalendarDays, ClipboardCheck, BellRing, PlusCircle, Trash2, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from "@/components/ui/alert";
+import { CalendarDays, ClipboardCheck, BellRing, PlusCircle, Trash2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { useAuth } from '@/lib/auth-context';
 
 interface Task {
   id: string;
@@ -26,6 +27,7 @@ interface Reminder {
 }
 
 export default function AgendaItPage() {
+  const { role } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -33,7 +35,20 @@ export default function AgendaItPage() {
   const [newReminderText, setNewReminderText] = useState("");
   const [newReminderTime, setNewReminderTime] = useState("");
 
-  // Placeholder functions - In a real app, these would interact with a backend/localStorage
+  if (role !== "Admin") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4">
+        <Alert variant="destructive" className="max-w-md text-center shadow-lg">
+          <ShieldAlert className="h-8 w-8 mx-auto mb-3 text-destructive" />
+          <RadixAlertTitle className="text-xl font-bold">Acceso Denegado</RadixAlertTitle>
+          <AlertDescription className="mb-4">
+            No tienes permiso para acceder a la Agenda IT. Esta área está restringida a administradores.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   const handleAddTask = () => {
     if (newTaskText.trim() === "") return;
     const newTask: Task = {
@@ -83,7 +98,7 @@ export default function AgendaItPage() {
 
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full">
       <div className="flex flex-col items-start">
         <h1 className="text-3xl font-bold tracking-tight flex items-center">
           <CalendarDays className="mr-3 h-8 w-8 text-primary" />
@@ -96,7 +111,7 @@ export default function AgendaItPage() {
 
       <Alert variant="default" className="bg-primary/5 border-primary/30">
         <AlertTriangle className="h-5 w-5 text-primary" />
-        <AlertTitle className="text-primary">Funcionalidad en Desarrollo</AlertTitle>
+        <RadixAlertTitle className="text-primary">Funcionalidad en Desarrollo</RadixAlertTitle>
         <AlertDescription>
           Esta sección de Agenda IT es un prototipo. Las tareas y recordatorios son temporales y no se guardan permanentemente.
           La integración completa con notificaciones y persistencia de datos se implementará en futuras versiones.

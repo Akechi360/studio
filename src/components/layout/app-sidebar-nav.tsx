@@ -28,7 +28,7 @@ import {
   ChevronRight,
   FileCheck,
   Wrench,
-  Bug, // Added Bug icon
+  Bug,
 } from "lucide-react";
 import { useAuth, SPECIFIC_APPROVER_EMAILS } from "@/lib/auth-context";
 import type { Role, User as UserType } from "@/lib/types";
@@ -78,7 +78,7 @@ const navItems: NavItem[] = [
       currentUser.email === "electromedicina@clinicaieq.com"),
   },
   {
-    href: "/fallas", // New section for Fallas
+    href: "/fallas",
     label: "Gestión de Fallas",
     icon: Bug,
     exact: true,
@@ -88,7 +88,7 @@ const navItems: NavItem[] = [
       currentUser.email === "electromedicina@clinicaieq.com"),
   },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
-  { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["User", "Admin"] },
+  { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["Admin"] },
   { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true, allowedRoles: ["User", "Admin"] },
   { href: "/profile", label: "Perfil", icon: User, exact: true },
   {
@@ -190,7 +190,7 @@ export function AppSidebarNav() {
                 isActive={isAnySubItemActive && isSectionOpen}
                 tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
                 aria-expanded={isSectionOpen}
-                className="justify-between w-full cursor-default"
+                className="cursor-default"
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   <Icon className="shrink-0" />
