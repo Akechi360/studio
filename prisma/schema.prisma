@@ -1,0 +1,333 @@
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  User
+  Admin
+  PresidenteIEQ
+}
+
+enum TicketPriority {
+  Low
+  Medium
+  High
+}
+
+enum TicketStatus {
+  Open
+  InProgress
+  Resolved
+  Closed
+}
+
+enum InventoryItemCategory {
+  Computadora
+  Monitor
+  Teclado
+  Mouse
+  Impresora
+  Escaner
+  Router
+  Switch
+  Servidor
+  Laptop
+  Tablet
+  Proyector
+  TelefonoIP
+  OtroPeriferico
+  Software
+  Licencia
+  Otro
+}
+
+enum InventoryItemStatus {
+  EnUso
+  EnAlmacen
+  EnReparacion
+  DeBaja
+  Perdido
+}
+
+enum RamOption {
+  NoEspecificado
+  RAM_2GB @map("2GB")
+  RAM_4GB @map("4GB")
+  RAM_8GB @map("8GB")
+  RAM_12GB @map("12GB")
+  RAM_16GB @map("16GB")
+  RAM_32GB @map("32GB")
+  RAM_64GB @map("64GB")
+  Otro
+}
+
+enum StorageType {
+  HDD
+  SSD
+}
+
+enum ApprovalRequestType {
+  Compra
+  PagoProveedor
+}
+
+enum ApprovalStatus {
+  Pendiente
+  Aprobado
+  Rechazado
+  InformacionSolicitada
+}
+
+enum PaymentType {
+  Contado
+  Cuotas
+}
+
+enum CasoMantenimientoStatus {
+  Registrado
+  PendientePresupuesto
+  PresupuestoAprobado
+  EnServicioReparacion
+  PendienteRespaldo
+  Resuelto
+  Cancelado // Added as it was in types
+}
+
+enum CasoMantenimientoPriority {
+  Baja
+  Media
+  Alta
+  Critica
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  role          Role
+  avatarUrl     String?
+  department    String?
+  password      String? // In a real app, this should be hashed
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  ticketsCreated            Ticket[]                 @relation("TicketsByUser")
+  commentsMade              Comment[]                @relation("CommentsByUser")
+  inventoryItemsAdded       InventoryItem[]          @relation("InventoryAddedByUser")
+  approvalRequestsMade      ApprovalRequest[]        @relation("ApprovalsRequestedByUser")
+  approvalActionsTaken      ApprovalActivityLog[]    @relation("ApprovalActionsByUser")
+  casosMantenimientoCreated CasoDeMantenimiento[]    @relation("CasosRegisteredByUser")
+  casoLogEntriesMade        CasoMantenimientoLogEntry[] @relation("CasoLogEntriesByUser")
+  auditLogEntries           AuditLogEntry[]          @relation("AuditLogEntriesByUser")
+
+  @@map("users")
+}
+
+model Ticket {
+  id          String        @id @default(cuid())
+  subject     String
+  description String
+  priority    TicketPriority
+  status      TicketStatus
+  userId      String
+  userName    String // Denormalized for convenience, consider removing if joining often
+  userEmail   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user        User          @relation("TicketsByUser", fields: [userId], references: [id])
+  attachments Attachment[]  @relation("TicketAttachments")
+  comments    Comment[]
+
+  @@map("tickets")
+}
+
+model Comment {
+  id            String   @id @default(cuid())
+  text          String   @db.Text
+  userId        String
+  userName      String // Denormalized
+  userAvatarUrl String?
+  createdAt     DateTime @default(now())
+  ticketId      String
+
+  ticket        Ticket   @relation(fields: [ticketId], references: [id])
+  user          User     @relation("CommentsByUser", fields: [userId], references: [id])
+
+  @@map("comments")
+}
+
+model Attachment {
+  id                String            @id @default(cuid())
+  fileName          String
+  url               String // This would be a URL to a storage service like S3 or Firebase Storage
+  size              Int
+  type              String?
+  ticketId          String?
+  approvalRequestId String?
+
+  ticket            Ticket?           @relation("TicketAttachments", fields: [ticketId], references: [id])
+  approvalRequest   ApprovalRequest?  @relation("ApprovalAttachments", fields: [approvalRequestId], references: [id])
+
+  @@map("attachments")
+}
+
+model InventoryItem {
+  id                String                @id // Custom ID format
+  name              String
+  category          InventoryItemCategory
+  brand             String?
+  model             String?
+  serialNumber      String?               @unique
+  ram               RamOption?
+  storageType       StorageType?
+  storage           String?
+  processor         String?
+  screenSize        String?
+  ipAddress         String?
+  quantity          Int
+  location          String?
+  purchaseDate      DateTime?
+  supplier          String?
+  warrantyEndDate   DateTime?
+  status            InventoryItemStatus
+  notes             String?               @db.Text
+  addedByUserId     String
+  addedByUserName   String // Denormalized
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  lastSeen          DateTime?
+
+  addedByUser       User                  @relation("InventoryAddedByUser", fields: [addedByUserId], references: [id])
+
+  @@map("inventory_items")
+}
+
+model AuditLogEntry {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  userEmail   String   // The email of the user performing the action
+  action      String
+  details     String?  @db.Text
+
+  user        User?    @relation("AuditLogEntriesByUser", fields: [userEmail], references: [email])
+
+
+  @@map("audit_logs")
+}
+
+model ApprovalRequest {
+  id                  String                @id // Custom ID format
+  type                ApprovalRequestType
+  subject             String
+  description         String?               @db.Text
+  status              ApprovalStatus
+  requesterId         String
+  requesterName       String // Denormalized
+  requesterEmail      String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  approverId          String?
+  approverName        String? // Denormalized
+  approverComment     String?               @db.Text
+  approvedAt          DateTime?
+  rejectedAt          DateTime?
+  infoRequestedAt     DateTime?
+
+  approvedPaymentType PaymentType?
+  approvedAmount      Float? // Using Float for currency
+  
+  // Purchase specific
+  itemDescription     String?
+  estimatedPrice      Float?
+  supplierCompra      String?
+
+  // Payment specific
+  supplierPago        String?
+  totalAmountToPay    Float?
+
+  requester           User                  @relation("ApprovalsRequestedByUser", fields: [requesterId], references: [id])
+  approver            User?                 @relation("ApprovalActionsByUser", fields: [approverId], references: [id])
+  attachments         Attachment[]          @relation("ApprovalAttachments")
+  activityLog         ApprovalActivityLog[] @relation("ApprovalLogEntries")
+  paymentInstallments PaymentInstallment[]  @relation("ApprovalPaymentInstallments")
+
+  @@map("approval_requests")
+}
+
+model ApprovalActivityLog {
+  id                String    @id @default(cuid())
+  action            String
+  userId            String
+  userName          String // Denormalized
+  timestamp         DateTime  @default(now())
+  comment           String?   @db.Text
+  approvalRequestId String
+
+  approvalRequest   ApprovalRequest @relation("ApprovalLogEntries", fields: [approvalRequestId], references: [id])
+  user              User            @relation("ApprovalActionsByUser", fields: [userId], references: [id])
+
+  @@map("approval_activity_logs")
+}
+
+model PaymentInstallment {
+  id                String   @id @default(cuid())
+  amount            Float
+  dueDate           DateTime
+  approvalRequestId String
+
+  approvalRequest   ApprovalRequest @relation("ApprovalPaymentInstallments", fields: [approvalRequestId], references: [id])
+
+  @@map("payment_installments")
+}
+
+model CasoDeMantenimiento {
+  id                      String                    @id // Custom ID format
+  title                   String
+  description             String                    @db.Text
+  location                String
+  equipment               String?
+  priority                CasoMantenimientoPriority
+  currentStatus           CasoMantenimientoStatus
+  registeredAt            DateTime                  @default(now())
+  registeredByUserId      String
+  registeredByUserName    String // Denormalized
+  assignedProviderName    String
+  providerContactPerson   String?
+  expectedResolutionDate  DateTime?
+  lastFollowUpDate        DateTime?
+  nextFollowUpDate        DateTime?
+  resolutionDetails       String?                   @db.Text
+  cost                    Float?
+  invoicingDetails        String?                   @db.Text
+  resolvedAt              DateTime?
+
+  registeredByUser        User                      @relation("CasosRegisteredByUser", fields: [registeredByUserId], references: [id])
+  logEntries              CasoMantenimientoLogEntry[] @relation("CasoLogForCaso")
+
+  @@map("casos_mantenimiento")
+}
+
+model CasoMantenimientoLogEntry {
+  id                String                   @id @default(cuid())
+  timestamp         DateTime                 @default(now())
+  action            String
+  notes             String                   @db.Text
+  userId            String
+  userName          String // Denormalized
+  statusAfterAction CasoMantenimientoStatus?
+  casoId            String
+
+  caso              CasoDeMantenimiento      @relation("CasoLogForCaso", fields: [casoId], references: [id])
+  user              User                     @relation("CasoLogEntriesByUser", fields: [userId], references: [id])
+
+  @@map("caso_mantenimiento_log_entries")
+}
+

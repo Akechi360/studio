@@ -1,246 +1,182 @@
 
+// This file's content is being significantly reduced as we move away from mock data.
+// Specific mock arrays and their manipulation functions will be removed.
+// Functions might be replaced with TODOs for Prisma integration if they were directly called
+// by client components (though most data access should go through server actions).
+
 import type { Ticket, InventoryItem, AuditLogEntry as AuditLogEntryType, ApprovalRequest, CasoDeMantenimiento } from '@/lib/types';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __mock_tickets_store__: Ticket[] | undefined;
-  // eslint-disable-next-line no-var
-  var __mock_inventory_store__: InventoryItem[] | undefined;
-  // eslint-disable-next-line no-var
-  var __mock_audit_logs_store__: AuditLogEntryType[] | undefined;
-  // eslint-disable-next-line no-var
-  var __mock_approvals_store__: ApprovalRequest[] | undefined;
-  // eslint-disable-next-line no-var
-  var __mock_casos_mantenimiento_store__: CasoDeMantenimiento[] | undefined;
-}
+// --- Mock Data Stores (To be removed or replaced by database) ---
+// declare global {
+//   // eslint-disable-next-line no-var
+//   var __mock_tickets_store__: Ticket[] | undefined;
+//   // eslint-disable-next-line no-var
+//   var __mock_inventory_store__: InventoryItem[] | undefined;
+//   // eslint-disable-next-line no-var
+//   var __mock_audit_logs_store__: AuditLogEntryType[] | undefined;
+//   // eslint-disable-next-line no-var
+//   var __mock_approvals_store__: ApprovalRequest[] | undefined;
+//   // eslint-disable-next-line no-var
+//   var __mock_casos_mantenimiento_store__: CasoDeMantenimiento[] | undefined;
+// }
 
-let ticketsStore_internal: Ticket[];
-let inventoryStore_internal: InventoryItem[];
-let auditLogsStore_internal: AuditLogEntryType[];
-let approvalsStore_internal: ApprovalRequest[];
-let casosMantenimientoStore_internal: CasoDeMantenimiento[];
+// let ticketsStore_internal: Ticket[] = global.__mock_tickets_store__ || [];
+// let inventoryStore_internal: InventoryItem[] = global.__mock_inventory_store__ || [];
+// let auditLogsStore_internal: AuditLogEntryType[] = global.__mock_audit_logs_store__ || [];
+// let approvalsStore_internal: ApprovalRequest[] = global.__mock_approvals_store__ || [];
+// let casosMantenimientoStore_internal: CasoDeMantenimiento[] = global.__mock_casos_mantenimiento_store__ || [];
+
+// if (process.env.NODE_ENV !== 'production') {
+//   global.__mock_tickets_store__ = ticketsStore_internal;
+//   global.__mock_inventory_store__ = inventoryStore_internal;
+//   global.__mock_audit_logs_store__ = auditLogsStore_internal;
+//   global.__mock_approvals_store__ = approvalsStore_internal;
+//   global.__mock_casos_mantenimiento_store__ = casosMantenimientoStore_internal;
+// }
 
 
-if (process.env.NODE_ENV === 'production') {
-  ticketsStore_internal = [];
-  inventoryStore_internal = [];
-  auditLogsStore_internal = [];
-  approvalsStore_internal = [];
-  casosMantenimientoStore_internal = [];
-} else {
-  if (!global.__mock_tickets_store__) {
-    global.__mock_tickets_store__ = [];
-  }
-  ticketsStore_internal = global.__mock_tickets_store__;
-
-  if (!global.__mock_inventory_store__) {
-    global.__mock_inventory_store__ = [];
-  }
-  inventoryStore_internal = global.__mock_inventory_store__;
-
-  if (!global.__mock_audit_logs_store__) {
-    global.__mock_audit_logs_store__ = [];
-  }
-  auditLogsStore_internal = global.__mock_audit_logs_store__;
-
-  if(!global.__mock_approvals_store__){
-    global.__mock_approvals_store__ = [];
-  }
-  approvalsStore_internal = global.__mock_approvals_store__;
-
-  if (!global.__mock_casos_mantenimiento_store__) {
-    global.__mock_casos_mantenimiento_store__ = [];
-  }
-  casosMantenimientoStore_internal = global.__mock_casos_mantenimiento_store__;
-}
-
-// --- Funciones para Tickets ---
+// --- Ticket Functions (To be refactored to use Prisma) ---
 export function getAllTicketsFromMock(): Ticket[] {
-  return [...ticketsStore_internal].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function getAllTicketsFromMock called. Needs Prisma implementation.");
+  return [];
 }
 
 export function getTicketByIdFromMock(id: string): Ticket | null {
-  return ticketsStore_internal.find(ticket => ticket.id === id) || null;
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function getTicketByIdFromMock called. Needs Prisma implementation.");
+  return null;
 }
 
 export function addTicketToMock(ticket: Ticket): void {
-  const existingIndex = ticketsStore_internal.findIndex(t => t.id === ticket.id);
-  if (existingIndex !== -1) {
-    ticketsStore_internal[existingIndex] = ticket;
-  } else {
-    ticketsStore_internal.unshift(ticket);
-  }
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function addTicketToMock called. Needs Prisma implementation.");
 }
 
 export function getRawTicketsStoreForStats(): Ticket[] {
-  return ticketsStore_internal;
+   // TODO: Replace with Prisma client call for aggregated stats
+  console.warn("Mock function getRawTicketsStoreForStats called. Needs Prisma implementation for stats.");
+  return [];
 }
 
-// --- Funciones para Inventario ---
+// --- Inventory Functions (To be refactored to use Prisma) ---
 export function getAllInventoryItemsFromMock(): InventoryItem[] {
-  return [...inventoryStore_internal].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function getAllInventoryItemsFromMock called. Needs Prisma implementation.");
+  return [];
 }
 
 export function getInventoryItemByIdFromMock(id: string): InventoryItem | null {
-  return inventoryStore_internal.find(item => item.id === id) || null;
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function getInventoryItemByIdFromMock called. Needs Prisma implementation.");
+  return null;
 }
 
 export function addInventoryItemToMock(item: InventoryItem): void {
-  const existingIndex = inventoryStore_internal.findIndex(i => i.id === item.id);
-  if (existingIndex !== -1) {
-    inventoryStore_internal[existingIndex] = item;
-  } else {
-    inventoryStore_internal.unshift(item);
-  }
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function addInventoryItemToMock called. Needs Prisma implementation.");
 }
 
 export function updateInventoryItemInMock(updatedItem: InventoryItem): boolean {
-  const itemIndex = inventoryStore_internal.findIndex(item => item.id === updatedItem.id);
-  if (itemIndex !== -1) {
-    inventoryStore_internal[itemIndex] = { ...inventoryStore_internal[itemIndex], ...updatedItem, updatedAt: new Date() };
-    return true;
-  }
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function updateInventoryItemInMock called. Needs Prisma implementation.");
   return false;
 }
 
 export function deleteInventoryItemFromMock(itemId: string): boolean {
-  const initialLength = inventoryStore_internal.length;
-  inventoryStore_internal = inventoryStore_internal.filter(item => item.id !== itemId);
-  return inventoryStore_internal.length < initialLength;
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function deleteInventoryItemFromMock called. Needs Prisma implementation.");
+  return false;
 }
 
 export function getRawInventoryStore(): InventoryItem[] {
-  return inventoryStore_internal;
+  // TODO: Replace with Prisma client call if direct access is needed, otherwise remove.
+  console.warn("Mock function getRawInventoryStore called. Needs Prisma implementation or removal.");
+  return [];
 }
 
-// --- Funciones para Logs de Auditoría ---
+// --- Audit Log Functions (To be refactored to use Prisma) ---
 export function getAllAuditLogsFromMock(): AuditLogEntryType[] {
-  return [...auditLogsStore_internal].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function getAllAuditLogsFromMock called. Needs Prisma implementation.");
+  return [];
 }
 
 export function addAuditLogEntryToMock(entryData: Omit<AuditLogEntryType, 'id' | 'timestamp'>): AuditLogEntryType {
-  const newLogEntry: AuditLogEntryType = {
-    id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function addAuditLogEntryToMock called. Needs Prisma implementation.");
+  // Return a placeholder or throw error, as this function structure changes with DB.
+  const placeholderEntry: AuditLogEntryType = {
+    id: `log-placeholder-${Date.now()}`,
     timestamp: new Date().toISOString(),
     ...entryData,
   };
-  auditLogsStore_internal.unshift(newLogEntry);
-  return newLogEntry;
+  return placeholderEntry;
 }
 
-// --- Funciones para Solicitudes de Aprobación ---
+// --- Approval Request Functions (To be refactored to use Prisma) ---
 export function getAllApprovalRequestsFromMock(): ApprovalRequest[] {
-  return [...approvalsStore_internal].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function getAllApprovalRequestsFromMock called. Needs Prisma implementation.");
+  return [];
 }
 
 export function getApprovalRequestByIdFromMock(id: string): ApprovalRequest | null {
-  return approvalsStore_internal.find(req => req.id === id) || null;
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function getApprovalRequestByIdFromMock called. Needs Prisma implementation.");
+  return null;
 }
 
 export function addApprovalRequestToMock(request: ApprovalRequest): void {
-  const existingIndex = approvalsStore_internal.findIndex(r => r.id === request.id);
-  if (existingIndex !== -1) {
-    approvalsStore_internal[existingIndex] = request;
-  } else {
-    approvalsStore_internal.unshift(request);
-  }
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function addApprovalRequestToMock called. Needs Prisma implementation.");
 }
 
 export function updateApprovalRequestInMock(updatedRequest: ApprovalRequest): boolean {
-  const reqIndex = approvalsStore_internal.findIndex(req => req.id === updatedRequest.id);
-  if (reqIndex !== -1) {
-    const originalRequest = approvalsStore_internal[reqIndex];
-
-    let actionDescription = `Estado Cambiado a: ${updatedRequest.status}`;
-     if (originalRequest.status !== updatedRequest.status) {
-        if (updatedRequest.status === "Aprobado") {
-            actionDescription = `Solicitud Aprobada (${updatedRequest.approvedPaymentType || 'N/A'})`;
-        } else if (updatedRequest.status === "Rechazado") {
-            actionDescription = "Solicitud Rechazada";
-        } else if (updatedRequest.status === "InformacionSolicitada") {
-            actionDescription = "Información Adicional Solicitada";
-        }
-    }
-
-    const currentActivityLog = Array.isArray(originalRequest.activityLog) ? originalRequest.activityLog : [];
-
-    const finalRequestData: ApprovalRequest = {
-      ...originalRequest,
-      ...updatedRequest,
-      updatedAt: new Date(),
-      activityLog: [
-          ...currentActivityLog,
-          {
-            id: `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-            action: actionDescription,
-            userId: updatedRequest.approverId || originalRequest.requesterId,
-            userName: updatedRequest.approverName || originalRequest.requesterName || "Sistema",
-            timestamp: new Date(),
-            comment: updatedRequest.approverComment,
-          }
-      ],
-      approvedAt: updatedRequest.status === "Aprobado" ? new Date() : originalRequest.approvedAt,
-      rejectedAt: updatedRequest.status === "Rechazado" ? new Date() : originalRequest.rejectedAt,
-      infoRequestedAt: updatedRequest.status === "InformacionSolicitada" ? new Date() : originalRequest.infoRequestedAt,
-    };
-    
-    if (finalRequestData.type === "PagoProveedor") {
-        if (finalRequestData.status === "Aprobado") {
-            if (finalRequestData.approvedPaymentType === 'Contado') {
-                finalRequestData.paymentInstallments = [];
-            }
-        }
-    } else if (finalRequestData.type === "Compra" && finalRequestData.status === "Aprobado") {
-        finalRequestData.approvedPaymentType = undefined;
-        finalRequestData.paymentInstallments = [];
-        finalRequestData.approvedAmount = undefined;
-    }
-
-    approvalsStore_internal[reqIndex] = finalRequestData;
-    return true;
-  }
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function updateApprovalRequestInMock called. Needs Prisma implementation.");
   return false;
 }
 
 export function getRawApprovalsStore(): ApprovalRequest[] {
-    return approvalsStore_internal;
+   // TODO: Replace with Prisma client call if direct access is needed, otherwise remove.
+  console.warn("Mock function getRawApprovalsStore called. Needs Prisma implementation or removal.");
+  return [];
 }
 
-// --- Funciones para Gestión de Casos de Mantenimiento ---
+// --- CasoDeMantenimiento Functions (To be refactored to use Prisma) ---
 export function getAllCasosMantenimientoFromMock(): CasoDeMantenimiento[] {
-  return [...casosMantenimientoStore_internal].sort((a, b) => b.registeredAt.getTime() - a.registeredAt.getTime());
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function getAllCasosMantenimientoFromMock called. Needs Prisma implementation.");
+  return [];
 }
 
 export function getCasoMantenimientoByIdFromMock(id: string): CasoDeMantenimiento | null {
-  return casosMantenimientoStore_internal.find(caso => caso.id === id) || null;
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function getCasoMantenimientoByIdFromMock called. Needs Prisma implementation.");
+  return null;
 }
 
 export function addCasoMantenimientoToMock(caso: CasoDeMantenimiento): void {
-  const existingIndex = casosMantenimientoStore_internal.findIndex(c => c.id === caso.id);
-  if (existingIndex !== -1) {
-    casosMantenimientoStore_internal[existingIndex] = caso;
-  } else {
-    casosMantenimientoStore_internal.unshift(caso);
-  }
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function addCasoMantenimientoToMock called. Needs Prisma implementation.");
 }
 
 export function updateCasoMantenimientoInMock(updatedCaso: CasoDeMantenimiento): boolean {
-  const casoIndex = casosMantenimientoStore_internal.findIndex(c => c.id === updatedCaso.id);
-  if (casoIndex !== -1) {
-    casosMantenimientoStore_internal[casoIndex] = { ...casosMantenimientoStore_internal[casoIndex], ...updatedCaso, lastFollowUpDate: new Date() }; // Ensure lastFollowUpDate is updated
-    return true;
-  }
+  // TODO: Replace with Prisma client call
+  console.warn("Mock function updateCasoMantenimientoInMock called. Needs Prisma implementation.");
   return false;
 }
 
 export function getRawCasosMantenimientoStore(): CasoDeMantenimiento[] {
-  return casosMantenimientoStore_internal;
+  // TODO: Replace with Prisma client call if direct access is needed, otherwise remove.
+  console.warn("Mock function getRawCasosMantenimientoStore called. Needs Prisma implementation or removal.");
+  return [];
 }
 
-
-// Para compatibilidad con código antiguo (debería refactorizarse)
-export const mockTickets: Ticket[] = ticketsStore_internal;
-export const mockInventory: InventoryItem[] = inventoryStore_internal;
-export const mockAuditLogs: AuditLogEntryType[] = auditLogsStore_internal;
-export const mockApprovalRequests: ApprovalRequest[] = approvalsStore_internal;
-export const mockCasosMantenimiento: CasoDeMantenimiento[] = casosMantenimientoStore_internal;
+// For compatibility with old code expecting these arrays directly, though they will be empty.
+export const mockTickets: Ticket[] = [];
+export const mockInventory: InventoryItem[] = [];
+export const mockAuditLogs: AuditLogEntryType[] = [];
+export const mockApprovalRequests: ApprovalRequest[] = [];
+export const mockCasosMantenimiento: CasoDeMantenimiento[] = [];
