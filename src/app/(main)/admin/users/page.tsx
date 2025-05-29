@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
@@ -87,13 +87,14 @@ const DEPARTMENT_DISPLAY_MAP: { [key: string]: string } = {
   "Suministros": "Suministros",
 };
 
-const ROLES_OPTIONS: Role[] = ["User", "Admin", "Presidente IEQ"];
+const ROLES_OPTIONS_BASE: Role[] = ["User", "Admin", "Presidente IEQ"];
+const ROLES_OPTIONS_ZOD = ROLES_OPTIONS_BASE as [Role, ...Role[]];
 
 
 const userEditFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
   email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
-  role: z.enum(ROLES_OPTIONS as [Role, ...Role[]], { required_error: "El rol es obligatorio." }),
+  role: z.enum(ROLES_OPTIONS_ZOD, { required_error: "El rol es obligatorio." }),
   department: z.string().optional(),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }).optional().or(z.literal('')),
 });
@@ -156,7 +157,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
       email: userToEdit?.email || "",
       role: userToEdit?.role || "User",
       department: userToEdit?.department || NO_DEPARTMENT_VALUE,
-      password: "", // Always start password field empty for editing
+      password: "", 
     },
   });
 
@@ -167,7 +168,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
         email: userToEdit.email,
         role: userToEdit.role,
         department: userToEdit.department || NO_DEPARTMENT_VALUE,
-        password: "", // Reset password to empty, admin can choose to set a new one
+        password: userToEdit.password || "", 
       });
     }
   }, [userToEdit, form]);
@@ -186,7 +187,14 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
     };
     if (data.password && data.password.trim() !== "") {
         updateData.password = data.password;
+    } else {
+      // If password field is submitted empty, we don't want to send it as part of the update,
+      // implying the password should remain unchanged.
+      // However, our mock logic in auth-context might need specific handling for this.
+      // For now, if it's empty, we don't include it.
+      // If the intent is to *clear* a password, that's a different operation.
     }
+
 
     const result = await updateUserByAdmin(userToEdit.id, updateData as Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>);
     setIsSubmitting(false);
@@ -292,7 +300,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {ROLES_OPTIONS.map((roleOption) => (
+                        {ROLES_OPTIONS_BASE.map((roleOption) => (
                            <SelectItem key={roleOption} value={roleOption}>
                              {roleOption === "Presidente IEQ" ? "Presidente IEQ" : roleOption}
                            </SelectItem>
@@ -309,7 +317,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Departamento</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || NO_DEPARTMENT_VALUE}>
+                    <Select onValueChange={field.onChange} value={field.value || NO_DEPARTMENT_VALUE}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona un departamento" />
@@ -421,12 +429,29 @@ export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+
+  const fetchUsers = useCallback(async () => {
+    if (getAllUsers) {
+      setIsLoadingUsers(true);
+      try {
+        const fetchedUsers = await getAllUsers();
+        setUsers(fetchedUsers);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        setUsers([]); // Set to empty array on error
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    } else {
+      setUsers([]);
+      setIsLoadingUsers(false);
+    }
+  }, [getAllUsers]);
 
   useEffect(() => {
-    if (getAllUsers) {
-      setUsers(getAllUsers());
-    }
-  }, [getAllUsers, currentUser]);
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleManageUser = (userToManage: User) => {
     setSelectedUser(userToManage);
@@ -439,9 +464,7 @@ export default function UserManagementPage() {
   };
 
   const handleUserUpdate = () => {
-     if (getAllUsers) {
-      setUsers(getAllUsers());
-    }
+    fetchUsers(); // Refetch users after an update
   };
 
 
@@ -460,7 +483,7 @@ export default function UserManagementPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full">
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold tracking-tight flex items-center"><Users className="mr-3 h-8 w-8 text-primary" />Gestión de Usuarios</h1>
         <p className="text-muted-foreground">
@@ -473,11 +496,16 @@ export default function UserManagementPage() {
           <CardDescription>Ver y gestionar todos los usuarios del sistema.</CardDescription>
         </CardHeader>
         <CardContent>
-          {users.length === 0 ? (
+          {isLoadingUsers ? (
+            <div className="flex flex-col items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="mt-2 text-muted-foreground">Cargando usuarios...</p>
+            </div>
+          ) : !Array.isArray(users) || users.length === 0 ? (
             <div className="mt-6 p-8 border border-dashed rounded-lg text-center">
               <Users className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
               <p className="font-semibold">No hay usuarios para mostrar.</p>
-              <p className="text-sm text-muted-foreground">Actualmente no hay usuarios registrados en el sistema.</p>
+              <p className="text-sm text-muted-foreground">Actualmente no hay usuarios registrados en el sistema o no se pudieron cargar.</p>
             </div>
           ) : (
             <Table>
@@ -499,7 +527,7 @@ export default function UserManagementPage() {
           )}
         </CardContent>
       </Card>
-      {selectedUser && (
+      {selectedUser && currentUser && (
         <EditUserDialog
           userToEdit={selectedUser}
           currentUser={currentUser}
@@ -511,3 +539,5 @@ export default function UserManagementPage() {
     </div>
   );
 }
+
+    
