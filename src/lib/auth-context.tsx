@@ -4,9 +4,19 @@
 import type { User, Role } from "@/lib/types";
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { logAuditEvent } from "@/lib/actions";
-import { prisma } from "@/lib/db"; 
-import bcrypt from 'bcryptjs'; 
+import { 
+  loginUserServerAction,
+  registerUserServerAction,
+  getUserByIdServerAction,
+  updateUserProfileServerAction,
+  updateUserPasswordServerAction,
+  resetUserPasswordByEmailServerAction,
+  getAllUsersServerAction,
+  updateUserByAdminServerAction,
+  deleteUserByAdminServerAction,
+  logAuditEvent // If logAuditEvent is to be called from client context, it needs to be a server action too. Assuming it is.
+} from "@/lib/actions";
+
 
 export const SPECIFIC_APPROVER_EMAILS = [
   "proveedoresvarios@clinicaieq.com",
@@ -46,10 +56,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (storedUserJson) {
           const parsedUserFromStorage = JSON.parse(storedUserJson) as User;
           if (parsedUserFromStorage && parsedUserFromStorage.id) {
-             const dbUser = await prisma.user.findUnique({ where: { id: parsedUserFromStorage.id }});
-             if (dbUser) {
-                const { password, ...userWithoutPassword } = dbUser; // Exclude password
-                setUser(userWithoutPassword as User); // Cast to User to satisfy type
+             const freshUser = await getUserByIdServerAction(parsedUserFromStorage.id);
+             if (freshUser) {
+                setUser(freshUser);
              } else {
                 localStorage.removeItem("ticketflow_user"); 
                 setUser(null);
@@ -72,24 +81,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, pass: string): Promise<boolean> => {
     setIsLoading(true);
-    try {
-      const dbUser = await prisma.user.findUnique({ where: { email } });
-      if (dbUser && dbUser.password) {
-        const passwordMatch = await bcrypt.compare(pass, dbUser.password);
-        if (passwordMatch) {
-          const { password, ...userToStore } = dbUser;
-          setUser(userToStore as User);
-          localStorage.setItem("ticketflow_user", JSON.stringify(userToStore));
-          await logAuditEvent(email, "Inicio de Sesión Exitoso");
-          setIsLoading(false);
-          return true;
-        }
-      }
-    } catch (error) {
-      console.error("Login error:", error);
-    }
-    await logAuditEvent(email, "Intento de Inicio de Sesión Fallido");
+    const result = await loginUserServerAction(email, pass);
     setIsLoading(false);
+    if (result.success && result.user) {
+      setUser(result.user);
+      localStorage.setItem("ticketflow_user", JSON.stringify(result.user));
+      return true;
+    }
+    // logAuditEvent is called within loginUserServerAction
     return false;
   };
 
@@ -104,180 +103,90 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const register = async (name: string, email: string, pass: string): Promise<boolean> => {
     setIsLoading(true);
-    try {
-      const existingUser = await prisma.user.findUnique({ where: { email } });
-      if (existingUser) {
-        setIsLoading(false);
-        return false; 
-      }
-      const hashedPassword = await bcrypt.hash(pass, 10);
-      const newUser = await prisma.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          role: "User", 
-        },
-      });
-      const { password, ...userToStore } = newUser;
-      setUser(userToStore as User);
-      localStorage.setItem("ticketflow_user", JSON.stringify(userToStore));
-      await logAuditEvent(email, "Registro de Nuevo Usuario");
-      setIsLoading(false);
+    const result = await registerUserServerAction(name, email, pass);
+    setIsLoading(false);
+    if (result.success && result.user) {
+      setUser(result.user);
+      localStorage.setItem("ticketflow_user", JSON.stringify(result.user));
       return true;
-    } catch (error) {
-      console.error("Registration error:", error);
-      setIsLoading(false);
-      return false;
     }
+    // logAuditEvent is called within registerUserServerAction
+    return false;
   };
 
   const updateProfile = async (name: string, email: string): Promise<boolean> => {
-    if (!user) return false;
+    if (!user || !user.id) return false;
     setIsLoading(true);
-    try {
-      if (email !== user.email) {
-        const existingUser = await prisma.user.findUnique({ where: { email } });
-        if (existingUser && existingUser.id !== user.id) {
-          setIsLoading(false);
-          return false; 
-        }
-      }
-      const updatedDbUser = await prisma.user.update({
-        where: { id: user.id },
-        data: { name, email },
-      });
-      const { password, ...userToStore } = updatedDbUser;
-      setUser(userToStore as User);
-      localStorage.setItem("ticketflow_user", JSON.stringify(userToStore));
-      await logAuditEvent(user.email, "Actualización de Perfil");
-      setIsLoading(false);
+    const result = await updateUserProfileServerAction(user.id, name, email);
+    setIsLoading(false);
+    if (result.success && result.user) {
+      setUser(result.user);
+      localStorage.setItem("ticketflow_user", JSON.stringify(result.user));
       return true;
-    } catch (error) {
-      console.error("Profile update error:", error);
-      setIsLoading(false);
-      return false;
     }
+    return false;
   };
 
   const updateSelfPassword = async (newPasswordValue: string): Promise<boolean> => {
-    if (!user) return false;
+    if (!user || !user.id) return false;
     setIsLoading(true);
-    try {
-      const hashedPassword = await bcrypt.hash(newPasswordValue, 10);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { password: hashedPassword },
-      });
-      await logAuditEvent(user.email, "Actualización de Contraseña Propia");
-      setIsLoading(false);
-      return true;
-    } catch (error) {
-      console.error("Self password update error:", error);
-      setIsLoading(false);
-      return false;
-    }
+    const result = await updateUserPasswordServerAction(user.id, newPasswordValue);
+    setIsLoading(false);
+    return result.success;
   };
 
   const resetPasswordByEmail = async (email: string, newPasswordValue: string): Promise<{ success: boolean; message: string }> => {
     setIsLoading(true);
-    try {
-      const targetUser = await prisma.user.findUnique({ where: { email } });
-      if (!targetUser) {
-        setIsLoading(false);
-        return { success: false, message: "Usuario no encontrado con ese correo." };
-      }
-      const hashedPassword = await bcrypt.hash(newPasswordValue, 10);
-      await prisma.user.update({
-        where: { email },
-        data: { password: hashedPassword },
-      });
-      await logAuditEvent(email, "Restablecimiento de Contraseña por Admin/Sistema");
-      setIsLoading(false);
-      return { success: true, message: "Contraseña restablecida exitosamente." };
-    } catch (error) {
-      console.error("Password reset error:", error);
-      setIsLoading(false);
-      return { success: false, message: "Error al restablecer la contraseña." };
-    }
+    const result = await resetUserPasswordByEmailServerAction(email, newPasswordValue);
+    setIsLoading(false);
+    return result;
   };
 
   const getAllUsers = async (): Promise<User[]> => {
-    try {
-      const dbUsers = await prisma.user.findMany({
-        orderBy: { name: 'asc' }
-      });
-      // Explicitly map to the User type expected by the context, excluding password
-      return dbUsers.map(({ password, ...userWithoutPassword }) => userWithoutPassword as User);
-    } catch (error) {
-      console.error("Error fetching all users:", error);
-      return [];
-    }
+    // setIsLoading(true); // Typically not needed for a simple fetch in admin panel
+    const users = await getAllUsersServerAction();
+    // setIsLoading(false);
+    return users;
   };
 
   const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>): Promise<{ success: boolean; message?: string }> => {
-    if (!user || user.role !== "Admin") {
-      return { success: false, message: "Acción no permitida." };
+    if (!user || user.role !== "Admin" || !user.email) {
+      return { success: false, message: "Acción no permitida o información del administrador incompleta." };
     }
     setIsLoading(true);
-    try {
-      const updateData: any = { 
-        name: data.name,
-        role: data.role,
-        email: data.email,
-        department: data.department,
-       };
-      if (data.password && data.password.trim() !== "") {
-        updateData.password = await bcrypt.hash(data.password, 10);
-      }
-
-      if (data.email) {
-         const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
-         if (existingUser && existingUser.id !== userId) {
-           setIsLoading(false);
-           return { success: false, message: "El correo electrónico ya está en uso por otro usuario." };
-         }
-      }
-
-      await prisma.user.update({
-        where: { id: userId },
-        data: updateData,
-      });
-      await logAuditEvent(user.email, "Actualización de Usuario por Admin", `Usuario ID: ${userId}, Nuevos Datos: ${JSON.stringify({name:data.name, email: data.email, role: data.role, department: data.department})}`); // Don't log password
-      setIsLoading(false);
-      return { success: true, message: "Usuario actualizado." };
-    } catch (error) {
-      console.error("Admin update user error:", error);
-      setIsLoading(false);
-      return { success: false, message: "Error al actualizar usuario." };
-    }
+    const result = await updateUserByAdminServerAction(user.email, userId, data);
+    setIsLoading(false);
+    return result;
   };
 
   const deleteUserByAdmin = async (userId: string): Promise<{ success: boolean; message: string }> => {
-    if (!user || user.role !== "Admin") {
-      return { success: false, message: "Acción no permitida." };
+    if (!user || user.role !== "Admin" || !user.email) {
+      return { success: false, message: "Acción no permitida o información del administrador incompleta." };
     }
     if (user.id === userId) {
       return { success: false, message: "No puedes eliminar tu propia cuenta de administrador."}
     }
     setIsLoading(true);
-    try {
-      await prisma.user.delete({ where: { id: userId } });
-      await logAuditEvent(user.email, "Eliminación de Usuario por Admin", `Usuario ID: ${userId}`);
-      setIsLoading(false);
-      return { success: true, message: "Usuario eliminado." };
-    } catch (error: any) {
-      console.error("Admin delete user error:", error);
-      setIsLoading(false);
-       if (error.code === 'P2003') { 
-        return { success: false, message: "No se puede eliminar el usuario porque tiene registros asociados (tickets, comentarios, etc.). Reasigna o elimina esos registros primero." };
-      }
-      return { success: false, message: "Error al eliminar usuario." };
-    }
+    const result = await deleteUserByAdminServerAction(user.email, userId);
+    setIsLoading(false);
+    return result;
   };
 
   return (
-    <AuthContext.Provider value={{ user, role: user?.role || null, isLoading, login, logout, register, updateProfile, updateSelfPassword, resetPasswordByEmail, getAllUsers, updateUserByAdmin, deleteUserByAdmin }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      role: user?.role || null, 
+      isLoading, 
+      login, 
+      logout, 
+      register, 
+      updateProfile, 
+      updateSelfPassword, 
+      resetPasswordByEmail, 
+      getAllUsers, 
+      updateUserByAdmin, 
+      deleteUserByAdmin 
+    }}>
       {children}
     </AuthContext.Provider>
   );
