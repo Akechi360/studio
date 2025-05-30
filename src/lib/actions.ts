@@ -5,7 +5,8 @@ import { z } from "zod";
 import { prisma } from "./db";
 import bcrypt from 'bcryptjs';
 
-import type { AttachmentClientData, ExcelInventoryItemData, User as UserType } from "./types"; // Keep User from types.ts for client-side compatibility
+// Keep User from types.ts for client-side compatibility
+import type { AttachmentClientData, ExcelInventoryItemData, User as UserType } from "./types"; 
 import type {
   User as PrismaUser,
   Ticket as TicketTypePrisma,
@@ -31,8 +32,9 @@ import type {
   CasoMantenimientoPriority
 } from "@prisma/client";
 
+import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "../lib/constants";
-import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM, CASO_STATUSES, CASO_PRIORITIES } from "../lib/types";
+import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM, CASO_STATUSES, CASO_PRIORITIES } from "./types";
 
 import {
   BaseInventoryItemSchema,
@@ -43,8 +45,12 @@ import {
   RejectOrInfoActionSchema,
   CreateCasoMantenimientoFormSchema,
   UpdateCasoMantenimientoFormSchema,
+  PurchaseRequestDataSchema,
+  PaymentRequestDataSchema,
+  AttachmentDataSchema,
+  ApproveActionBaseSchema,
+  PaymentInstallmentActionSchema,
 } from "../lib/schemas";
-import { revalidatePath } from "next/cache";
 import { sendNtfyNotification } from "./ntfy";
 
 
@@ -61,6 +67,7 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     console.error("logAuditEvent Error:", error);
+    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
 
@@ -76,7 +83,7 @@ export async function getAuditLogs(): Promise<AuditLogEntryTypePrisma[]> {
   }
 }
 
-// --- Authentication Server Actions ---
+// --- Authentication Server Actions (called by AuthContext) ---
 
 export async function loginUserServerAction(email: string, pass: string): Promise<{ success: boolean; user: Omit<PrismaUser, 'password'> | null; message?: string }> {
   try {
@@ -222,7 +229,7 @@ export async function updateUserByAdminServerAction(
   try {
     const updateData: any = {
       name: data.name,
-      role: data.role as Role,
+      role: data.role as Role, // Cast is okay as we validate on client
       email: data.email,
       department: data.department,
     };
@@ -269,7 +276,7 @@ export async function deleteUserByAdminServerAction(adminEmail: string, userId: 
     return { success: true, message: "Usuario eliminado." };
   } catch (error: any) {
     console.error("deleteUserByAdminServerAction Error:", error);
-    if (error.code === 'P2003' || error.code === 'P2014' ) {
+    if (error.code === 'P2003' || error.code === 'P2014' ) { // Prisma foreign key constraint violation
       return { success: false, message: "No se puede eliminar el usuario porque tiene registros asociados (tickets, comentarios, etc.). Reasigna o elimina esos registros primero." };
     }
     return { success: false, message: "Error del servidor al eliminar usuario." };
@@ -299,7 +306,7 @@ export async function createTicketAction(
   userId: string,
   userName: string,
   values: z.infer<typeof CreateTicketClientSchema>
-) {
+): Promise<{ success: boolean; message: string; ticketId?: string; errors?: any }> {
   const validatedFields = CreateTicketClientSchema.safeParse(values);
 
   if (!validatedFields.success) {
@@ -325,8 +332,6 @@ export async function createTicketAction(
     });
 
     await logAuditEvent(userEmail, "Creación de Ticket", `Ticket Asunto: ${subject}, ID: ${newTicket.id}`);
-    
-    // Send NTFY notification
     await sendNtfyNotification({
       title: `Nuevo Ticket: ${subject.substring(0, 30)}...`,
       message: `Ticket #${newTicket.id} (${subject}) creado por ${userName}. Prioridad: ${priority}.`,
@@ -358,7 +363,7 @@ export async function addCommentAction(
   ticketId: string,
   commenter: Pick<PrismaUser, 'id' | 'name' | 'email' | 'avatarUrl'>,
   values: z.infer<typeof AddCommentClientSchema>
-) {
+): Promise<{ success: boolean; message: string; commentId?: string, errors?: any }> {
   const validatedFields = AddCommentClientSchema.safeParse(values);
 
   if (!validatedFields.success) {
@@ -380,21 +385,19 @@ export async function addCommentAction(
         ticketId,
         userId: commenter.id,
         userName: commenter.name,
-        userAvatarUrl: commenter.avatarUrl,
+        userAvatarUrl: commenter.avatarUrl || null,
       }
     });
-    const updatedTicket = await prisma.ticket.update({
+    await prisma.ticket.update({
       where: { id: ticketId },
       data: { updatedAt: new Date() }
     });
 
     await logAuditEvent(commenter.email, "Adición de Comentario", `Ticket ID: ${ticketId}, Usuario: ${commenter.name}`);
-    
     await sendNtfyNotification({
       title: `Nuevo Comentario en Ticket #${ticketId}`,
       message: `${commenter.name} comentó: "${validatedFields.data.text.substring(0,50)}..."`,
       tags: ['ticket', 'comentario', ticketId],
-      // click: `YOUR_APP_URL/tickets/${ticketId}` // Consider adding click URL
     });
 
     revalidatePath(`/tickets/${ticketId}`);
@@ -404,7 +407,7 @@ export async function addCommentAction(
     return {
       success: true,
       message: "¡Comentario añadido exitosamente!",
-      comment: newComment,
+      commentId: newComment.id,
     };
   } catch (error) {
     console.error("addCommentAction Error:", error);
@@ -418,7 +421,7 @@ export async function addCommentAction(
 export async function updateTicketStatusAction(
   ticketId: string,
   values: z.infer<typeof UpdateTicketStatusClientSchema>
-) {
+): Promise<{ success: boolean; message: string; errors?: any }> {
   const validatedFields = UpdateTicketStatusClientSchema.safeParse(values);
 
   if (!validatedFields.success) {
@@ -441,13 +444,12 @@ export async function updateTicketStatusAction(
     });
 
     await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatus}, A: ${status}`);
-    
     await sendNtfyNotification({
       title: `Ticket #${ticketId} Actualizado`,
       message: `El estado del ticket "${ticket.subject}" cambió de ${oldStatus} a ${status}.`,
       tags: ['ticket', 'actualizacion-estado', ticketId, status.toLowerCase().replace(' ', '-')],
     });
-
+    
     revalidatePath(`/tickets/${ticketId}`);
     revalidatePath("/tickets");
     revalidatePath("/dashboard");
@@ -455,9 +457,10 @@ export async function updateTicketStatusAction(
     revalidatePath("/admin/reports");
     
     const statusDisplayMap: Record<string, string> = TICKET_STATUSES_ENGLISH.reduce((acc, s) => {
-        acc[s] = s;
+        acc[s] = s; // Assuming english values are keys for display map in constants too
         return acc;
     }, {} as Record<string, string>);
+
 
     return { success: true, message: `Estado del ticket actualizado a ${statusDisplayMap[status] || status}.` };
   } catch (error) {
@@ -483,24 +486,29 @@ export async function getTicketById(ticketId: string): Promise<(TicketTypePrisma
   }
 }
 
-export async function getAllTickets(): Promise<(TicketTypePrisma & { comments: CommentTypePrisma[], attachments: AttachmentTypePrisma[], user: { name: string | null } | null })[]> {
+export async function getAllTickets(): Promise<(TicketTypePrisma & { comments: {id: string}[], attachments: {id: string, fileName: string, url: string, size: number}[], user: { name: string | null } | null })[]> {
   try {
     const tickets = await prisma.ticket.findMany({
       include: {
         user: { select: { name: true }},
-        comments: { select: { id: true } },
+        comments: { select: { id: true } }, // Only select id if full comment objects are not needed for list item
         attachments: { select: { id: true, fileName: true, url: true, size: true }}
-      }
+      },
+      orderBy: [
+        { priority: 'asc' }, // Assuming 'High' comes before 'Low' lexicographically if not using custom sort.
+        { createdAt: 'desc'}
+      ]
     });
-    const priorityOrder: Record<TicketPriority, number> = { High: 0, Medium: 1, Low: 2 };
-    tickets.sort((a, b) => {
-        if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
-            return priorityOrder[a.priority] - priorityOrder[b.priority];
-        }
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    // For custom priority sort:
+    // const priorityOrder: Record<TicketPriority, number> = { High: 0, Medium: 1, Low: 2 };
+    // tickets.sort((a, b) => {
+    //     if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+    //         return priorityOrder[a.priority] - priorityOrder[b.priority];
+    //     }
+    //     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    // });
 
-    return tickets.map(t => ({...t, comments: t.comments || [], attachments: t.attachments || []}));
+    return tickets;
   } catch (error) {
     console.error("getAllTickets Error:", error);
     return [];
@@ -534,11 +542,11 @@ export async function getDashboardStats() {
 
     const stats = {
       byPriority: TICKET_PRIORITIES_ENGLISH.map(pKey => ({
-        name: pKey as string,
+        name: pKey as string, // Or map to Spanish display name
         value: priorityMap[pKey],
       })),
       byStatus: TICKET_STATUSES_ENGLISH.map(sKey => ({
-        name: sKey as string,
+        name: sKey as string, // Or map to Spanish display name
         value: statusMap[sKey],
       })),
     };
@@ -572,8 +580,8 @@ export async function getAllInventoryItems(): Promise<(InventoryItemTypePrisma &
 export async function addInventoryItemAction(
   currentUser: Pick<UserType, 'id' | 'name' | 'email'>,
   values: z.infer<typeof BaseInventoryItemSchema>
-): Promise<{ success: boolean; message: string; item?: InventoryItemTypePrisma, errors?: any }> {
-   if (!currentUser || !currentUser.id || !currentUser.name || !currentUser.email) {
+): Promise<{ success: boolean; message: string; itemId?: string, errors?: any }> {
+  if (!currentUser || !currentUser.id || !currentUser.name || !currentUser.email) {
     console.error("addInventoryItemAction: currentUser is invalid", currentUser);
     return { success: false, message: "Información del usuario actual incompleta o inválida." };
   }
@@ -613,7 +621,7 @@ export async function addInventoryItemAction(
 
     await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo Nombre: ${data.name}, ID: ${newItem.id}`);
     revalidatePath("/inventory");
-    return { success: true, message: `Artículo "${data.name}" con ID "${newItem.id}" añadido exitosamente.`, item: newItem };
+    return { success: true, message: `Artículo "${data.name}" con ID "${newItem.id}" añadido exitosamente.`, itemId: newItem.id };
   } catch (error: any) {
     console.error("addInventoryItemAction Error:", error);
     if (error.code === 'P2002' && error.meta?.target?.includes('serialNumber')) {
@@ -627,7 +635,7 @@ export async function updateInventoryItemAction(
   itemId: string,
   actingUserEmail: string,
   values: z.infer<typeof BaseInventoryItemSchema>
-) {
+): Promise<{ success: boolean; message: string; itemId?: string, errors?: any }> {
   const validatedFields = BaseInventoryItemSchema.safeParse(values);
   if (!validatedFields.success) {
     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Fallo al actualizar artículo debido a errores de validación." };
@@ -662,7 +670,7 @@ export async function updateInventoryItemAction(
 
     await logAuditEvent(actingUserEmail, "Actualización de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${data.name}`);
     revalidatePath("/inventory");
-    return { success: true, message: `Artículo "${data.name}" actualizado exitosamente.`, item: updatedItem };
+    return { success: true, message: `Artículo "${data.name}" actualizado exitosamente.`, itemId: updatedItem.id };
   } catch (error: any) {
     console.error("updateInventoryItemAction Error:", error);
      if (error.code === 'P2002' && error.meta?.target?.includes('serialNumber')) {
@@ -672,7 +680,7 @@ export async function updateInventoryItemAction(
   }
 }
 
-export async function deleteInventoryItemAction(itemId: string, actingUserEmail: string) {
+export async function deleteInventoryItemAction(itemId: string, actingUserEmail: string): Promise<{ success: boolean; message: string }> {
   try {
     const itemToDelete = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
     if (!itemToDelete) return { success: false, message: "Artículo no encontrado para eliminar." };
@@ -751,14 +759,13 @@ export async function importInventoryItemsAction(
   currentUserEmail: string,
   currentUserId: string,
   currentUserName: string
-): Promise<{ success: boolean; message: string; successCount: number; errorCount: number; errors: { row: number; message: string; data: ExcelInventoryItemData }[]; importedItems: InventoryItemTypePrisma[] }> {
+): Promise<{ success: boolean; message: string; successCount: number; errorCount: number; errors: { row: number; message: string; data: ExcelInventoryItemData }[]; }> {
   let successCount = 0;
   let errorCount = 0;
   const errors: { row: number; message: string; data: ExcelInventoryItemData }[] = [];
-  const importedItems: InventoryItemTypePrisma[] = [];
 
   if (!itemDataArray || itemDataArray.length === 0) {
-    return { success: false, message: "No se proporcionaron datos para importar o el archivo está vacío.", successCount: 0, errorCount: itemDataArray?.length || 0, errors: [{ row: 0, message: "Archivo vacío o sin datos.", data: {} }], importedItems: [] };
+    return { success: false, message: "No se proporcionaron datos para importar o el archivo está vacío.", successCount: 0, errorCount: itemDataArray?.length || 0, errors: [{ row: 0, message: "Archivo vacío o sin datos.", data: {} }] };
   }
 
   try {
@@ -793,12 +800,11 @@ export async function importInventoryItemsAction(
           addedByUserId: currentUserId,
           addedByUserName: currentUserName,
         };
-        // Ensure Category is valid before prefix generation
-        if (!INVENTORY_ITEM_CATEGORIES.includes(dataToCreate.category)) {
+        
+        if (!INVENTORY_ITEM_CATEGORIES.includes(dataToCreate.category as InventoryItemCategory)) { // Ensure category is valid
             throw new Error(`Categoría inválida '${dataToCreate.category}' encontrada.`);
         }
-        const newItem = await prisma.inventoryItem.create({ data: dataToCreate as any });
-        importedItems.push(newItem);
+        await prisma.inventoryItem.create({ data: dataToCreate });
         successCount++;
       } catch (e: any) {
         errorCount++;
@@ -823,7 +829,6 @@ export async function importInventoryItemsAction(
       successCount,
       errorCount,
       errors,
-      importedItems
     };
 
   } catch (globalError: any) {
@@ -835,7 +840,6 @@ export async function importInventoryItemsAction(
       successCount,
       errorCount: itemDataArray.length - successCount,
       errors: itemDataArray.map((row, index) => ({ row: index + 2, message: "Error global durante la importación.", data: row})),
-      importedItems
     };
   }
 }
@@ -869,12 +873,13 @@ export async function createApprovalRequestAction(
         ...(data.type === "PagoProveedor" && {
           supplierPago: data.supplierPago,
           totalAmountToPay: data.totalAmountToPay,
+          // paymentDueDate is intentionally not set here, as it's part of description
         }),
         attachments: data.attachmentsData && data.attachmentsData.length > 0 ? {
           createMany: {
             data: data.attachmentsData.map(att => ({
               fileName: att.fileName,
-              url: "placeholder/url/" + att.fileName, // Placeholder, replace with actual storage URL
+              url: "uploads/placeholder/" + Date.now() + "_" + att.fileName, // Placeholder URL
               size: att.size,
               type: att.type || 'application/octet-stream',
             }))
@@ -893,7 +898,6 @@ export async function createApprovalRequestAction(
 
     if (data.requesterEmail && newApproval) {
       await logAuditEvent(data.requesterEmail, `Creación de Solicitud de Aprobación (${data.type})`, `Asunto: ${data.subject}, ID: ${newApproval.id}`);
-      
       await sendNtfyNotification({
         title: `Nueva Solicitud de Aprobación: ${data.type}`,
         message: `Solicitud "${data.subject}" por ${data.requesterName} (ID: ${newApproval.id}) está pendiente.`,
@@ -926,6 +930,7 @@ export async function getApprovalRequestsForUser(userId: string, userRole: Role)
         orderBy: { createdAt: 'desc' }
       });
     }
+    // For Admin and specific approvers who submitted requests
     return await prisma.approvalRequest.findMany({
       where: { requesterId: userId },
       orderBy: { createdAt: 'desc' }
@@ -943,7 +948,7 @@ export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRe
       include: {
         attachments: true,
         activityLog: {
-            include: { user: { select: { name: true }}},
+            include: { user: { select: { name: true }}}, // user might be null if userId is not a foreign key
             orderBy: { timestamp: 'desc' }
         },
         paymentInstallments: { orderBy: { dueDate: 'asc' }}
@@ -957,7 +962,11 @@ export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRe
 
 
 export async function approveRequestAction(
-  values: any
+  values: z.infer<typeof ApproveActionBaseSchema> & {
+    approvedPaymentType?: PaymentType;
+    approvedAmount?: number;
+    installments?: z.infer<typeof PaymentInstallmentActionSchema>[];
+  }
 ): Promise<{ success: boolean; message: string }> {
   const { requestId, approverId, approverName, approverEmail, comment, approvedPaymentType, approvedAmount, installments } = values;
 
@@ -972,7 +981,7 @@ export async function approveRequestAction(
       return { success: false, message: "La solicitud no está en un estado que permita aprobación." };
     }
 
-    let validatedData;
+    let validatedData: any; // Holds validated data from specific schemas
     if (request.type === "PagoProveedor") {
         if (approvedPaymentType === "Contado") {
             validatedData = ApprovePagoProveedorContadoSchema.parse(values);
@@ -982,7 +991,7 @@ export async function approveRequestAction(
             return { success: false, message: "Tipo de pago no válido para Pago a Proveedor." };
         }
     } else if (request.type === "Compra") {
-        validatedData = ApproveCompraSchema.parse(values);
+        validatedData = ApproveCompraSchema.parse(values); // This doesn't expect payment type details
     } else {
         return { success: false, message: "Tipo de solicitud desconocida." };
     }
@@ -1001,12 +1010,13 @@ export async function approveRequestAction(
             updateData.approvedPaymentType = validatedData.approvedPaymentType as PaymentType;
             updateData.approvedAmount = validatedData.approvedAmount;
 
+            // Delete existing installments before creating new ones
             await tx.paymentInstallment.deleteMany({ where: { approvalRequestId: requestId }});
             if (validatedData.approvedPaymentType === "Cuotas" && validatedData.installments && validatedData.installments.length > 0) {
                 await tx.paymentInstallment.createMany({
                     data: validatedData.installments.map((inst: { amount: number; dueDate: Date; }) => ({
                         amount: inst.amount,
-                        dueDate: new Date(inst.dueDate),
+                        dueDate: new Date(inst.dueDate), // Ensure it's a Date object
                         approvalRequestId: requestId,
                     }))
                 });
@@ -1019,7 +1029,7 @@ export async function approveRequestAction(
             data: {
                 approvalRequestId: requestId,
                 action: "Solicitud Aprobada",
-                userId: approverId,
+                userId: approverId, // FK to User table
                 userName: approverName,
                 comment: validatedData.comment || "Aprobado sin comentarios adicionales.",
             }
@@ -1080,7 +1090,7 @@ export async function rejectRequestAction(
             data: {
                 approvalRequestId: requestId,
                 action: "Solicitud Rechazada",
-                userId: approverId,
+                userId: approverId, // FK to User table
                 userName: approverName,
                 comment: comment,
             }
@@ -1134,7 +1144,7 @@ export async function requestMoreInfoAction(
             data: {
                 approvalRequestId: requestId,
                 action: "Información Adicional Solicitada",
-                userId: approverId,
+                userId: approverId, // FK to User table
                 userName: approverName,
                 comment: comment,
             }
@@ -1199,7 +1209,6 @@ export async function createCasoMantenimientoAction(
     });
 
     await logAuditEvent(currentUserEmail, "Registro de Nuevo Caso de Mantenimiento", `Título: ${data.title}, ID: ${newCaso.id}`);
-    
     await sendNtfyNotification({
       title: `Nuevo Caso de Mantenimiento: ${data.title.substring(0,30)}...`,
       message: `Caso #${newCaso.id} (${data.title}) registrado por ${currentUserName}. Proveedor: ${data.assignedProviderName}.`,
@@ -1243,7 +1252,7 @@ export async function getCasoMantenimientoByIdAction(id: string): Promise<(CasoD
       include: {
         registeredByUser: { select: { name: true }},
         log: {
-          include: { user: { select: { name: true }}},
+          include: { user: { select: { name: true }}}, // user might be null if userId is not a foreign key
           orderBy: { timestamp: 'desc' }
         }
       }
@@ -1288,7 +1297,6 @@ export async function updateCasoMantenimientoAction(
         dataToUpdate.invoicingDetails = invoicingDetails || null;
         dataToUpdate.resolvedAt = new Date(resolvedAt);
     } else {
-        // Ensure these are nulled out if not 'Resuelto'
         dataToUpdate.resolutionDetails = null;
         dataToUpdate.cost = null;
         dataToUpdate.invoicingDetails = null;
@@ -1305,7 +1313,7 @@ export async function updateCasoMantenimientoAction(
                 casoId: casoId,
                 action: `Actualización de Estado: ${currentStatus}`,
                 notes: notes,
-                userId: actingUserId,
+                userId: actingUserId, // FK to User table
                 userName: actingUserName,
                 statusAfterAction: currentStatus
             }
@@ -1313,7 +1321,6 @@ export async function updateCasoMantenimientoAction(
     });
 
     await logAuditEvent(actingUserEmail, `Actualización de Caso de Mantenimiento: ${currentStatus}`, `ID Caso: ${casoId}. Notas: ${notes}`);
-    
     await sendNtfyNotification({
       title: `Caso de Mantenimiento #${casoId} Actualizado`,
       message: `El caso "${casoToUpdate.title}" cambió a estado ${currentStatus}. Notas: ${notes.substring(0,50)}...`,
@@ -1329,16 +1336,4 @@ export async function updateCasoMantenimientoAction(
    }
 }
 
-// AI Solution Suggestion Action (No longer used, but kept for reference if needed later)
-// import {ai} from '@/ai/genkit';
-// import {suggestSolution, SuggestSolutionInput} from '@/ai/flows/suggest-solution';
-// export async function getAISolutionSuggestion(ticketDescription: string): Promise<{ suggestion?: string; error?: string }> {
-//   try {
-//     const input: SuggestSolutionInput = { ticketDescription };
-//     const result = await suggestSolution(input);
-//     return { suggestion: result.suggestedSolution };
-//   } catch (error: any) {
-//     console.error("Error getting AI suggestion:", error);
-//     return { error: error.message || "Failed to get suggestion from AI." };
-//   }
-// }
+    
