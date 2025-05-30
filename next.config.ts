@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    serverComponentsExternalPackages: ['bcrypt', '@mapbox/node-pre-gyp'], // Added @mapbox/node-pre-gyp
+    serverComponentsExternalPackages: [], 
   },
 };
 

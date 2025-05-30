@@ -5,8 +5,8 @@ import type { User, Role } from "@/lib/types";
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { logAuditEvent } from "@/lib/actions";
-import { prisma } from "@/lib/db"; // Import Prisma client
-import bcrypt from 'bcrypt'; // For password comparison
+import { prisma } from "@/lib/db"; 
+import bcrypt from 'bcryptjs'; 
 
 // Placeholder for specific approver emails, this might be managed differently (e.g. roles/permissions table)
 // For now, this array is still used for UI logic related to who can submit approvals vs. only approve.
@@ -44,22 +44,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const checkUserSession = async () => {
       setIsLoading(true);
       try {
-        // In a real app with server-side sessions, you'd make an API call here
-        // For this client-side context, we'll rely on localStorage initially,
-        // but this is NOT secure for production.
         const storedUserJson = localStorage.getItem("ticketflow_user");
         if (storedUserJson) {
           const parsedUserFromStorage = JSON.parse(storedUserJson) as User;
-          // TODO: Validate this user against the database if they exist in localStorage
-          // For now, if they were logged in and are in localStorage, we set them.
-          // A better approach would be a session check API endpoint.
           if (parsedUserFromStorage && parsedUserFromStorage.id) {
              const dbUser = await prisma.user.findUnique({ where: { id: parsedUserFromStorage.id }});
              if (dbUser) {
                 const { password, ...userWithoutPassword } = dbUser;
-                setUser(userWithoutPassword);
+                setUser(userWithoutPassword as User);
              } else {
-                localStorage.removeItem("ticketflow_user"); // User not found in DB, clear local
+                localStorage.removeItem("ticketflow_user"); 
              }
           }
         }
@@ -76,11 +70,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const dbUser = await prisma.user.findUnique({ where: { email } });
-      if (dbUser) {
+      if (dbUser && dbUser.password) {
         const passwordMatch = await bcrypt.compare(pass, dbUser.password);
         if (passwordMatch) {
           const { password, ...userToStore } = dbUser;
-          setUser(userToStore);
+          setUser(userToStore as User);
           localStorage.setItem("ticketflow_user", JSON.stringify(userToStore));
           await logAuditEvent(email, "Inicio de Sesión Exitoso");
           setIsLoading(false);
@@ -110,7 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         setIsLoading(false);
-        return false; // User already exists
+        return false; 
       }
       const hashedPassword = await bcrypt.hash(pass, 10);
       const newUser = await prisma.user.create({
@@ -118,11 +112,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name,
           email,
           password: hashedPassword,
-          role: "User", // Default role
+          role: "User", 
         },
       });
       const { password, ...userToStore } = newUser;
-      setUser(userToStore);
+      setUser(userToStore as User);
       localStorage.setItem("ticketflow_user", JSON.stringify(userToStore));
       await logAuditEvent(email, "Registro de Nuevo Usuario");
       setIsLoading(false);
@@ -138,12 +132,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return false;
     setIsLoading(true);
     try {
-      // Check if new email is taken by another user
       if (email !== user.email) {
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser && existingUser.id !== user.id) {
           setIsLoading(false);
-          return false; // Email already in use
+          return false; 
         }
       }
       const updatedDbUser = await prisma.user.update({
@@ -151,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         data: { name, email },
       });
       const { password, ...userToStore } = updatedDbUser;
-      setUser(userToStore);
+      setUser(userToStore as User);
       localStorage.setItem("ticketflow_user", JSON.stringify(userToStore));
       await logAuditEvent(user.email, "Actualización de Perfil");
       setIsLoading(false);
@@ -210,7 +203,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const dbUsers = await prisma.user.findMany({
         orderBy: { name: 'asc' }
       });
-      return dbUsers.map(({ password, ...userWithoutPassword }) => userWithoutPassword);
+      return dbUsers.map(({ password, ...userWithoutPassword }) => userWithoutPassword as User);
     } catch (error) {
       console.error("Error fetching all users:", error);
       return [];
@@ -223,11 +216,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
     try {
-      const updateData: any = { ...data };
+      const updateData: any = { 
+        name: data.name,
+        role: data.role,
+        email: data.email,
+        department: data.department,
+       };
       if (data.password && data.password.trim() !== "") {
         updateData.password = await bcrypt.hash(data.password, 10);
-      } else {
-        delete updateData.password; // Don't update password if field is empty
       }
 
       if (data.email) {
@@ -261,12 +257,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsLoading(true);
     try {
-      // Consider what to do with related records (e.g., tickets, comments).
-      // Prisma's default onDelete behavior (Cascade, SetNull) in schema.prisma handles this.
-      // Here, we might need to handle related records manually if cascade is not set or if specific logic is needed.
-      // For simplicity, we'll rely on schema-defined cascade or restrict for now.
-      // Example: Manually disassociate or delete related records first if cascade isn't set up for all relations.
-      // await prisma.ticket.updateMany({ where: { userId: userId }, data: { userId: null } }); // if userId is nullable
       await prisma.user.delete({ where: { id: userId } });
       await logAuditEvent(user.email, "Eliminación de Usuario por Admin", `Usuario ID: ${userId}`);
       setIsLoading(false);
@@ -274,7 +264,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error("Admin delete user error:", error);
       setIsLoading(false);
-       if (error.code === 'P2003') { // Foreign key constraint failed
+       if (error.code === 'P2003') { 
         return { success: false, message: "No se puede eliminar el usuario porque tiene registros asociados (tickets, comentarios, etc.). Reasigna o elimina esos registros primero." };
       }
       return { success: false, message: "Error al eliminar usuario." };
