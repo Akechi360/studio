@@ -8,8 +8,6 @@ import { logAuditEvent } from "@/lib/actions";
 import { prisma } from "@/lib/db"; 
 import bcrypt from 'bcryptjs'; 
 
-// Placeholder for specific approver emails, this might be managed differently (e.g. roles/permissions table)
-// For now, this array is still used for UI logic related to who can submit approvals vs. only approve.
 export const SPECIFIC_APPROVER_EMAILS = [
   "proveedoresvarios@clinicaieq.com",
   "gerencia_administracion@clinicaieq.com",
@@ -50,16 +48,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (parsedUserFromStorage && parsedUserFromStorage.id) {
              const dbUser = await prisma.user.findUnique({ where: { id: parsedUserFromStorage.id }});
              if (dbUser) {
-                const { password, ...userWithoutPassword } = dbUser;
-                setUser(userWithoutPassword as User);
+                const { password, ...userWithoutPassword } = dbUser; // Exclude password
+                setUser(userWithoutPassword as User); // Cast to User to satisfy type
              } else {
                 localStorage.removeItem("ticketflow_user"); 
+                setUser(null);
              }
+          } else {
+            setUser(null);
           }
+        } else {
+            setUser(null);
         }
       } catch (error) {
         console.error("Error checking user session:", error);
         localStorage.removeItem("ticketflow_user");
+        setUser(null);
       }
       setIsLoading(false);
     };
@@ -203,6 +207,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const dbUsers = await prisma.user.findMany({
         orderBy: { name: 'asc' }
       });
+      // Explicitly map to the User type expected by the context, excluding password
       return dbUsers.map(({ password, ...userWithoutPassword }) => userWithoutPassword as User);
     } catch (error) {
       console.error("Error fetching all users:", error);
@@ -238,7 +243,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         where: { id: userId },
         data: updateData,
       });
-      await logAuditEvent(user.email, "Actualización de Usuario por Admin", `Usuario ID: ${userId}, Nuevos Datos: ${JSON.stringify(data)}`);
+      await logAuditEvent(user.email, "Actualización de Usuario por Admin", `Usuario ID: ${userId}, Nuevos Datos: ${JSON.stringify({name:data.name, email: data.email, role: data.role, department: data.department})}`); // Don't log password
       setIsLoading(false);
       return { success: true, message: "Usuario actualizado." };
     } catch (error) {

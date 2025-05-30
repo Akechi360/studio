@@ -2,8 +2,8 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket as TicketType, Comment as CommentType, TicketPriority, TicketStatus, User as UserType, InventoryItem as InventoryItemType, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest as ApprovalRequestTypePrisma, ApprovalRequestType as ApprovalRequestTypeEnum, ApprovalStatus as ApprovalStatusEnum, Role as UserRoleEnum, Attachment as AttachmentTypePrisma, PaymentInstallment as PaymentInstallmentTypePrisma, PaymentType as PaymentTypeEnum, CasoDeMantenimiento as CasoDeMantenimientoTypePrisma, CasoMantenimientoStatus as CasoMantenimientoStatusEnum, CasoMantenimientoPriority as CasoMantenimientoPriorityEnum, CasoMantenimientoLogEntry as CasoMantenimientoLogEntryTypePrisma, AuditLogEntry as AuditLogEntryTypePrisma } from "@prisma/client"; // Import Prisma generated types
-import type { AttachmentClientData } from "./types"; // Keep client-specific types if different
+import type { Ticket as TicketType, Comment as CommentType, TicketPriority, TicketStatus, User as UserType, InventoryItem as InventoryItemType, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest as ApprovalRequestTypePrisma, ApprovalRequestType as ApprovalRequestTypeEnum, ApprovalStatus as ApprovalStatusEnumType, Role as UserRoleEnum, Attachment as AttachmentTypePrisma, PaymentInstallment as PaymentInstallmentTypePrisma, PaymentType as PaymentTypeEnum, CasoDeMantenimiento as CasoDeMantenimientoTypePrisma, CasoMantenimientoStatus as CasoMantenimientoStatusEnum, CasoMantenimientoPriority as CasoMantenimientoPriorityEnum, CasoMantenimientoLogEntry as CasoMantenimientoLogEntryTypePrisma, AuditLogEntry as AuditLogEntryTypePrisma } from "@prisma/client";
+import type { AttachmentClientData } from "./types";
 
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
@@ -13,9 +13,10 @@ import {
   INVENTORY_ITEM_STATUSES, 
   RAM_OPTIONS, 
   STORAGE_TYPES_ZOD_ENUM, 
-  CASO_STATUSES, // Use Prisma enum values where possible or map them
-  CASO_PRIORITIES as CASO_PRIORITIES_TYPES // Keep if different from Prisma or map
-} from "./types"; // Keep client-facing enums if they differ from Prisma's schema enums
+  CASO_STATUSES,
+  CASO_PRIORITIES as CASO_PRIORITIES_TYPES,
+  ApprovalStatus
+} from "./types";
 import {
   BaseInventoryItemSchema,
   CreateApprovalRequestActionSchema,
@@ -25,11 +26,8 @@ import {
   RejectOrInfoActionSchema,
   CreateCasoMantenimientoFormSchema,
   UpdateCasoMantenimientoFormSchema,
-  CreateTicketSchema, // Ensure this is defined or imported
-  AddCommentSchema, // Ensure this is defined or imported
-  UpdateTicketStatusSchema // Ensure this is defined or imported
 } from "../lib/schemas";
-import * as XLSX from 'xlsx'; // Still needed for Excel import client-side logic if action handles raw data
+
 
 // --- Audit Log Actions ---
 export async function logAuditEvent(performingUserEmail: string, actionDescription: string, details?: string): Promise<void> {
@@ -44,7 +42,6 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     revalidatePath("/admin/audit");
   } catch (error) {
     console.error("Error logging audit event:", error);
-    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
 
@@ -52,7 +49,7 @@ export async function getAuditLogs(): Promise<AuditLogEntryTypePrisma[]> {
   try {
     const logs = await prisma.auditLogEntry.findMany({
       orderBy: { timestamp: 'desc' },
-      include: { user: { select: { name: true, email: true }} } // Include user name for display
+      include: { user: { select: { name: true, email: true }} }
     });
     return logs;
   } catch (error) {
@@ -61,9 +58,25 @@ export async function getAuditLogs(): Promise<AuditLogEntryTypePrisma[]> {
   }
 }
 
-// --- Ticket Creation ---
-// Using schema from lib/schemas.ts
+// --- Ticket Schemas (remains client-side, but used by actions) ---
+const CreateTicketSchema = z.object({
+  subject: z.string().min(5).max(100),
+  description: z.string().min(10).max(2000),
+  priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]),
+  userEmail: z.string().email(),
+});
 
+const AddCommentSchema = z.object({
+  text: z.string().min(1).max(1000),
+});
+
+const UpdateTicketStatusSchema = z.object({
+  status: z.enum(TICKET_STATUSES_ENGLISH as [TicketStatus, ...TicketStatus[]]),
+  actingUserEmail: z.string().email(),
+});
+
+
+// --- Ticket Creation ---
 export async function createTicketAction(
   userId: string,
   userName: string,
@@ -85,8 +98,8 @@ export async function createTicketAction(
       data: {
         subject,
         description,
-        priority, // Assumes TicketPriority enum in Prisma matches Zod enum
-        status: "Open", // Assumes TicketStatus enum in Prisma matches
+        priority,
+        status: "Open",
         userId,
         userName,
         userEmail,
@@ -101,6 +114,7 @@ export async function createTicketAction(
     revalidatePath("/dashboard");
     revalidatePath("/admin/analytics");
     revalidatePath("/admin/reports");
+    revalidatePath("/approvals");
 
 
     return {
@@ -118,8 +132,6 @@ export async function createTicketAction(
 }
 
 // --- Add Comment ---
-// Using schema from lib/schemas.ts
-
 export async function addCommentAction(
   ticketId: string,
   commenter: Pick<UserType, 'id' | 'name' | 'email' | 'avatarUrl'>,
@@ -174,8 +186,6 @@ export async function addCommentAction(
 }
 
 // --- Update Ticket Status ---
-// Using schema from lib/schemas.ts
-
 export async function updateTicketStatusAction(
   ticketId: string,
   values: z.infer<typeof UpdateTicketStatusSchema>
@@ -209,10 +219,10 @@ export async function updateTicketStatusAction(
     revalidatePath("/admin/reports");
 
 
-    const statusDisplayMap: Record<TicketStatus, string> = {
+    const statusDisplayMap: Record<string, string> = {
       Open: "Abierto", InProgress: "En Progreso", Resolved: "Resuelto", Closed: "Cerrado",
     };
-    return { success: true, message: `Estado del ticket actualizado a ${statusDisplayMap[status as TicketStatus]}.` };
+    return { success: true, message: `Estado del ticket actualizado a ${statusDisplayMap[status]}.` };
   } catch (error) {
     console.error("Error updating ticket status in DB:", error);
     return { success: false, message: "Error de base de datos al actualizar estado." };
@@ -220,7 +230,7 @@ export async function updateTicketStatusAction(
 }
 
 // --- Fetch Ticket by ID ---
-export async function getTicketById(ticketId: string): Promise<TicketTypePrisma & { comments: CommentTypePrisma[], attachments: AttachmentTypePrisma[] } | null> {
+export async function getTicketById(ticketId: string): Promise<(TicketType & { comments: CommentType[], attachments: AttachmentTypePrisma[], user: { name: string | null, email: string | null } | null }) | null> {
   try {
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
@@ -234,10 +244,10 @@ export async function getTicketById(ticketId: string): Promise<TicketTypePrisma 
 }
 
 // --- Fetch All Tickets ---
-export async function getAllTickets(): Promise<(TicketTypePrisma & { comments: CommentTypePrisma[], attachments: AttachmentTypePrisma[], user: { name: string } })[]> {
+export async function getAllTickets(): Promise<(TicketType & { comments: CommentType[], attachments: AttachmentTypePrisma[], user: { name: string | null } | null })[]> {
   try {
     const tickets = await prisma.ticket.findMany({
-      orderBy: [{priority: 'desc'}, {createdAt: 'desc'}], // Example: prioritize High first, then by date
+      orderBy: [{priority: 'desc'}, {createdAt: 'desc'}],
       include: { user: { select: { name: true }}, comments: true, attachments: true }
     });
     return tickets;
@@ -258,23 +268,23 @@ export async function getDashboardStats() {
 
     const summary = { total, open, inProgress, resolved, closed };
 
-    const byPriority = await prisma.ticket.groupBy({
+    const byPriorityDb = await prisma.ticket.groupBy({
       by: ['priority'],
       _count: { id: true },
     });
-    const byStatus = await prisma.ticket.groupBy({
+    const byStatusDb = await prisma.ticket.groupBy({
       by: ['status'],
       _count: { id: true },
     });
 
     const stats = {
       byPriority: TICKET_PRIORITIES_ENGLISH.map(pKey => ({
-        name: pKey, // Assuming pKey is 'High', 'Medium', 'Low'
-        value: byPriority.find(p => p.priority === pKey)?._count.id || 0,
+        name: pKey as string,
+        value: byPriorityDb.find(p => p.priority === pKey)?._count.id || 0,
       })),
       byStatus: TICKET_STATUSES_ENGLISH.map(sKey => ({
-        name: sKey, // Assuming sKey matches Prisma enum values
-        value: byStatus.find(s => s.status === sKey)?._count.id || 0,
+        name: sKey as string,
+        value: byStatusDb.find(s => s.status === sKey)?._count.id || 0,
       })),
     };
     return { summary, stats };
@@ -282,15 +292,15 @@ export async function getDashboardStats() {
     console.error("Error fetching dashboard stats:", error);
     const placeholderSummary = { total: 0, open: 0, inProgress: 0, resolved: 0, closed: 0 };
     const placeholderStats = { 
-      byPriority: TICKET_PRIORITIES_ENGLISH.map(pKey => ({ name: pKey, value: 0 })),
-      byStatus: TICKET_STATUSES_ENGLISH.map(sKey => ({ name: sKey, value: 0 }))
+      byPriority: TICKET_PRIORITIES_ENGLISH.map(pKey => ({ name: pKey as string, value: 0 })),
+      byStatus: TICKET_STATUSES_ENGLISH.map(sKey => ({ name: sKey as string, value: 0 }))
     };
     return { summary: placeholderSummary, stats: placeholderStats };
   }
 }
 
 // --- Inventory Actions ---
-export async function getAllInventoryItems(): Promise<InventoryItemTypePrisma[]> {
+export async function getAllInventoryItems(): Promise<(InventoryItemType & { addedByUser: { name: string | null } | null })[]> {
   try {
     const items = await prisma.inventoryItem.findMany({ 
       orderBy: { createdAt: 'desc' },
@@ -303,7 +313,6 @@ export async function getAllInventoryItems(): Promise<InventoryItemTypePrisma[]>
   }
 }
 
-// Using BaseInventoryItemSchema from lib/schemas.ts
 export async function addInventoryItemAction(
   currentUser: Pick<UserType, 'id' | 'name' | 'email'>,
   values: Omit<z.infer<typeof BaseInventoryItemSchema>, "currentUserEmail">
@@ -315,14 +324,9 @@ export async function addInventoryItemAction(
   const data = validatedFields.data;
 
   try {
-    // Simplified ID: Prisma will generate a CUID. The PREFIJO-IEQ-NNN logic is removed.
     const newItem = await prisma.inventoryItem.create({
       data: {
         ...data,
-        category: data.category as InventoryItemCategory, // Ensure type compatibility
-        status: data.status as InventoryItemStatus, // Ensure type compatibility
-        ram: data.ram as RamOption | undefined, // Ensure type compatibility
-        storageType: data.storageType as StorageType | undefined, // Ensure type compatibility
         addedByUserId: currentUser.id,
         addedByUserName: currentUser.name || "Usuario del Sistema",
       }
@@ -361,10 +365,6 @@ export async function updateInventoryItemAction(
       where: { id: itemId },
       data: { 
         ...data, 
-        category: data.category as InventoryItemCategory,
-        status: data.status as InventoryItemStatus,
-        ram: data.ram as RamOption | undefined,
-        storageType: data.storageType as StorageType | undefined,
         updatedAt: new Date()
       }
     });
@@ -455,7 +455,7 @@ export async function importInventoryItemsAction(
   currentUserEmail: string,
   currentUserId: string,
   currentUserName: string
-): Promise<{ success: boolean; message: string; successCount: number; errorCount: number; errors: { row: number; message: string; data: ExcelInventoryItemData }[]; importedItems: InventoryItemTypePrisma[] }> {
+): Promise<{ success: boolean; message: string; successCount: number; errorCount: number; errors: { row: number; message: string; data: ExcelInventoryItemData }[]; importedItems: InventoryItemType[] }> {
   if (!itemDataArray || itemDataArray.length === 0) {
     return { success: false, message: "No se proporcionaron datos para importar o el archivo está vacío.", successCount: 0, errorCount: itemDataArray?.length || 0, errors: [{ row: 0, message: "Archivo vacío o sin datos.", data: {} }], importedItems: [] };
   }
@@ -463,7 +463,7 @@ export async function importInventoryItemsAction(
   let successCount = 0;
   let errorCount = 0;
   const errors: { row: number; message: string; data: ExcelInventoryItemData }[] = [];
-  const importedItems: InventoryItemTypePrisma[] = [];
+  const importedItems: InventoryItemType[] = [];
 
   try {
     for (let i = 0; i < itemDataArray.length; i++) {
@@ -484,15 +484,10 @@ export async function importInventoryItemsAction(
         
         const dataToCreate = {
           ...validatedFields.data,
-          category: validatedFields.data.category as InventoryItemCategory,
-          status: validatedFields.data.status as InventoryItemStatus,
-          ram: validatedFields.data.ram as RamOption | undefined,
-          storageType: validatedFields.data.storageType as StorageType | undefined,
           addedByUserId: currentUserId,
           addedByUserName: currentUserName,
         };
 
-        // Check for existing serial number before attempting to create
         if (dataToCreate.serialNumber && dataToCreate.serialNumber.trim() !== "") {
           const existingItemBySerial = await prisma.inventoryItem.findUnique({
             where: { serialNumber: dataToCreate.serialNumber },
@@ -535,7 +530,7 @@ export async function importInventoryItemsAction(
       success: false, 
       message: `Error general durante la importación: ${globalError.message || "Error desconocido"}`, 
       successCount, 
-      errorCount: itemDataArray.length - successCount, // Assume all remaining rows failed if a global error occurs
+      errorCount: itemDataArray.length - successCount,
       errors, 
       importedItems 
     };
@@ -543,7 +538,6 @@ export async function importInventoryItemsAction(
 }
 
 // --- Approval Actions ---
-// Using CreateApprovalRequestActionSchema from lib/schemas.ts
 export async function createApprovalRequestAction(
   values: z.infer<typeof CreateApprovalRequestActionSchema>
 ): Promise<{ success: boolean; message: string; approvalId?: string; errors?: any }> {
@@ -554,66 +548,64 @@ export async function createApprovalRequestAction(
   const data = validatedFields.data;
 
   try {
-    const requestDataToCreate: any = {
-      type: data.type,
-      subject: data.subject,
-      description: data.description,
-      status: "Pendiente", // Initial status
-      requesterId: data.requesterId,
-      requesterName: data.requesterName,
-      requesterEmail: data.requesterEmail,
-    };
+    let newApproval;
+    await prisma.$transaction(async (tx) => {
+        const approvalData: any = {
+            type: data.type,
+            subject: data.subject,
+            description: data.description,
+            status: "Pendiente",
+            requesterId: data.requesterId,
+            requesterName: data.requesterName,
+            requesterEmail: data.requesterEmail,
+            attachments: data.attachmentsData && data.attachmentsData.length > 0 ? {
+                create: data.attachmentsData.map(att => ({
+                    fileName: att.fileName,
+                    url: "placeholder/url/" + att.fileName, // Placeholder URL
+                    size: att.size,
+                    type: att.type,
+                }))
+            } : undefined,
+        };
 
-    if (data.type === "Compra") {
-      requestDataToCreate.itemDescription = data.itemDescription;
-      requestDataToCreate.estimatedPrice = data.estimatedPrice;
-      requestDataToCreate.supplierCompra = data.supplierCompra;
-    } else if (data.type === "PagoProveedor") {
-      requestDataToCreate.supplierPago = data.supplierPago;
-      requestDataToCreate.totalAmountToPay = data.totalAmountToPay;
-      // paymentDueDate is not directly in form now, comes from description.
-    }
-
-    const newApproval = await prisma.approvalRequest.create({
-      data: requestDataToCreate
-    });
-
-    if (data.attachmentsData && data.attachmentsData.length > 0) {
-      await prisma.attachment.createMany({
-        data: data.attachmentsData.map(att => ({
-          fileName: att.fileName,
-          url: "placeholder/url/" + att.fileName, // Placeholder URL
-          size: att.size,
-          type: att.type,
-          approvalRequestId: newApproval.id,
-        }))
-      });
-    }
-    
-    // Initial Activity Log
-    await prisma.approvalActivityLogEntry.create({
-        data: {
-            approvalRequestId: newApproval.id,
-            action: "Solicitud Creada",
-            userId: data.requesterId,
-            userName: data.requesterName,
-            comment: "Solicitud creada inicialmente.",
+        if (data.type === "Compra") {
+            approvalData.itemDescription = data.itemDescription;
+            approvalData.estimatedPrice = data.estimatedPrice;
+            approvalData.supplierCompra = data.supplierCompra;
+        } else if (data.type === "PagoProveedor") {
+            approvalData.supplierPago = data.supplierPago;
+            approvalData.totalAmountToPay = data.totalAmountToPay;
         }
+
+        newApproval = await tx.approvalRequest.create({
+            data: approvalData
+        });
+
+        await tx.approvalActivityLogEntry.create({
+            data: {
+                approvalRequestId: newApproval.id,
+                action: "Solicitud Creada",
+                userId: data.requesterId,
+                userName: data.requesterName,
+                comment: "Solicitud creada inicialmente.",
+            }
+        });
     });
 
 
-    if (data.requesterEmail) {
+    if (data.requesterEmail && newApproval) {
       await logAuditEvent(data.requesterEmail, `Creación de Solicitud de Aprobación (${data.type})`, `Asunto: ${data.subject}, ID: ${newApproval.id}`);
     }
     revalidatePath("/approvals");
     revalidatePath("/dashboard");
-    revalidatePath(`/approvals/${newApproval.id}`, "page");
-
+    if (newApproval) {
+        revalidatePath(`/approvals/${newApproval.id}`);
+    }
 
     return {
       success: true,
       message: `Solicitud de ${data.type === "Compra" ? "Compra" : "Pago a Proveedores"} enviada exitosamente.`,
-      approvalId: newApproval.id,
+      approvalId: newApproval?.id,
     };
   } catch (error) {
     console.error("Error creating approval request in DB:", error);
@@ -630,7 +622,6 @@ export async function getApprovalRequestsForUser(userId: string, userRole: UserR
         orderBy: { createdAt: 'desc' }
       });
     }
-    // For Admins and specific approvers, show requests they created
     return await prisma.approvalRequest.findMany({
       where: { requesterId: userId },
       include: { requester: { select: { name: true, email: true } } },
@@ -642,7 +633,7 @@ export async function getApprovalRequestsForUser(userId: string, userRole: UserR
   }
 }
 
-export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRequestTypePrisma & { attachments: AttachmentTypePrisma[], activityLog: (ApprovalActivityLogEntryTypePrisma & { user: { name: string }})[], paymentInstallments: PaymentInstallmentTypePrisma[] }) | null> {
+export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRequestTypePrisma & { attachments: AttachmentTypePrisma[], activityLog: (ApprovalActivityLogEntryTypePrisma & { user: { name: string | null } | null })[], paymentInstallments: PaymentInstallmentTypePrisma[] }) | null> {
   try {
     return await prisma.approvalRequest.findUnique({
       where: { id },
@@ -651,8 +642,7 @@ export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRe
         approver: { select: { name: true, email: true } },
         attachments: true, 
         activityLog: { 
-            // Removed user relation for activity log, assuming userId/userName is sufficient
-            // In Prisma schema, ApprovalActivityLogEntry does not have a direct 'user' relation, but stores userId/userName.
+            include: { user: { select: { name: true }}},
             orderBy: { timestamp: 'desc' } 
         }, 
         paymentInstallments: { orderBy: { dueDate: 'asc' }}
@@ -665,7 +655,7 @@ export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRe
 }
 
 export async function approveRequestAction(
-  values: any // Needs a proper Zod schema for validation based on type
+  values: any
 ): Promise<{ success: boolean; message: string }> {
   const { requestId, approverId, approverName, approverEmail, comment, approvedPaymentType, approvedAmount, installments } = values;
 
@@ -691,45 +681,42 @@ export async function approveRequestAction(
         return { success: false, message: "Tipo de solicitud desconocida." };
     }
     
-    const updateData: any = {
-      status: "Aprobado" as ApprovalStatusEnum,
-      approverId,
-      approverName,
-      approverComment: validatedData.comment,
-      approvedAt: new Date(),
-    };
+    await prisma.$transaction(async (tx) => {
+        const updateData: any = {
+            status: "Aprobado" as ApprovalStatusEnumType,
+            approverId,
+            approverName,
+            approverComment: validatedData.comment,
+            approvedAt: new Date(),
+        };
 
-    if (request.type === "PagoProveedor") {
-      updateData.approvedPaymentType = validatedData.approvedPaymentType;
-      updateData.approvedAmount = validatedData.approvedAmount;
-      
-      // Handle installments: delete existing and create new ones within a transaction
-      await prisma.$transaction(async (tx) => {
-        await tx.paymentInstallment.deleteMany({ where: { approvalRequestId: requestId }});
-        if (validatedData.approvedPaymentType === "Cuotas" && validatedData.installments && validatedData.installments.length > 0) {
-          await tx.paymentInstallment.createMany({
-            data: validatedData.installments.map((inst: any) => ({
-              amount: inst.amount,
-              dueDate: new Date(inst.dueDate), // Ensure it's a Date object
-              approvalRequestId: requestId,
-            }))
-          });
+        if (request.type === "PagoProveedor") {
+            updateData.approvedPaymentType = validatedData.approvedPaymentType;
+            updateData.approvedAmount = validatedData.approvedAmount;
+            
+            await tx.paymentInstallment.deleteMany({ where: { approvalRequestId: requestId }});
+            if (validatedData.approvedPaymentType === "Cuotas" && validatedData.installments && validatedData.installments.length > 0) {
+                await tx.paymentInstallment.createMany({
+                    data: validatedData.installments.map((inst: any) => ({
+                        amount: inst.amount,
+                        dueDate: new Date(inst.dueDate),
+                        approvalRequestId: requestId,
+                    }))
+                });
+            }
         }
+        
         await tx.approvalRequest.update({ where: { id: requestId }, data: updateData });
-      });
 
-    } else { // Compra
-        await prisma.approvalRequest.update({ where: { id: requestId }, data: updateData });
-    }
-
-    await prisma.approvalActivityLogEntry.create({
-      data: {
-        approvalRequestId: requestId,
-        action: "Solicitud Aprobada",
-        userId: approverId,
-        userName: approverName,
-        comment: validatedData.comment || "Aprobado sin comentarios adicionales.",
-      }
+        await tx.approvalActivityLogEntry.create({
+            data: {
+                approvalRequestId: requestId,
+                action: "Solicitud Aprobada",
+                userId: approverId,
+                userName: approverName,
+                comment: validatedData.comment || "Aprobado sin comentarios adicionales.",
+            }
+        });
     });
 
     await logAuditEvent(approverEmail, "Aprobación de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${validatedData.comment || 'N/A'}.`);
@@ -762,25 +749,27 @@ export async function rejectRequestAction(
       return { success: false, message: "La solicitud no está en un estado que permita rechazo." };
     }
 
-    await prisma.approvalRequest.update({
-      where: { id: requestId },
-      data: {
-        status: "Rechazado" as ApprovalStatusEnum,
-        approverId,
-        approverName,
-        approverComment: comment,
-        rejectedAt: new Date(),
-      }
-    });
+    await prisma.$transaction(async (tx) => {
+        await tx.approvalRequest.update({
+            where: { id: requestId },
+            data: {
+                status: "Rechazado" as ApprovalStatusEnumType,
+                approverId,
+                approverName,
+                approverComment: comment,
+                rejectedAt: new Date(),
+            }
+        });
 
-    await prisma.approvalActivityLogEntry.create({
-      data: {
-        approvalRequestId: requestId,
-        action: "Solicitud Rechazada",
-        userId: approverId,
-        userName: approverName,
-        comment: comment,
-      }
+        await tx.approvalActivityLogEntry.create({
+            data: {
+                approvalRequestId: requestId,
+                action: "Solicitud Rechazada",
+                userId: approverId,
+                userName: approverName,
+                comment: comment,
+            }
+        });
     });
 
     await logAuditEvent(approverEmail, "Rechazo de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
@@ -810,26 +799,28 @@ export async function requestMoreInfoAction(
       return { success: false, message: "La solicitud no está en un estado que permita solicitar más información." };
     }
 
-    await prisma.approvalRequest.update({
-      where: { id: requestId },
-      data: {
-        status: "InformacionSolicitada" as ApprovalStatusEnum,
-        approverId, // Record who requested info
-        approverName,
-        infoRequestedAt: new Date(),
-        // approverComment: comment, // Comment is logged in activity
-      }
-    });
+    await prisma.$transaction(async (tx) => {
+        await tx.approvalRequest.update({
+            where: { id: requestId },
+            data: {
+                status: "InformacionSolicitada" as ApprovalStatusEnumType,
+                approverId, 
+                approverName,
+                infoRequestedAt: new Date(),
+            }
+        });
 
-    await prisma.approvalActivityLogEntry.create({
-      data: {
-        approvalRequestId: requestId,
-        action: "Información Adicional Solicitada",
-        userId: approverId,
-        userName: approverName,
-        comment: comment,
-      }
+        await tx.approvalActivityLogEntry.create({
+            data: {
+                approvalRequestId: requestId,
+                action: "Información Adicional Solicitada",
+                userId: approverId,
+                userName: approverName,
+                comment: comment,
+            }
+        });
     });
+    
 
     await logAuditEvent(approverEmail, "Solicitud de Más Información", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
     revalidatePath(`/approvals/${requestId}`);
@@ -843,7 +834,6 @@ export async function requestMoreInfoAction(
 }
 
 // --- Gestión de Casos de Mantenimiento Actions ---
-// Using CreateCasoMantenimientoFormSchema from lib/schemas.ts
 export async function createCasoMantenimientoAction(
   values: z.infer<typeof CreateCasoMantenimientoFormSchema>,
   currentUserId: string,
@@ -863,9 +853,9 @@ export async function createCasoMantenimientoAction(
         description: data.description,
         location: data.location,
         equipment: data.equipment,
-        priority: data.priority as CasoMantenimientoPriorityEnum,
+        priority: data.priority,
         assignedProviderName: data.assignedProviderName,
-        currentStatus: "Registrado" as CasoMantenimientoStatusEnum,
+        currentStatus: "Registrado",
         registeredAt: new Date(),
         registeredByUserId: currentUserId,
         registeredByUserName: currentUserName,
@@ -875,7 +865,7 @@ export async function createCasoMantenimientoAction(
             notes: "Caso de mantenimiento inicial registrado.",
             userId: currentUserId,
             userName: currentUserName,
-            statusAfterAction: "Registrado" as CasoMantenimientoStatusEnum
+            statusAfterAction: "Registrado"
           }]
         }
       }
@@ -895,7 +885,7 @@ export async function createCasoMantenimientoAction(
   }
 }
 
-export async function getAllCasosMantenimientoAction(): Promise<(CasoDeMantenimientoTypePrisma & { log: CasoMantenimientoLogEntryTypePrisma[] })[]> {
+export async function getAllCasosMantenimientoAction(): Promise<(CasoDeMantenimientoTypePrisma & { log: CasoMantenimientoLogEntryTypePrisma[], registeredByUser: { name: string | null } | null })[]> {
   try {
     return await prisma.casoDeMantenimiento.findMany({
       include: { 
@@ -910,7 +900,7 @@ export async function getAllCasosMantenimientoAction(): Promise<(CasoDeMantenimi
   }
 }
 
-export async function getCasoMantenimientoByIdAction(id: string): Promise<(CasoDeMantenimientoTypePrisma & { log: (CasoMantenimientoLogEntryTypePrisma & {user: { name: string }})[] }) | null> {
+export async function getCasoMantenimientoByIdAction(id: string): Promise<(CasoDeMantenimientoTypePrisma & { log: (CasoMantenimientoLogEntryTypePrisma & {user: { name: string | null }})[], registeredByUser: { name: string | null } | null }) | null> {
    try {
     return await prisma.casoDeMantenimiento.findUnique({
       where: { id },
@@ -928,7 +918,6 @@ export async function getCasoMantenimientoByIdAction(id: string): Promise<(CasoD
   }
 }
 
-// Using UpdateCasoMantenimientoFormSchema from lib/schemas.ts
 export async function updateCasoMantenimientoAction(
   casoId: string,
   updates: z.infer<typeof UpdateCasoMantenimientoFormSchema>,
@@ -947,10 +936,10 @@ export async function updateCasoMantenimientoAction(
     if (!casoToUpdate) return { success: false, message: "Caso no encontrado." };
 
     const dataToUpdate: any = {
-        currentStatus: currentStatus as CasoMantenimientoStatusEnum,
+        currentStatus: currentStatus,
         assignedProviderName,
         nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : null,
-        lastFollowUpDate: new Date(), // Set last follow-up to now
+        lastFollowUpDate: new Date(), 
     };
 
     if (currentStatus === "Resuelto") {
@@ -962,29 +951,28 @@ export async function updateCasoMantenimientoAction(
         dataToUpdate.invoicingDetails = invoicingDetails;
         dataToUpdate.resolvedAt = new Date(resolvedAt);
     } else {
-        // Clear closure fields if status is not Resuelto
         dataToUpdate.resolutionDetails = null;
         dataToUpdate.cost = null;
         dataToUpdate.invoicingDetails = null;
         dataToUpdate.resolvedAt = null;
     }
     
-    await prisma.$transaction([
-        prisma.casoDeMantenimiento.update({
+    await prisma.$transaction(async (tx) => {
+        await tx.casoDeMantenimiento.update({
             where: { id: casoId },
             data: dataToUpdate
-        }),
-        prisma.casoMantenimientoLogEntry.create({
+        });
+        await tx.casoMantenimientoLogEntry.create({
             data: {
                 casoId: casoId,
                 action: `Actualización de Estado: ${currentStatus}`,
                 notes: notes,
                 userId: actingUserId,
                 userName: actingUserName,
-                statusAfterAction: currentStatus as CasoMantenimientoStatusEnum
+                statusAfterAction: currentStatus
             }
-        })
-    ]);
+        });
+    });
 
     await logAuditEvent(actingUserEmail, `Actualización de Caso de Mantenimiento: ${currentStatus}`, `ID Caso: ${casoId}. Notas: ${notes}`);
     revalidatePath(`/mantenimiento/${casoId}`);
@@ -995,3 +983,13 @@ export async function updateCasoMantenimientoAction(
      return { success: false, message: "Error de base de datos al actualizar caso de mantenimiento." };
    }
 }
+
+// --- AI Solution Suggestion ---
+// No longer needed, but keeping structure if it were to be re-added elsewhere.
+// import { ai } from '@/ai/genkit';
+// export async function getAISolutionSuggestion(ticketDescription: string): Promise<{ suggestion?: string; error?: string }> {
+//   // This will be replaced by the AI Flow for suggesting solutions
+//   // For now, a placeholder:
+//   // return { suggestion: `Based on "${ticketDescription}", try restarting the device. If that doesn't work, check network cables.` };
+//   return { error: "AI suggestion feature is not implemented yet."};
+// }
