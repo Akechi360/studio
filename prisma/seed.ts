@@ -1,17 +1,17 @@
 
 import { PrismaClient, Role } from '@prisma/client';
-// import bcrypt from 'bcrypt'; // In a real app, use bcrypt for password hashing
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Start seeding ...');
 
-  // const saltRounds = 10; // For bcrypt
+  const saltRounds = 10;
 
   // Create Admin User
-  const adminPassword = "adminpassword"; // Store as plain text for this mock-to-DB transition
-  // const hashedPasswordAdmin = await bcrypt.hash(adminPassword, saltRounds); // Real app
+  const adminPassword = "adminpassword"; // Default admin password
+  const hashedPasswordAdmin = await bcrypt.hash(adminPassword, saltRounds);
 
   await prisma.user.upsert({
     where: { email: 'sistemas@clinicaieq.com' },
@@ -21,14 +21,15 @@ async function main() {
       email: 'sistemas@clinicaieq.com',
       role: Role.Admin,
       department: 'Sistemas',
-      password: adminPassword, // Use hashedPasswordAdmin in real app
+      password: hashedPasswordAdmin,
       avatarUrl: 'https://placehold.co/100x100.png?text=SC',
     },
   });
-  console.log('Admin user systems@clinicaieq.com created/ensured.');
+  console.log('Admin user sistemas@clinicaieq.com created/ensured.');
 
-  const presidentePassword = "presidentepassword";
-  // const hashedPasswordPresidente = await bcrypt.hash(presidentePassword, saltRounds); // Real app
+  // Create Presidente User
+  const presidentePassword = "presidentepassword"; // Default presidente password
+  const hashedPasswordPresidente = await bcrypt.hash(presidentePassword, saltRounds);
 
   await prisma.user.upsert({
     where: { email: 'presidente@clinicaieq.com' },
@@ -38,7 +39,7 @@ async function main() {
       email: 'presidente@clinicaieq.com',
       role: Role.PresidenteIEQ,
       department: 'Presidente',
-      password: presidentePassword, // Use hashedPasswordPresidente in real app
+      password: hashedPasswordPresidente,
       avatarUrl: 'https://placehold.co/100x100.png?text=PI',
     },
   });
@@ -51,7 +52,7 @@ async function main() {
       email: "proveedoresvarios@clinicaieq.com",
       role: Role.User,
       department: "Tesoreria",
-      password: "123456789",
+      password: "123456789", // Temporary password
       avatarUrl: "https://placehold.co/100x100.png?text=MM",
     },
     {
@@ -65,7 +66,7 @@ async function main() {
     {
       name: "Emilia Valderrama",
       email: "electromedicina@clinicaieq.com",
-      role: Role.User, // Role can be User, access to modules is also email-based
+      role: Role.User, 
       department: "Equipos Medicos",
       password: "123456789",
       avatarUrl: "https://placehold.co/100x100.png?text=EV",
@@ -80,7 +81,7 @@ async function main() {
     },
     {
       name: "Pina Aulino",
-      email: "suministros@cliniciaeq.com", // Typo in original? clinicaieq.com
+      email: "suministros@clinicaieq.com", 
       role: Role.User,
       department: "Suministros",
       password: "123456789",
@@ -89,7 +90,7 @@ async function main() {
   ];
 
   for (const approver of approvers) {
-    // const hashedPassword = await bcrypt.hash(approver.password, saltRounds); // Real app
+    const hashedPassword = await bcrypt.hash(approver.password, saltRounds);
     await prisma.user.upsert({
       where: { email: approver.email },
       update: {},
@@ -98,7 +99,7 @@ async function main() {
         email: approver.email,
         role: approver.role,
         department: approver.department,
-        password: approver.password, // Use hashedPassword in real app
+        password: hashedPassword,
         avatarUrl: approver.avatarUrl,
       },
     });

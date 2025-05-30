@@ -2,31 +2,10 @@
 "use server";
 
 import { z } from "zod";
-import type { Ticket, Comment, TicketPriority, TicketStatus, User, InventoryItem, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest, ApprovalRequestType, ApprovalStatus as ApprovalStatusType, Role as UserRole, AttachmentClientData, Attachment, PaymentInstallment, PaymentType, CasoDeMantenimiento, CasoMantenimientoStatus, CasoMantenimientoPriority, CasoMantenimientoLogEntry } from "./types";
-import type { AuditLogEntry as AuditLogEntryType } from "@/lib/types";
-// Removed mock data imports as we are transitioning to Prisma
-// import {
-//   addTicketToMock,
-//   getAllTicketsFromMock,
-//   getTicketByIdFromMock,
-//   getRawTicketsStoreForStats,
-//   getAllInventoryItemsFromMock,
-//   addInventoryItemToMock,
-//   getRawInventoryStore,
-//   updateInventoryItemInMock,
-//   deleteInventoryItemFromMock,
-//   getInventoryItemByIdFromMock,
-//   addAuditLogEntryToMock,
-//   getAllAuditLogsFromMock,
-//   addApprovalRequestToMock,
-//   getAllApprovalRequestsFromMock,
-//   getApprovalRequestByIdFromMock,
-//   updateApprovalRequestInMock,
-//   addCasoMantenimientoToMock,
-//   getAllCasosMantenimientoFromMock,
-//   getCasoMantenimientoByIdFromMock,
-//   updateCasoMantenimientoInMock,
-// } from "./mock-data";
+import type { Ticket as TicketType, Comment as CommentType, TicketPriority, TicketStatus, User as UserType, InventoryItem as InventoryItemType, InventoryItemCategory, InventoryItemStatus, StorageType, ExcelInventoryItemData, ApprovalRequest as ApprovalRequestTypePrisma, ApprovalRequestType as ApprovalRequestTypeEnum, ApprovalStatus as ApprovalStatusEnum, Role as UserRoleEnum, Attachment as AttachmentTypePrisma, PaymentInstallment as PaymentInstallmentTypePrisma, PaymentType as PaymentTypeEnum, CasoDeMantenimiento as CasoDeMantenimientoTypePrisma, CasoMantenimientoStatus as CasoMantenimientoStatusEnum, CasoMantenimientoPriority as CasoMantenimientoPriorityEnum, CasoMantenimientoLogEntry as CasoMantenimientoLogEntryTypePrisma, AuditLogEntry as AuditLogEntryTypePrisma } from "@prisma/client"; // Import Prisma generated types
+import type { AttachmentClientData } from "./types"; // Keep client-specific types if different
+
+import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
 import { 
@@ -34,9 +13,9 @@ import {
   INVENTORY_ITEM_STATUSES, 
   RAM_OPTIONS, 
   STORAGE_TYPES_ZOD_ENUM, 
-  CASO_STATUSES, 
-  CASO_PRIORITIES 
-} from "./types";
+  CASO_STATUSES, // Use Prisma enum values where possible or map them
+  CASO_PRIORITIES as CASO_PRIORITIES_TYPES // Keep if different from Prisma or map
+} from "./types"; // Keep client-facing enums if they differ from Prisma's schema enums
 import {
   BaseInventoryItemSchema,
   CreateApprovalRequestActionSchema,
@@ -45,49 +24,48 @@ import {
   ApproveCompraSchema,
   RejectOrInfoActionSchema,
   CreateCasoMantenimientoFormSchema,
-  UpdateCasoMantenimientoFormSchema
-} from "../lib/schemas"; 
-import * as XLSX from 'xlsx';
-
-// TODO: Initialize Prisma Client (typically in a separate db.ts file and import it here)
-// import prisma from './db'; 
+  UpdateCasoMantenimientoFormSchema,
+  CreateTicketSchema, // Ensure this is defined or imported
+  AddCommentSchema, // Ensure this is defined or imported
+  UpdateTicketStatusSchema // Ensure this is defined or imported
+} from "../lib/schemas";
+import * as XLSX from 'xlsx'; // Still needed for Excel import client-side logic if action handles raw data
 
 // --- Audit Log Actions ---
 export async function logAuditEvent(performingUserEmail: string, actionDescription: string, details?: string): Promise<void> {
   try {
-    // TODO: Implement using Prisma client
-    // await prisma.auditLogEntry.create({
-    //   data: {
-    //     userEmail: performingUserEmail,
-    //     action: actionDescription,
-    //     details: details || undefined,
-    //   }
-    // });
-    console.warn(`Audit Event (needs Prisma): User: ${performingUserEmail}, Action: ${actionDescription}, Details: ${details}`);
-    revalidatePath("/admin/audit"); // This might still be useful
+    await prisma.auditLogEntry.create({
+      data: {
+        userEmail: performingUserEmail,
+        action: actionDescription,
+        details: details || undefined,
+      }
+    });
+    revalidatePath("/admin/audit");
   } catch (error) {
-    console.error("Error logging audit event (Prisma TODO):", error);
+    console.error("Error logging audit event:", error);
+    // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
 
-export async function getAuditLogs(): Promise<AuditLogEntryType[]> {
-  // TODO: Implement using Prisma client
-  // const logs = await prisma.auditLogEntry.findMany({ orderBy: { timestamp: 'desc' } });
-  // return logs;
-  console.warn("getAuditLogs needs Prisma implementation.");
-  return [];
+export async function getAuditLogs(): Promise<AuditLogEntryTypePrisma[]> {
+  try {
+    const logs = await prisma.auditLogEntry.findMany({
+      orderBy: { timestamp: 'desc' },
+      include: { user: { select: { name: true, email: true }} } // Include user name for display
+    });
+    return logs;
+  } catch (error) {
+    console.error("Error fetching audit logs:", error);
+    return [];
+  }
 }
 
 // --- Ticket Creation ---
-const CreateTicketSchema = z.object({
-  subject: z.string().min(5, "El asunto debe tener al menos 5 caracteres."),
-  description: z.string().min(10, "La descripción debe tener al menos 10 caracteres."),
-  priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]),
-  userEmail: z.string().email("Debe ser un correo electrónico válido para el usuario que crea el ticket.")
-});
+// Using schema from lib/schemas.ts
 
 export async function createTicketAction(
-  userId: string, // This would be the authenticated user's ID from your session/db
+  userId: string,
   userName: string,
   values: z.infer<typeof CreateTicketSchema>
 ) {
@@ -102,45 +80,49 @@ export async function createTicketAction(
   }
   const { subject, description, priority, userEmail } = validatedFields.data;
 
-  // TODO: Implement using Prisma client
-  // const newTicket = await prisma.ticket.create({
-  //   data: {
-  //     subject,
-  //     description,
-  //     priority,
-  //     status: "Open",
-  //     userId, // This should link to the User model via foreign key
-  //     userName, // Denormalized, or fetched via relation
-  //     userEmail,
-  //     // attachments and comments would be handled via relational inserts if needed
-  //   }
-  // });
-  const placeholderTicketId = `TICKET-DB-${Date.now()}`;
-  console.warn(`createTicketAction needs Prisma implementation. Placeholder ID: ${placeholderTicketId}`);
+  try {
+    const newTicket = await prisma.ticket.create({
+      data: {
+        subject,
+        description,
+        priority, // Assumes TicketPriority enum in Prisma matches Zod enum
+        status: "Open", // Assumes TicketStatus enum in Prisma matches
+        userId,
+        userName,
+        userEmail,
+      }
+    });
 
-  if (userEmail) {
-    await logAuditEvent(userEmail, "Creación de Ticket", `Ticket Asunto: ${subject}`);
+    if (userEmail) {
+      await logAuditEvent(userEmail, "Creación de Ticket", `Ticket Asunto: ${subject}, ID: ${newTicket.id}`);
+    }
+    revalidatePath("/tickets");
+    revalidatePath(`/tickets/${newTicket.id}`);
+    revalidatePath("/dashboard");
+    revalidatePath("/admin/analytics");
+    revalidatePath("/admin/reports");
+
+
+    return {
+      success: true,
+      message: "¡Ticket creado exitosamente!",
+      ticketId: newTicket.id,
+    };
+  } catch (error) {
+    console.error("Error creating ticket in DB:", error);
+    return {
+      success: false,
+      message: "Error de base de datos al crear el ticket.",
+    };
   }
-  revalidatePath("/tickets");
-  revalidatePath(`/tickets/${placeholderTicketId}`); // Adjust if ID generation changes
-  revalidatePath("/dashboard");
-  revalidatePath("/admin/analytics");
-
-  return {
-    success: true,
-    message: "¡Ticket creado exitosamente! (Implementación DB pendiente)",
-    ticketId: placeholderTicketId,
-  };
 }
 
 // --- Add Comment ---
-const AddCommentSchema = z.object({
-  text: z.string().min(1, "El comentario no puede estar vacío."),
-});
+// Using schema from lib/schemas.ts
 
 export async function addCommentAction(
   ticketId: string,
-  commenter: Pick<User, 'id' | 'name' | 'email' | 'avatarUrl'>, // User object from session/db
+  commenter: Pick<UserType, 'id' | 'name' | 'email' | 'avatarUrl'>,
   values: z.infer<typeof AddCommentSchema>
 ) {
   const validatedFields = AddCommentSchema.safeParse(values);
@@ -153,42 +135,46 @@ export async function addCommentAction(
     };
   }
 
-  // TODO: Implement using Prisma client
-  // const newComment = await prisma.comment.create({
-  //   data: {
-  //     text: validatedFields.data.text,
-  //     ticketId,
-  //     userId: commenter.id,
-  //     userName: commenter.name,
-  //     userAvatarUrl: commenter.avatarUrl,
-  //   }
-  // });
-  // await prisma.ticket.update({ where: { id: ticketId }, data: { updatedAt: new Date() } });
-  const placeholderCommentId = `COMMENT-DB-${Date.now()}`;
-  console.warn(`addCommentAction needs Prisma implementation. Placeholder ID: ${placeholderCommentId}`);
+  try {
+    const newComment = await prisma.comment.create({
+      data: {
+        text: validatedFields.data.text,
+        ticketId,
+        userId: commenter.id,
+        userName: commenter.name || "Usuario Desconocido",
+        userAvatarUrl: commenter.avatarUrl,
+      }
+    });
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: { updatedAt: new Date() }
+    });
 
+    if (commenter.email) {
+      await logAuditEvent(commenter.email, "Adición de Comentario", `Ticket ID: ${ticketId}, Usuario: ${commenter.name}`);
+    }
 
-  if (commenter.email) {
-    await logAuditEvent(commenter.email, "Adición de Comentario", `Ticket ID: ${ticketId}, Usuario: ${commenter.name}`);
+    revalidatePath(`/tickets/${ticketId}`);
+    revalidatePath("/tickets");
+    revalidatePath("/dashboard");
+    revalidatePath("/admin/analytics");
+
+    return {
+      success: true,
+      message: "¡Comentario añadido exitosamente!",
+      comment: newComment,
+    };
+  } catch (error) {
+    console.error("Error adding comment to DB:", error);
+    return {
+      success: false,
+      message: "Error de base de datos al añadir comentario.",
+    };
   }
-
-  revalidatePath(`/tickets/${ticketId}`);
-  revalidatePath("/tickets");
-  revalidatePath("/dashboard");
-  revalidatePath("/admin/analytics");
-
-  return {
-    success: true,
-    message: "¡Comentario añadido exitosamente! (Implementación DB pendiente)",
-    // comment: newComment, // Return the actual comment object from Prisma
-  };
 }
 
 // --- Update Ticket Status ---
-const UpdateTicketStatusSchema = z.object({
-  status: z.enum(TICKET_STATUSES_ENGLISH as [TicketStatus, ...TicketStatus[]]),
-  actingUserEmail: z.string().email("Debe proporcionar el correo del usuario que realiza la acción.")
-});
+// Using schema from lib/schemas.ts
 
 export async function updateTicketStatusAction(
   ticketId: string,
@@ -205,85 +191,121 @@ export async function updateTicketStatusAction(
   }
   const { status, actingUserEmail } = validatedFields.data;
 
-  // TODO: Implement using Prisma client
-  // const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-  // if (!ticket) return { success: false, message: "Ticket no encontrado." };
-  // const oldStatus = ticket.status;
-  // await prisma.ticket.update({
-  //   where: { id: ticketId },
-  //   data: { status, updatedAt: new Date() }
-  // });
-  const oldStatusPlaceholder = "Open"; // Placeholder
-  console.warn(`updateTicketStatusAction needs Prisma implementation for ticket ${ticketId}.`);
+  try {
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket) return { success: false, message: "Ticket no encontrado." };
+    const oldStatus = ticket.status;
 
-  await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatusPlaceholder}, A: ${status}`);
-  revalidatePath(`/tickets/${ticketId}`);
-  revalidatePath("/tickets");
-  revalidatePath("/dashboard");
-  revalidatePath("/admin/analytics");
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: { status, updatedAt: new Date() }
+    });
 
-  const statusDisplayMap: Record<TicketStatus, string> = {
-    Open: "Abierto", "In Progress": "En Progreso", Resolved: "Resuelto", Closed: "Cerrado",
-  };
-  return { success: true, message: `Estado del ticket actualizado a ${statusDisplayMap[status as TicketStatus]}. (Implementación DB pendiente)` };
+    await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatus}, A: ${status}`);
+    revalidatePath(`/tickets/${ticketId}`);
+    revalidatePath("/tickets");
+    revalidatePath("/dashboard");
+    revalidatePath("/admin/analytics");
+    revalidatePath("/admin/reports");
+
+
+    const statusDisplayMap: Record<TicketStatus, string> = {
+      Open: "Abierto", InProgress: "En Progreso", Resolved: "Resuelto", Closed: "Cerrado",
+    };
+    return { success: true, message: `Estado del ticket actualizado a ${statusDisplayMap[status as TicketStatus]}.` };
+  } catch (error) {
+    console.error("Error updating ticket status in DB:", error);
+    return { success: false, message: "Error de base de datos al actualizar estado." };
+  }
 }
 
 // --- Fetch Ticket by ID ---
-export async function getTicketById(ticketId: string): Promise<Ticket | null> {
-  // TODO: Implement using Prisma client
-  // const ticket = await prisma.ticket.findUnique({
-  //   where: { id: ticketId },
-  //   include: { comments: true, attachments: true, user: true } // Example includes
-  // });
-  // return ticket;
-  console.warn(`getTicketById needs Prisma implementation for ticket ${ticketId}.`);
-  return null;
+export async function getTicketById(ticketId: string): Promise<TicketTypePrisma & { comments: CommentTypePrisma[], attachments: AttachmentTypePrisma[] } | null> {
+  try {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: { comments: { orderBy: { createdAt: 'asc' }}, attachments: true, user: { select: { name: true, email: true }} }
+    });
+    return ticket;
+  } catch (error) {
+    console.error(`Error fetching ticket by ID ${ticketId}:`, error);
+    return null;
+  }
 }
 
 // --- Fetch All Tickets ---
-export async function getAllTickets(): Promise<Ticket[]> {
-  // TODO: Implement using Prisma client
-  // const tickets = await prisma.ticket.findMany({
-  //   orderBy: { createdAt: 'desc' },
-  //   include: { user: true, comments: true, attachments: true } // Example includes
-  // });
-  // return tickets;
-  console.warn("getAllTickets needs Prisma implementation.");
-  return [];
+export async function getAllTickets(): Promise<(TicketTypePrisma & { comments: CommentTypePrisma[], attachments: AttachmentTypePrisma[], user: { name: string } })[]> {
+  try {
+    const tickets = await prisma.ticket.findMany({
+      orderBy: [{priority: 'desc'}, {createdAt: 'desc'}], // Example: prioritize High first, then by date
+      include: { user: { select: { name: true }}, comments: true, attachments: true }
+    });
+    return tickets;
+  } catch (error) {
+    console.error("Error fetching all tickets:", error);
+    return [];
+  }
 }
 
 // --- Fetch Dashboard Stats ---
 export async function getDashboardStats() {
-  // TODO: Implement using Prisma client with aggregate queries
-  // const total = await prisma.ticket.count();
-  // const open = await prisma.ticket.count({ where: { status: "Open" } });
-  // ... and so on for other statuses and priorities
-  console.warn("getDashboardStats needs Prisma implementation.");
-  const placeholderSummary = { total: 0, open: 0, inProgress: 0, resolved: 0, closed: 0 };
-  const placeholderStats = { 
-    byPriority: (TICKET_PRIORITIES_ENGLISH).map(pKey  => ({ name: pKey, value: 0 })),
-    byStatus: (TICKET_STATUSES_ENGLISH).map(sKey => ({ name: sKey, value: 0 }))
-  };
-  return { summary: placeholderSummary, stats: placeholderStats };
+  try {
+    const total = await prisma.ticket.count();
+    const open = await prisma.ticket.count({ where: { status: "Open" } });
+    const inProgress = await prisma.ticket.count({ where: { status: "InProgress" } });
+    const resolved = await prisma.ticket.count({ where: { status: "Resolved" } });
+    const closed = await prisma.ticket.count({ where: { status: "Closed" } });
+
+    const summary = { total, open, inProgress, resolved, closed };
+
+    const byPriority = await prisma.ticket.groupBy({
+      by: ['priority'],
+      _count: { id: true },
+    });
+    const byStatus = await prisma.ticket.groupBy({
+      by: ['status'],
+      _count: { id: true },
+    });
+
+    const stats = {
+      byPriority: TICKET_PRIORITIES_ENGLISH.map(pKey => ({
+        name: pKey, // Assuming pKey is 'High', 'Medium', 'Low'
+        value: byPriority.find(p => p.priority === pKey)?._count.id || 0,
+      })),
+      byStatus: TICKET_STATUSES_ENGLISH.map(sKey => ({
+        name: sKey, // Assuming sKey matches Prisma enum values
+        value: byStatus.find(s => s.status === sKey)?._count.id || 0,
+      })),
+    };
+    return { summary, stats };
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error);
+    const placeholderSummary = { total: 0, open: 0, inProgress: 0, resolved: 0, closed: 0 };
+    const placeholderStats = { 
+      byPriority: TICKET_PRIORITIES_ENGLISH.map(pKey => ({ name: pKey, value: 0 })),
+      byStatus: TICKET_STATUSES_ENGLISH.map(sKey => ({ name: sKey, value: 0 }))
+    };
+    return { summary: placeholderSummary, stats: placeholderStats };
+  }
 }
 
 // --- Inventory Actions ---
-export async function getAllInventoryItems(): Promise<InventoryItem[]> {
-  // TODO: Implement using Prisma client
-  // const items = await prisma.inventoryItem.findMany({ orderBy: { createdAt: 'desc' } });
-  // return items;
-  console.warn("getAllInventoryItems needs Prisma implementation.");
-  return [];
+export async function getAllInventoryItems(): Promise<InventoryItemTypePrisma[]> {
+  try {
+    const items = await prisma.inventoryItem.findMany({ 
+      orderBy: { createdAt: 'desc' },
+      include: { addedByUser: { select: { name: true }}}
+    });
+    return items;
+  } catch (error) {
+    console.error("Error fetching all inventory items:", error);
+    return [];
+  }
 }
 
-const categoryPrefixMap: Record<InventoryItemCategory, string> = {
-  Computadora: "PC", Monitor: "MON", Teclado: "TEC", Mouse: "MOU", Impresora: "IMP", Escaner: "ESC",
-  Router: "ROU", Switch: "SWI", Servidor: "SRV", Laptop: "LAP", Tablet: "TAB", Proyector: "PRO",
-  "TelefonoIP": "TIP", "OtroPeriferico": "PER", Software: "SOF", Licencia: "LIC", Otro: "OTR",
-};
-
+// Using BaseInventoryItemSchema from lib/schemas.ts
 export async function addInventoryItemAction(
-  currentUser: Pick<User, 'id' | 'name' | 'email'>,
+  currentUser: Pick<UserType, 'id' | 'name' | 'email'>,
   values: Omit<z.infer<typeof BaseInventoryItemSchema>, "currentUserEmail">
 ) {
   const validatedFields = BaseInventoryItemSchema.safeParse(values);
@@ -291,31 +313,33 @@ export async function addInventoryItemAction(
     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Fallo al añadir artículo debido a errores de validación." };
   }
   const data = validatedFields.data;
-  const prefix = categoryPrefixMap[data.category as InventoryItemCategory];
-  
-  // TODO: ID generation logic needs to be database-aware (e.g., query max number for prefix)
-  // This mock logic for ID generation will not work reliably with a DB.
-  // let maxNum = 0; // Query DB: await prisma.inventoryItem.findFirst({ where: { id: { startsWith: `${prefix}-IEQ-` } }, orderBy: { id: 'desc' } })
-  const newNum = 1; // Placeholder
-  const formattedNum = String(newNum).padStart(3, '0');
-  const newId = `${prefix}-IEQ-${formattedNum}`;
-  
-  // TODO: Implement using Prisma client
-  // const newItem = await prisma.inventoryItem.create({
-  //   data: {
-  //     id: newId, ...data,
-  //     category: data.category as InventoryItemCategory, status: data.status as InventoryItemStatus,
-  //     addedByUserId: currentUser.id, addedByUserName: currentUser.name,
-  //     // ensure date fields are Date objects if Prisma expects them
-  //   }
-  // });
-  console.warn(`addInventoryItemAction needs Prisma implementation. Placeholder ID: ${newId}`);
-  
-  if(currentUser.email){
-    await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo ID: ${newId}, Nombre: ${data.name}`);
+
+  try {
+    // Simplified ID: Prisma will generate a CUID. The PREFIJO-IEQ-NNN logic is removed.
+    const newItem = await prisma.inventoryItem.create({
+      data: {
+        ...data,
+        category: data.category as InventoryItemCategory, // Ensure type compatibility
+        status: data.status as InventoryItemStatus, // Ensure type compatibility
+        ram: data.ram as RamOption | undefined, // Ensure type compatibility
+        storageType: data.storageType as StorageType | undefined, // Ensure type compatibility
+        addedByUserId: currentUser.id,
+        addedByUserName: currentUser.name || "Usuario del Sistema",
+      }
+    });
+    
+    if(currentUser.email){
+      await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo ID: ${newItem.id}, Nombre: ${data.name}`);
+    }
+    revalidatePath("/inventory");
+    return { success: true, message: `Artículo "${data.name}" con ID "${newItem.id}" añadido exitosamente.`, item: newItem };
+  } catch (error: any) {
+    console.error("Error adding inventory item to DB:", error);
+     if (error.code === 'P2002' && error.meta?.target?.includes('serialNumber')) {
+      return { success: false, message: "Error: El número de serie ya existe en el inventario." };
+    }
+    return { success: false, message: "Error de base de datos al añadir artículo." };
   }
-  revalidatePath("/inventory");
-  return { success: true, message: `Artículo "${data.name}" con ID "${newId}" añadido exitosamente. (DB Pendiente)`, item: {id: newId, ...data} as any };
 }
 
 export async function updateInventoryItemAction(
@@ -327,34 +351,53 @@ export async function updateInventoryItemAction(
   if (!validatedFields.success) {
     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Fallo al actualizar artículo debido a errores de validación." };
   }
-  // TODO: Implement using Prisma client
-  // const itemToUpdate = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
-  // if (!itemToUpdate) return { success: false, message: "Artículo no encontrado." };
-  // const updatedItem = await prisma.inventoryItem.update({
-  //   where: { id: itemId },
-  //   data: { ...validatedFields.data, category: validatedFields.data.category as InventoryItemCategory, status: validatedFields.data.status as InventoryItemStatus, updatedAt: new Date() }
-  // });
-  console.warn(`updateInventoryItemAction needs Prisma implementation for item ${itemId}.`);
+  const data = validatedFields.data;
 
-  await logAuditEvent(actingUserEmail, "Actualización de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${validatedFields.data.name}`);
-  revalidatePath("/inventory");
-  return { success: true, message: `Artículo "${validatedFields.data.name}" actualizado exitosamente. (DB Pendiente)` };
+  try {
+    const itemToUpdate = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+    if (!itemToUpdate) return { success: false, message: "Artículo no encontrado." };
+
+    const updatedItem = await prisma.inventoryItem.update({
+      where: { id: itemId },
+      data: { 
+        ...data, 
+        category: data.category as InventoryItemCategory,
+        status: data.status as InventoryItemStatus,
+        ram: data.ram as RamOption | undefined,
+        storageType: data.storageType as StorageType | undefined,
+        updatedAt: new Date()
+      }
+    });
+
+    await logAuditEvent(actingUserEmail, "Actualización de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${data.name}`);
+    revalidatePath("/inventory");
+    return { success: true, message: `Artículo "${data.name}" actualizado exitosamente.`, item: updatedItem };
+  } catch (error: any) {
+    console.error("Error updating inventory item in DB:", error);
+     if (error.code === 'P2002' && error.meta?.target?.includes('serialNumber')) {
+      return { success: false, message: "Error: El número de serie ya existe en el inventario para otro artículo." };
+    }
+    return { success: false, message: "Error de base de datos al actualizar artículo." };
+  }
 }
 
 export async function deleteInventoryItemAction(itemId: string, actingUserEmail: string) {
-  // TODO: Implement using Prisma client
-  // const itemToDelete = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
-  // if (!itemToDelete) return { success: false, message: "Artículo no encontrado para eliminar." };
-  // await prisma.inventoryItem.delete({ where: { id: itemId } });
-  const placeholderItemName = "Artículo Desconocido"; // Fetch name before delete
-  console.warn(`deleteInventoryItemAction needs Prisma implementation for item ${itemId}.`);
+  try {
+    const itemToDelete = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
+    if (!itemToDelete) return { success: false, message: "Artículo no encontrado para eliminar." };
+    
+    await prisma.inventoryItem.delete({ where: { id: itemId } });
 
-  await logAuditEvent(actingUserEmail, "Eliminación de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${placeholderItemName}`);
-  revalidatePath("/inventory");
-  return { success: true, message: "Artículo eliminado exitosamente. (DB Pendiente)" };
+    await logAuditEvent(actingUserEmail, "Eliminación de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${itemToDelete.name}`);
+    revalidatePath("/inventory");
+    return { success: true, message: "Artículo eliminado exitosamente." };
+  } catch (error) {
+    console.error("Error deleting inventory item from DB:", error);
+    return { success: false, message: "Error de base de datos al eliminar artículo." };
+  }
 }
 
-const excelToInternalFieldMap: Record<string, keyof InventoryItem | keyof Omit<z.infer<typeof BaseInventoryItemSchema>, 'name'>> = {
+const excelToInternalFieldMap: Record<string, keyof z.infer<typeof BaseInventoryItemSchema>> = {
   'nombre': 'name', 'nombre del articulo': 'name', 'nombre del artículo': 'name', 'articulo': 'name', 'artículo': 'name', 'equipo': 'name',
   'categoría': 'category', 'categoria': 'category',
   'marca': 'brand',
@@ -380,34 +423,39 @@ const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Part
       if (internalField === 'quantity' && typeof value === 'string') {
         const parsedQuantity = parseInt(value, 10);
         (mapped as any)[internalField] = isNaN(parsedQuantity) ? undefined : parsedQuantity;
-      } else if (['category', 'status', 'ram', 'storageType'].includes(internalField)) {
+      } else if (internalField === 'category') {
         const normalizedValue = String(value).toLowerCase().replace(/\s/g,"").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const options = internalField === 'category' ? INVENTORY_ITEM_CATEGORIES :
-                        internalField === 'status' ? INVENTORY_ITEM_STATUSES :
-                        internalField === 'ram' ? RAM_OPTIONS : STORAGE_TYPES_ZOD_ENUM;
-        const foundValue = (options as readonly string[]).find(opt => opt.toLowerCase().replace(/\s/g,"").normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
+        const foundValue = INVENTORY_ITEM_CATEGORIES.find(opt => opt.toLowerCase().replace(/\s/g,"").replace(" ","").normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
         (mapped as any)[internalField] = foundValue || undefined;
-      } else {
+      } else if (internalField === 'status') {
+         const normalizedValue = String(value).toLowerCase().replace(/\s/g,"").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+         const foundValue = INVENTORY_ITEM_STATUSES.find(opt => opt.toLowerCase().replace(/\s/g,"").replace(" ","").normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
+        (mapped as any)[internalField] = foundValue || undefined;
+      } else if (internalField === 'ram') {
+        const normalizedValue = String(value).toUpperCase().replace(/\s/g,"");
+        const foundValue = RAM_OPTIONS.find(opt => opt.toUpperCase().replace(/\s/g,"") === normalizedValue);
+        (mapped as any)[internalField] = foundValue || undefined;
+      } else if (internalField === 'storageType') {
+        const normalizedValue = String(value).toUpperCase().replace(/\s/g,"");
+        const foundValue = STORAGE_TYPES_ZOD_ENUM.find(opt => opt.toUpperCase().replace(/\s/g,"") === normalizedValue);
+        (mapped as any)[internalField] = foundValue || undefined;
+      }
+      else {
          (mapped as any)[internalField] = value === null || value === undefined ? undefined : String(value).trim();
       }
     }
   }
   if (mapped.quantity === undefined || isNaN(Number(mapped.quantity))) mapped.quantity = 1;
-  if (mapped.status === undefined) mapped.status = "EnUso" as InventoryItemStatus; // Prisma enum uses EnUso
+  if (mapped.status === undefined) mapped.status = "EnUso" as InventoryItemStatus;
   return mapped;
 };
-
 
 export async function importInventoryItemsAction(
   itemDataArray: ExcelInventoryItemData[],
   currentUserEmail: string,
   currentUserId: string,
   currentUserName: string
-): Promise<{ success: boolean; message: string; successCount: number; errorCount: number; errors: { row: number; message: string; data: ExcelInventoryItemData }[]; importedItems: InventoryItem[] }> {
-  // TODO: This entire action needs to be refactored for Prisma.
-  // The ID generation logic specifically needs a DB query for max sequence.
-  // Consider batch inserts or transactions for performance and atomicity.
-  console.warn("importInventoryItemsAction needs Prisma implementation.");
+): Promise<{ success: boolean; message: string; successCount: number; errorCount: number; errors: { row: number; message: string; data: ExcelInventoryItemData }[]; importedItems: InventoryItemTypePrisma[] }> {
   if (!itemDataArray || itemDataArray.length === 0) {
     return { success: false, message: "No se proporcionaron datos para importar o el archivo está vacío.", successCount: 0, errorCount: itemDataArray?.length || 0, errors: [{ row: 0, message: "Archivo vacío o sin datos.", data: {} }], importedItems: [] };
   }
@@ -415,45 +463,87 @@ export async function importInventoryItemsAction(
   let successCount = 0;
   let errorCount = 0;
   const errors: { row: number; message: string; data: ExcelInventoryItemData }[] = [];
-  const importedItems: InventoryItem[] = [];
+  const importedItems: InventoryItemTypePrisma[] = [];
 
-   for (let i = 0; i < itemDataArray.length; i++) {
+  try {
+    for (let i = 0; i < itemDataArray.length; i++) {
+      const rawRow = itemDataArray[i];
       try {
-        const rawRow = itemDataArray[i];
         const mappedData = mapExcelRowToInventoryItemFormValues(rawRow);
         const validatedFields = BaseInventoryItemSchema.safeParse(mappedData);
 
         if (!validatedFields.success) {
           errorCount++;
           const fieldErrors = validatedFields.error.flatten().fieldErrors as Record<string, string[] | undefined>;
-           let errorMessage = Object.entries(fieldErrors)
+          let errorMessage = Object.entries(fieldErrors)
             .map(([field, messages]) => `${field}: ${(messages || ['Error desconocido']).join(', ')}`)
             .join('; ') || "Error desconocido en validación.";
-          
-          if (fieldErrors.category && mappedData.category && !INVENTORY_ITEM_CATEGORIES.includes(mappedData.category as InventoryItemCategory) ) errorMessage = `Categoría "${mappedData.category}" no es válida. Valores permitidos: ${INVENTORY_ITEM_CATEGORIES.join(', ')}.`;
-          else if (fieldErrors.status && mappedData.status && !INVENTORY_ITEM_STATUSES.includes(mappedData.status as InventoryItemStatus)) errorMessage = `Estado "${mappedData.status}" no es válido. Valores permitidos: ${INVENTORY_ITEM_STATUSES.join(', ')}.`;
-
           errors.push({ row: i + 2, message: `Error de validación: ${errorMessage}`, data: rawRow });
           continue;
         }
-        // Simulate success for now
+        
+        const dataToCreate = {
+          ...validatedFields.data,
+          category: validatedFields.data.category as InventoryItemCategory,
+          status: validatedFields.data.status as InventoryItemStatus,
+          ram: validatedFields.data.ram as RamOption | undefined,
+          storageType: validatedFields.data.storageType as StorageType | undefined,
+          addedByUserId: currentUserId,
+          addedByUserName: currentUserName,
+        };
+
+        // Check for existing serial number before attempting to create
+        if (dataToCreate.serialNumber && dataToCreate.serialNumber.trim() !== "") {
+          const existingItemBySerial = await prisma.inventoryItem.findUnique({
+            where: { serialNumber: dataToCreate.serialNumber },
+          });
+          if (existingItemBySerial) {
+            errorCount++;
+            errors.push({ row: i + 2, message: `Error: Número de serie '${dataToCreate.serialNumber}' ya existe.`, data: rawRow });
+            continue;
+          }
+        }
+        
+        const newItem = await prisma.inventoryItem.create({ data: dataToCreate });
+        importedItems.push(newItem);
         successCount++;
-        // importedItems.push(newItemFromDb); // Push actual item from DB
       } catch (e: any) {
         errorCount++;
-        errors.push({ row: i + 2, message: `Error procesando fila: ${e.message || String(e)}`, data: itemDataArray[i] });
+        errors.push({ row: i + 2, message: `Error procesando fila: ${e.message || String(e)}`, data: rawRow });
       }
     }
 
-  if (successCount > 0) await logAuditEvent(currentUserEmail, "Importación Masiva de Inventario (DB Pendiente)", `Se intentarían importar ${successCount} artículos. Errores: ${errorCount}.`);
-  else if (errorCount > 0 && itemDataArray.length > 0) await logAuditEvent(currentUserEmail, "Intento Fallido de Importación Masiva de Inventario (DB Pendiente)", `No se importaron artículos. Errores: ${errorCount} de ${itemDataArray.length} filas.`);
-  
-  revalidatePath("/inventory");
-  return { success: successCount > 0 && errorCount === 0, message: `Importación (DB Pendiente): ${successCount} procesados, ${errorCount} errores.`, successCount, errorCount, errors, importedItems };
+    if (successCount > 0) {
+      await logAuditEvent(currentUserEmail, "Importación Masiva de Inventario", `Se importaron ${successCount} artículos. Errores: ${errorCount}.`);
+    } else if (errorCount > 0 && itemDataArray.length > 0) {
+      await logAuditEvent(currentUserEmail, "Intento Fallido de Importación Masiva de Inventario", `No se importaron artículos. Errores: ${errorCount} de ${itemDataArray.length} filas.`);
+    }
+    
+    revalidatePath("/inventory");
+    return { 
+      success: successCount > 0 && errorCount === 0, 
+      message: `Importación completada. ${successCount} artículos importados. ${errorCount > 0 ? `${errorCount} filas con errores.` : ''}`, 
+      successCount, 
+      errorCount, 
+      errors, 
+      importedItems 
+    };
+
+  } catch (globalError: any) {
+    console.error("Error global durante la importación de inventario:", globalError);
+    return { 
+      success: false, 
+      message: `Error general durante la importación: ${globalError.message || "Error desconocido"}`, 
+      successCount, 
+      errorCount: itemDataArray.length - successCount, // Assume all remaining rows failed if a global error occurs
+      errors, 
+      importedItems 
+    };
+  }
 }
 
-
 // --- Approval Actions ---
+// Using CreateApprovalRequestActionSchema from lib/schemas.ts
 export async function createApprovalRequestAction(
   values: z.infer<typeof CreateApprovalRequestActionSchema>
 ): Promise<{ success: boolean; message: string; approvalId?: string; errors?: any }> {
@@ -462,59 +552,198 @@ export async function createApprovalRequestAction(
     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
   }
   const data = validatedFields.data;
-  // TODO: Implement using Prisma client
-  // Handle attachments by creating Attachment records and linking them.
-  const placeholderApprovalId = `APR-DB-${Date.now()}`;
-  console.warn(`createApprovalRequestAction needs Prisma implementation. Placeholder ID: ${placeholderApprovalId}`);
 
-  if (data.requesterEmail) {
-    await logAuditEvent(data.requesterEmail, `Creación de Solicitud de Aprobación (${data.type})`, `Asunto: ${data.subject}`);
+  try {
+    const requestDataToCreate: any = {
+      type: data.type,
+      subject: data.subject,
+      description: data.description,
+      status: "Pendiente", // Initial status
+      requesterId: data.requesterId,
+      requesterName: data.requesterName,
+      requesterEmail: data.requesterEmail,
+    };
+
+    if (data.type === "Compra") {
+      requestDataToCreate.itemDescription = data.itemDescription;
+      requestDataToCreate.estimatedPrice = data.estimatedPrice;
+      requestDataToCreate.supplierCompra = data.supplierCompra;
+    } else if (data.type === "PagoProveedor") {
+      requestDataToCreate.supplierPago = data.supplierPago;
+      requestDataToCreate.totalAmountToPay = data.totalAmountToPay;
+      // paymentDueDate is not directly in form now, comes from description.
+    }
+
+    const newApproval = await prisma.approvalRequest.create({
+      data: requestDataToCreate
+    });
+
+    if (data.attachmentsData && data.attachmentsData.length > 0) {
+      await prisma.attachment.createMany({
+        data: data.attachmentsData.map(att => ({
+          fileName: att.fileName,
+          url: "placeholder/url/" + att.fileName, // Placeholder URL
+          size: att.size,
+          type: att.type,
+          approvalRequestId: newApproval.id,
+        }))
+      });
+    }
+    
+    // Initial Activity Log
+    await prisma.approvalActivityLogEntry.create({
+        data: {
+            approvalRequestId: newApproval.id,
+            action: "Solicitud Creada",
+            userId: data.requesterId,
+            userName: data.requesterName,
+            comment: "Solicitud creada inicialmente.",
+        }
+    });
+
+
+    if (data.requesterEmail) {
+      await logAuditEvent(data.requesterEmail, `Creación de Solicitud de Aprobación (${data.type})`, `Asunto: ${data.subject}, ID: ${newApproval.id}`);
+    }
+    revalidatePath("/approvals");
+    revalidatePath("/dashboard");
+    revalidatePath(`/approvals/${newApproval.id}`, "page");
+
+
+    return {
+      success: true,
+      message: `Solicitud de ${data.type === "Compra" ? "Compra" : "Pago a Proveedores"} enviada exitosamente.`,
+      approvalId: newApproval.id,
+    };
+  } catch (error) {
+    console.error("Error creating approval request in DB:", error);
+    return { success: false, message: "Error de base de datos al crear solicitud de aprobación." };
   }
-  revalidatePath("/approvals");
-  revalidatePath("/dashboard");
-  revalidatePath("/approvals/[id]", "page");
-
-  return {
-    success: true,
-    message: `Solicitud de ${data.type === "Compra" ? "Compra" : "Pago a Proveedores"} enviada exitosamente. (DB Pendiente)`,
-    approvalId: placeholderApprovalId,
-  };
 }
 
-export async function getApprovalRequestsForUser(userId: string, userRole: UserRole): Promise<ApprovalRequest[]> {
-  // TODO: Implement using Prisma client
-  // if (userRole === "PresidenteIEQ") {
-  //   return await prisma.approvalRequest.findMany({ where: { status: { in: ["Pendiente", "InformacionSolicitada"] } }, include: { requester: true }});
-  // }
-  // return await prisma.approvalRequest.findMany({ where: { requesterId: userId }, include: { requester: true }});
-  console.warn("getApprovalRequestsForUser needs Prisma implementation.");
-  return [];
+export async function getApprovalRequestsForUser(userId: string, userRole: UserRoleEnum): Promise<ApprovalRequestTypePrisma[]> {
+  try {
+    if (userRole === "PresidenteIEQ") {
+      return await prisma.approvalRequest.findMany({
+        where: { status: { in: ["Pendiente", "InformacionSolicitada"] } },
+        include: { requester: { select: { name: true, email: true } } },
+        orderBy: { createdAt: 'desc' }
+      });
+    }
+    // For Admins and specific approvers, show requests they created
+    return await prisma.approvalRequest.findMany({
+      where: { requesterId: userId },
+      include: { requester: { select: { name: true, email: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+  } catch (error) {
+    console.error("Error fetching approval requests for user:", error);
+    return [];
+  }
 }
 
-export async function getApprovalRequestDetails(id: string): Promise<ApprovalRequest | null> {
-  // TODO: Implement using Prisma client
-  // return await prisma.approvalRequest.findUnique({
-  //   where: { id },
-  //   include: { requester: true, approver: true, attachments: true, activityLog: { include: { user: true }, orderBy: { timestamp: 'desc' } }, paymentInstallments: true }
-  // });
-  console.warn(`getApprovalRequestDetails needs Prisma implementation for ID ${id}.`);
-  return null;
+export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRequestTypePrisma & { attachments: AttachmentTypePrisma[], activityLog: (ApprovalActivityLogEntryTypePrisma & { user: { name: string }})[], paymentInstallments: PaymentInstallmentTypePrisma[] }) | null> {
+  try {
+    return await prisma.approvalRequest.findUnique({
+      where: { id },
+      include: { 
+        requester: { select: { name: true, email: true } }, 
+        approver: { select: { name: true, email: true } },
+        attachments: true, 
+        activityLog: { 
+            // Removed user relation for activity log, assuming userId/userName is sufficient
+            // In Prisma schema, ApprovalActivityLogEntry does not have a direct 'user' relation, but stores userId/userName.
+            orderBy: { timestamp: 'desc' } 
+        }, 
+        paymentInstallments: { orderBy: { dueDate: 'asc' }}
+      }
+    });
+  } catch (error) {
+    console.error(`Error fetching approval request details for ID ${id}:`, error);
+    return null;
+  }
 }
 
 export async function approveRequestAction(
-  values: any 
+  values: any // Needs a proper Zod schema for validation based on type
 ): Promise<{ success: boolean; message: string }> {
-  // TODO: Full Prisma implementation needed here.
-  // This includes fetching the request, validating, updating status,
-  // creating activity log entries, and handling payment installments if applicable.
-  console.warn("approveRequestAction needs Prisma implementation.");
-  const { requestId, approverEmail, approverName, comment, approvedPaymentType } = values; // Simplified access
+  const { requestId, approverId, approverName, approverEmail, comment, approvedPaymentType, approvedAmount, installments } = values;
 
-  await logAuditEvent(approverEmail, "Aprobación de Solicitud (DB Pendiente)", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment || 'N/A'}. Tipo Pago: ${approvedPaymentType || 'N/A'}`);
-  revalidatePath(`/approvals/${requestId}`);
-  revalidatePath('/approvals');
-  revalidatePath('/dashboard');
-  return { success: true, message: "Solicitud aprobada. (DB Pendiente)" };
+  try {
+    const request = await prisma.approvalRequest.findUnique({ where: { id: requestId } });
+    if (!request) return { success: false, message: "Solicitud no encontrada." };
+    if (request.status !== "Pendiente" && request.status !== "InformacionSolicitada") {
+      return { success: false, message: "La solicitud no está en un estado que permita aprobación." };
+    }
+
+    let validatedData;
+    if (request.type === "PagoProveedor") {
+        if (approvedPaymentType === "Contado") {
+            validatedData = ApprovePagoProveedorContadoSchema.parse(values);
+        } else if (approvedPaymentType === "Cuotas") {
+            validatedData = ApprovePagoProveedorCuotasSchema.parse(values);
+        } else {
+            return { success: false, message: "Tipo de pago no válido para Pago a Proveedor." };
+        }
+    } else if (request.type === "Compra") {
+        validatedData = ApproveCompraSchema.parse(values);
+    } else {
+        return { success: false, message: "Tipo de solicitud desconocida." };
+    }
+    
+    const updateData: any = {
+      status: "Aprobado" as ApprovalStatusEnum,
+      approverId,
+      approverName,
+      approverComment: validatedData.comment,
+      approvedAt: new Date(),
+    };
+
+    if (request.type === "PagoProveedor") {
+      updateData.approvedPaymentType = validatedData.approvedPaymentType;
+      updateData.approvedAmount = validatedData.approvedAmount;
+      
+      // Handle installments: delete existing and create new ones within a transaction
+      await prisma.$transaction(async (tx) => {
+        await tx.paymentInstallment.deleteMany({ where: { approvalRequestId: requestId }});
+        if (validatedData.approvedPaymentType === "Cuotas" && validatedData.installments && validatedData.installments.length > 0) {
+          await tx.paymentInstallment.createMany({
+            data: validatedData.installments.map((inst: any) => ({
+              amount: inst.amount,
+              dueDate: new Date(inst.dueDate), // Ensure it's a Date object
+              approvalRequestId: requestId,
+            }))
+          });
+        }
+        await tx.approvalRequest.update({ where: { id: requestId }, data: updateData });
+      });
+
+    } else { // Compra
+        await prisma.approvalRequest.update({ where: { id: requestId }, data: updateData });
+    }
+
+    await prisma.approvalActivityLogEntry.create({
+      data: {
+        approvalRequestId: requestId,
+        action: "Solicitud Aprobada",
+        userId: approverId,
+        userName: approverName,
+        comment: validatedData.comment || "Aprobado sin comentarios adicionales.",
+      }
+    });
+
+    await logAuditEvent(approverEmail, "Aprobación de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${validatedData.comment || 'N/A'}.`);
+    revalidatePath(`/approvals/${requestId}`);
+    revalidatePath('/approvals');
+    revalidatePath('/dashboard');
+    return { success: true, message: "Solicitud aprobada exitosamente." };
+  } catch (error: any) {
+    console.error("Error approving request:", error);
+    if (error instanceof z.ZodError) {
+        return { success: false, message: "Error de validación: " + error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ') };
+    }
+    return { success: false, message: "Error de base de datos al aprobar la solicitud." };
+  }
 }
 
 export async function rejectRequestAction(
@@ -524,14 +753,45 @@ export async function rejectRequestAction(
   if (!validatedFields.success) {
     return { success: false, message: validatedFields.error.flatten().fieldErrors.comment?.[0] || "Error de validación." };
   }
-  // TODO: Prisma implementation
-  console.warn("rejectRequestAction needs Prisma implementation.");
-  const { requestId, approverEmail, approverName, comment } = validatedFields.data;
-  await logAuditEvent(approverEmail, "Rechazo de Solicitud (DB Pendiente)", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
-  revalidatePath(`/approvals/${requestId}`);
-  revalidatePath('/approvals');
-  revalidatePath('/dashboard');
-  return { success: true, message: "Solicitud rechazada. (DB Pendiente)" };
+  const { requestId, approverId, approverName, approverEmail, comment } = validatedFields.data;
+
+  try {
+    const request = await prisma.approvalRequest.findUnique({ where: { id: requestId } });
+    if (!request) return { success: false, message: "Solicitud no encontrada." };
+     if (request.status !== "Pendiente" && request.status !== "InformacionSolicitada") {
+      return { success: false, message: "La solicitud no está en un estado que permita rechazo." };
+    }
+
+    await prisma.approvalRequest.update({
+      where: { id: requestId },
+      data: {
+        status: "Rechazado" as ApprovalStatusEnum,
+        approverId,
+        approverName,
+        approverComment: comment,
+        rejectedAt: new Date(),
+      }
+    });
+
+    await prisma.approvalActivityLogEntry.create({
+      data: {
+        approvalRequestId: requestId,
+        action: "Solicitud Rechazada",
+        userId: approverId,
+        userName: approverName,
+        comment: comment,
+      }
+    });
+
+    await logAuditEvent(approverEmail, "Rechazo de Solicitud", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
+    revalidatePath(`/approvals/${requestId}`);
+    revalidatePath('/approvals');
+    revalidatePath('/dashboard');
+    return { success: true, message: "Solicitud rechazada." };
+  } catch (error) {
+    console.error("Error rejecting request:", error);
+    return { success: false, message: "Error de base de datos al rechazar solicitud." };
+  }
 }
 
 export async function requestMoreInfoAction(
@@ -541,17 +801,49 @@ export async function requestMoreInfoAction(
   if (!validatedFields.success) {
     return { success: false, message: validatedFields.error.flatten().fieldErrors.comment?.[0] || "Error de validación." };
   }
-  // TODO: Prisma implementation
-  console.warn("requestMoreInfoAction needs Prisma implementation.");
-  const { requestId, approverEmail, approverName, comment } = validatedFields.data;
-  await logAuditEvent(approverEmail, "Solicitud de Más Información (DB Pendiente)", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
-  revalidatePath(`/approvals/${requestId}`);
-  revalidatePath('/approvals');
-  revalidatePath('/dashboard');
-  return { success: true, message: "Se solicitó más información. (DB Pendiente)" };
+  const { requestId, approverId, approverName, approverEmail, comment } = validatedFields.data;
+
+  try {
+    const request = await prisma.approvalRequest.findUnique({ where: { id: requestId } });
+    if (!request) return { success: false, message: "Solicitud no encontrada." };
+     if (request.status !== "Pendiente" && request.status !== "InformacionSolicitada") {
+      return { success: false, message: "La solicitud no está en un estado que permita solicitar más información." };
+    }
+
+    await prisma.approvalRequest.update({
+      where: { id: requestId },
+      data: {
+        status: "InformacionSolicitada" as ApprovalStatusEnum,
+        approverId, // Record who requested info
+        approverName,
+        infoRequestedAt: new Date(),
+        // approverComment: comment, // Comment is logged in activity
+      }
+    });
+
+    await prisma.approvalActivityLogEntry.create({
+      data: {
+        approvalRequestId: requestId,
+        action: "Información Adicional Solicitada",
+        userId: approverId,
+        userName: approverName,
+        comment: comment,
+      }
+    });
+
+    await logAuditEvent(approverEmail, "Solicitud de Más Información", `ID Solicitud: ${requestId}, Aprobador: ${approverName}. Comentario: ${comment}`);
+    revalidatePath(`/approvals/${requestId}`);
+    revalidatePath('/approvals');
+    revalidatePath('/dashboard');
+    return { success: true, message: "Se solicitó más información." };
+  } catch (error) {
+    console.error("Error requesting more info:", error);
+    return { success: false, message: "Error de base de datos al solicitar más información." };
+  }
 }
 
 // --- Gestión de Casos de Mantenimiento Actions ---
+// Using CreateCasoMantenimientoFormSchema from lib/schemas.ts
 export async function createCasoMantenimientoAction(
   values: z.infer<typeof CreateCasoMantenimientoFormSchema>,
   currentUserId: string,
@@ -562,35 +854,81 @@ export async function createCasoMantenimientoAction(
   if (!validatedFields.success) {
     return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación al crear el caso." };
   }
-  // TODO: Implement using Prisma client
-  // Create CasoDeMantenimiento and initial CasoMantenimientoLogEntry
-  const placeholderCasoId = `CASO-DB-${Date.now()}`;
-  console.warn(`createCasoMantenimientoAction needs Prisma implementation. Placeholder ID: ${placeholderCasoId}`);
+  const data = validatedFields.data;
 
-  await logAuditEvent(currentUserEmail, "Registro de Nuevo Caso de Mantenimiento (DB Pendiente)", `Título: ${values.title}`);
-  revalidatePath("/mantenimiento");
+  try {
+    const newCaso = await prisma.casoDeMantenimiento.create({
+      data: {
+        title: data.title,
+        description: data.description,
+        location: data.location,
+        equipment: data.equipment,
+        priority: data.priority as CasoMantenimientoPriorityEnum,
+        assignedProviderName: data.assignedProviderName,
+        currentStatus: "Registrado" as CasoMantenimientoStatusEnum,
+        registeredAt: new Date(),
+        registeredByUserId: currentUserId,
+        registeredByUserName: currentUserName,
+        log: {
+          create: [{
+            action: "Caso Registrado",
+            notes: "Caso de mantenimiento inicial registrado.",
+            userId: currentUserId,
+            userName: currentUserName,
+            statusAfterAction: "Registrado" as CasoMantenimientoStatusEnum
+          }]
+        }
+      }
+    });
 
-  return {
-    success: true,
-    message: "Caso de mantenimiento registrado exitosamente. (DB Pendiente)",
-    casoId: placeholderCasoId,
-  };
+    await logAuditEvent(currentUserEmail, "Registro de Nuevo Caso de Mantenimiento", `Título: ${data.title}, ID: ${newCaso.id}`);
+    revalidatePath("/mantenimiento");
+
+    return {
+      success: true,
+      message: "Caso de mantenimiento registrado exitosamente.",
+      casoId: newCaso.id,
+    };
+  } catch (error) {
+    console.error("Error creating caso de mantenimiento:", error);
+    return { success: false, message: "Error de base de datos al crear caso de mantenimiento." };
+  }
 }
 
-export async function getAllCasosMantenimientoAction(): Promise<CasoDeMantenimiento[]> {
-  // TODO: Implement using Prisma client
-  // return await prisma.casoDeMantenimiento.findMany({ include: { registeredByUser: true, logEntries: true } });
-  console.warn("getAllCasosMantenimientoAction needs Prisma implementation.");
-  return [];
+export async function getAllCasosMantenimientoAction(): Promise<(CasoDeMantenimientoTypePrisma & { log: CasoMantenimientoLogEntryTypePrisma[] })[]> {
+  try {
+    return await prisma.casoDeMantenimiento.findMany({
+      include: { 
+        registeredByUser: { select: { name: true }}, 
+        log: { orderBy: { timestamp: 'desc' }} 
+      },
+      orderBy: { registeredAt: 'desc' }
+    });
+  } catch (error) {
+    console.error("Error fetching casos de mantenimiento:", error);
+    return [];
+  }
 }
 
-export async function getCasoMantenimientoByIdAction(id: string): Promise<CasoDeMantenimiento | null> {
-  // TODO: Implement using Prisma client
-  // return await prisma.casoDeMantenimiento.findUnique({ where: { id }, include: { registeredByUser: true, logEntries: { include: { user: true }, orderBy: { timestamp: 'desc' } } } });
-  console.warn(`getCasoMantenimientoByIdAction needs Prisma implementation for ID ${id}.`);
-  return null;
+export async function getCasoMantenimientoByIdAction(id: string): Promise<(CasoDeMantenimientoTypePrisma & { log: (CasoMantenimientoLogEntryTypePrisma & {user: { name: string }})[] }) | null> {
+   try {
+    return await prisma.casoDeMantenimiento.findUnique({
+      where: { id },
+      include: { 
+        registeredByUser: { select: { name: true }}, 
+        log: { 
+          include: { user: { select: { name: true }}},
+          orderBy: { timestamp: 'desc' }
+        }
+      }
+    });
+  } catch (error) {
+    console.error(`Error fetching caso de mantenimiento by ID ${id}:`, error);
+    return null;
+  }
 }
 
+// Using UpdateCasoMantenimientoFormSchema from lib/schemas.ts
 export async function updateCasoMantenimientoAction(
   casoId: string,
   updates: z.infer<typeof UpdateCasoMantenimientoFormSchema>,
@@ -602,13 +940,58 @@ export async function updateCasoMantenimientoAction(
    if (!validatedFields.success) {
      return { success: false, message: "Error de validación: " + JSON.stringify(validatedFields.error.flatten().fieldErrors) };
    }
-   // TODO: Implement using Prisma client
-   // Fetch caso, update fields, add log entry transactionally.
-   console.warn(`updateCasoMantenimientoAction needs Prisma implementation for caso ${casoId}.`);
-   const { currentStatus, notes } = validatedFields.data;
+   const { currentStatus, notes, assignedProviderName, nextFollowUpDate, resolutionDetails, cost, invoicingDetails, resolvedAt } = validatedFields.data;
 
-   await logAuditEvent(actingUserEmail, `Actualización de Caso de Mantenimiento (DB Pendiente): ${currentStatus}`, `ID Caso: ${casoId}. Notas: ${notes}`);
-   revalidatePath(`/mantenimiento/${casoId}`);
-   revalidatePath("/mantenimiento");
-   return { success: true, message: `Caso de mantenimiento actualizado: ${currentStatus}. (DB Pendiente)` };
+   try {
+    const casoToUpdate = await prisma.casoDeMantenimiento.findUnique({ where: { id: casoId }});
+    if (!casoToUpdate) return { success: false, message: "Caso no encontrado." };
+
+    const dataToUpdate: any = {
+        currentStatus: currentStatus as CasoMantenimientoStatusEnum,
+        assignedProviderName,
+        nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : null,
+        lastFollowUpDate: new Date(), // Set last follow-up to now
+    };
+
+    if (currentStatus === "Resuelto") {
+        if (!resolutionDetails || !resolvedAt) {
+            return { success: false, message: "Para el estado 'Resuelto', los Detalles de Resolución y la Fecha de Resolución son obligatorios."};
+        }
+        dataToUpdate.resolutionDetails = resolutionDetails;
+        dataToUpdate.cost = cost;
+        dataToUpdate.invoicingDetails = invoicingDetails;
+        dataToUpdate.resolvedAt = new Date(resolvedAt);
+    } else {
+        // Clear closure fields if status is not Resuelto
+        dataToUpdate.resolutionDetails = null;
+        dataToUpdate.cost = null;
+        dataToUpdate.invoicingDetails = null;
+        dataToUpdate.resolvedAt = null;
+    }
+    
+    await prisma.$transaction([
+        prisma.casoDeMantenimiento.update({
+            where: { id: casoId },
+            data: dataToUpdate
+        }),
+        prisma.casoMantenimientoLogEntry.create({
+            data: {
+                casoId: casoId,
+                action: `Actualización de Estado: ${currentStatus}`,
+                notes: notes,
+                userId: actingUserId,
+                userName: actingUserName,
+                statusAfterAction: currentStatus as CasoMantenimientoStatusEnum
+            }
+        })
+    ]);
+
+    await logAuditEvent(actingUserEmail, `Actualización de Caso de Mantenimiento: ${currentStatus}`, `ID Caso: ${casoId}. Notas: ${notes}`);
+    revalidatePath(`/mantenimiento/${casoId}`);
+    revalidatePath("/mantenimiento");
+    return { success: true, message: `Caso de mantenimiento actualizado a ${currentStatus}.` };
+   } catch (error) {
+     console.error("Error updating caso de mantenimiento:", error);
+     return { success: false, message: "Error de base de datos al actualizar caso de mantenimiento." };
+   }
 }
