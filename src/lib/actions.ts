@@ -2,10 +2,10 @@
 "use server";
 
 import { z } from "zod";
-import { prisma } from "@/lib/db";
+import { prisma } from "./db"; // Ensure this is the only way prisma client is imported
 import bcrypt from 'bcryptjs';
 import type {
-  User as UserTypePrisma,
+  User as PrismaUser, // Renamed to avoid conflict with local User type
   Ticket as TicketTypePrisma,
   Comment as CommentTypePrisma,
   Attachment as AttachmentTypePrisma,
@@ -22,23 +22,16 @@ import type {
   ApprovalRequestType,
   ApprovalStatus,
   PaymentType,
+  InventoryItemCategory, // Ensured import for schema
+  InventoryItemStatus,   // Ensured import for schema
+  StorageType,           // Ensured import for schema
   CasoMantenimientoStatus,
   CasoMantenimientoPriority
 } from "@prisma/client";
 
-import type { AttachmentClientData, ExcelInventoryItemData, User } from "./types"; // Keep User from types.ts for client-side compatibility
-import {
-  INVENTORY_ITEM_CATEGORIES,
-  INVENTORY_ITEM_STATUSES,
-  RAM_OPTIONS,
-  STORAGE_TYPES_ZOD_ENUM,
-  CASO_STATUSES,
-  CASO_PRIORITIES
-} from "./types";
-import {
-  TICKET_PRIORITIES_ENGLISH,
-  TICKET_STATUSES_ENGLISH
-} from "./constants";
+import type { AttachmentClientData, ExcelInventoryItemData, User } from "./types";
+import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
+import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM, CASO_STATUSES, CASO_PRIORITIES } from "./types";
 
 import {
   BaseInventoryItemSchema,
@@ -65,7 +58,7 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
     });
     revalidatePath("/admin/audit");
   } catch (error) {
-    console.error("Error logging audit event:", error);
+    console.error("logAuditEvent Error:", error);
     // Depending on requirements, you might want to throw the error or handle it silently
   }
 }
@@ -75,16 +68,16 @@ export async function getAuditLogs(): Promise<AuditLogEntryTypePrisma[]> {
     const logs = await prisma.auditLogEntry.findMany({
       orderBy: { timestamp: 'desc' },
     });
-    return logs.map(log => ({...log, user: log.userEmail })); // Keep original structure for `user` field if needed by page
+    return logs;
   } catch (error) {
-    console.error("Error fetching audit logs:", error);
+    console.error("getAuditLogs Error:", error);
     return [];
   }
 }
 
-// --- Authentication Server Actions ---
+// --- Authentication Server Actions (Moved from auth-context) ---
 
-export async function loginUserServerAction(email: string, pass: string): Promise<{ success: boolean; user: User | null; message?: string }> {
+export async function loginUserServerAction(email: string, pass: string): Promise<{ success: boolean; user: Omit<PrismaUser, 'password'> | null; message?: string }> {
   try {
     const dbUser = await prisma.user.findUnique({ where: { email } });
     if (dbUser && dbUser.password) {
@@ -92,18 +85,18 @@ export async function loginUserServerAction(email: string, pass: string): Promis
       if (passwordMatch) {
         const { password, ...userToReturn } = dbUser;
         await logAuditEvent(email, "Inicio de Sesión Exitoso");
-        return { success: true, user: userToReturn as User };
+        return { success: true, user: userToReturn, message: "Inicio de sesión exitoso." };
       }
     }
     await logAuditEvent(email, "Intento de Inicio de Sesión Fallido");
     return { success: false, user: null, message: "Correo electrónico o contraseña no válidos." };
   } catch (error) {
-    console.error("Login server action error:", error);
-    return { success: false, user: null, message: "Error del servidor durante el inicio de sesión." };
+    console.error("loginUserServerAction Error:", error);
+    return { success: false, user: null, message: "Error del servidor durante el inicio de sesión. Por favor, intente más tarde." };
   }
 }
 
-export async function registerUserServerAction(name: string, email: string, pass: string): Promise<{ success: boolean; user: User | null; message?: string }> {
+export async function registerUserServerAction(name: string, email: string, pass: string): Promise<{ success: boolean; user: Omit<PrismaUser, 'password'> | null; message?: string }> {
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -115,36 +108,41 @@ export async function registerUserServerAction(name: string, email: string, pass
         name,
         email,
         password: hashedPassword,
-        role: "User", // Default role
-        avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,2).toUpperCase()}`, // Placeholder avatar
+        role: "User",
+        avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,2).toUpperCase()}`,
       },
     });
     const { password, ...userToReturn } = newUser;
     await logAuditEvent(email, "Registro de Nuevo Usuario");
-    return { success: true, user: userToReturn as User };
+    return { success: true, user: userToReturn, message: "Registro exitoso." };
   } catch (error) {
-    console.error("Registration server action error:", error);
-    return { success: false, user: null, message: "Error del servidor durante el registro." };
+    console.error("registerUserServerAction Error:", error);
+    return { success: false, user: null, message: "Error del servidor durante el registro. Por favor, intente más tarde." };
   }
 }
 
-export async function getUserByIdServerAction(userId: string): Promise<User | null> {
+export async function getUserByIdServerAction(userId: string): Promise<Omit<PrismaUser, 'password'> | null> {
   try {
     const dbUser = await prisma.user.findUnique({ where: { id: userId } });
     if (dbUser) {
       const { password, ...userToReturn } = dbUser;
-      return userToReturn as User;
+      return userToReturn;
     }
     return null;
   } catch (error) {
-    console.error("Get user by ID server action error:", error);
+    console.error("getUserByIdServerAction Error:", error);
     return null;
   }
 }
 
-export async function updateUserProfileServerAction(userId: string, name: string, email: string): Promise<{ success: boolean; user: User | null; message?: string }> {
+export async function updateUserProfileServerAction(userId: string, name: string, email: string): Promise<{ success: boolean; user: Omit<PrismaUser, 'password'> | null; message?: string }> {
   try {
-    if (email) {
+    const currentUserData = await prisma.user.findUnique({ where: { id: userId }});
+    if (!currentUserData) {
+        return { success: false, user: null, message: "Usuario no encontrado." };
+    }
+
+    if (email && email !== currentUserData.email) {
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser && existingUser.id !== userId) {
         return { success: false, user: null, message: "El correo electrónico ya está en uso por otro usuario." };
@@ -158,35 +156,33 @@ export async function updateUserProfileServerAction(userId: string, name: string
     await logAuditEvent(email, "Actualización de Perfil");
     revalidatePath("/profile");
     revalidatePath("/admin/users");
-    return { success: true, user: userToReturn as User };
+    return { success: true, user: userToReturn, message: "Perfil actualizado." };
   } catch (error) {
-    console.error("Profile update server action error:", error);
-    return { success: false, user: null, message: "Error del servidor al actualizar el perfil." };
+    console.error("updateUserProfileServerAction Error:", error);
+    return { success: false, user: null, message: "Error del servidor al actualizar el perfil. Por favor, intente más tarde." };
   }
 }
 
-export async function updateUserPasswordServerAction(userId: string, newPasswordValue: string): Promise<{ success: boolean; message?: string }> {
+export async function updateUserPasswordServerAction(userId: string, newPasswordValue: string): Promise<{ success: boolean; message: string }> {
   try {
     const userToUpdate = await prisma.user.findUnique({ where: { id: userId } });
-    if (!userToUpdate) {
-        return { success: false, message: "Usuario no encontrado." };
+    if (!userToUpdate || !userToUpdate.email) {
+        return { success: false, message: "Usuario no encontrado o email no disponible." };
     }
     const hashedPassword = await bcrypt.hash(newPasswordValue, 10);
     await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });
-    if (userToUpdate.email) {
-        await logAuditEvent(userToUpdate.email, "Actualización de Contraseña Propia");
-    }
+    await logAuditEvent(userToUpdate.email, "Actualización de Contraseña Propia");
     return { success: true, message: "Contraseña actualizada exitosamente." };
   } catch (error) {
-    console.error("Self password update server action error:", error);
-    return { success: false, message: "Error del servidor al actualizar la contraseña." };
+    console.error("updateUserPasswordServerAction Error:", error);
+    return { success: false, message: "Error del servidor al actualizar la contraseña. Por favor, intente más tarde." };
   }
 }
 
-export async function resetUserPasswordByEmailServerAction(email: string, newPasswordValue: string): Promise<{ success: boolean; message?: string }> {
+export async function resetUserPasswordByEmailServerAction(email: string, newPasswordValue: string): Promise<{ success: boolean; message: string }> {
   try {
     const targetUser = await prisma.user.findUnique({ where: { email } });
     if (!targetUser) {
@@ -200,19 +196,19 @@ export async function resetUserPasswordByEmailServerAction(email: string, newPas
     await logAuditEvent(email, "Restablecimiento de Contraseña por Olvido");
     return { success: true, message: "Contraseña restablecida exitosamente." };
   } catch (error) {
-    console.error("Password reset server action error:", error);
-    return { success: false, message: "Error del servidor al restablecer la contraseña." };
+    console.error("resetUserPasswordByEmailServerAction Error:", error);
+    return { success: false, message: "Error del servidor al restablecer la contraseña. Por favor, intente más tarde." };
   }
 }
 
-export async function getAllUsersServerAction(): Promise<User[]> {
+export async function getAllUsersServerAction(): Promise<Omit<PrismaUser, 'password'>[]> {
   try {
     const dbUsers = await prisma.user.findMany({
       orderBy: { name: 'asc' }
     });
-    return dbUsers.map(({ password, ...userWithoutPassword }) => userWithoutPassword as User);
+    return dbUsers.map(({ password, ...userWithoutPassword }) => userWithoutPassword);
   } catch (error) {
-    console.error("Error fetching all users server action:", error);
+    console.error("getAllUsersServerAction Error:", error);
     return [];
   }
 }
@@ -220,12 +216,12 @@ export async function getAllUsersServerAction(): Promise<User[]> {
 export async function updateUserByAdminServerAction(
   adminEmail: string,
   userId: string,
-  data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>
+  data: Partial<Pick<PrismaUser, 'name' | 'role' | 'email' | 'department' | 'password'>>
 ): Promise<{ success: boolean; message?: string }> {
   try {
     const updateData: any = {
       name: data.name,
-      role: data.role as Role,
+      role: data.role as Role, // Assuming Role type from Prisma matches your custom type
       email: data.email,
       department: data.department,
     };
@@ -234,9 +230,12 @@ export async function updateUserByAdminServerAction(
     }
 
     if (data.email) {
-        const existingUserWithEmail = await prisma.user.findUnique({ where: { email: data.email } });
-        if (existingUserWithEmail && existingUserWithEmail.id !== userId) {
-        return { success: false, message: "El correo electrónico ya está en uso por otro usuario." };
+        const userBeingEdited = await prisma.user.findUnique({ where: { id: userId } });
+        if (userBeingEdited && data.email !== userBeingEdited.email) {
+            const existingUserWithEmail = await prisma.user.findUnique({ where: { email: data.email } });
+            if (existingUserWithEmail && existingUserWithEmail.id !== userId) {
+                return { success: false, message: "El correo electrónico ya está en uso por otro usuario." };
+            }
         }
     }
 
@@ -248,8 +247,8 @@ export async function updateUserByAdminServerAction(
     revalidatePath("/admin/users");
     return { success: true, message: "Usuario actualizado." };
   } catch (error) {
-    console.error("Admin update user server action error:", error);
-    return { success: false, message: "Error del servidor al actualizar usuario." };
+    console.error("updateUserByAdminServerAction Error:", error);
+    return { success: false, message: "Error del servidor al actualizar usuario. Por favor, intente más tarde." };
   }
 }
 
@@ -268,20 +267,21 @@ export async function deleteUserByAdminServerAction(adminEmail: string, userId: 
     revalidatePath("/admin/users");
     return { success: true, message: "Usuario eliminado." };
   } catch (error: any) {
-    console.error("Admin delete user server action error:", error);
-    if (error.code === 'P2003' || error.code === 'P2014' ) {
+    console.error("deleteUserByAdminServerAction Error:", error);
+    if (error.code === 'P2003' || error.code === 'P2014' ) { // Foreign key constraint
       return { success: false, message: "No se puede eliminar el usuario porque tiene registros asociados (tickets, comentarios, etc.). Reasigna o elimina esos registros primero." };
     }
-    return { success: false, message: "Error del servidor al eliminar usuario." };
+    return { success: false, message: "Error del servidor al eliminar usuario. Por favor, intente más tarde." };
   }
 }
 
-// --- Ticket Schemas (kept client-side for TicketForm, but actions will use Prisma types) ---
-const CreateTicketClientSchema = z.object({ // This is used client-side, server action will re-validate against Prisma schema
+
+// --- Ticket Actions ---
+const CreateTicketClientSchema = z.object({
   subject: z.string().min(5).max(100),
   description: z.string().min(10).max(2000),
   priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]),
-  userEmail: z.string().email(),
+  userEmail: z.string().email(), // Required for logging
 });
 
 const AddCommentClientSchema = z.object({
@@ -294,7 +294,6 @@ const UpdateTicketStatusClientSchema = z.object({
 });
 
 
-// --- Ticket Creation ---
 export async function createTicketAction(
   userId: string,
   userName: string,
@@ -319,8 +318,9 @@ export async function createTicketAction(
         priority,
         status: "Open",
         userId,
-        userName,
-        userEmail,
+        userName, // Store denormalized user name
+        userEmail, // Store denormalized user email
+        // attachments will be handled separately if needed
       }
     });
 
@@ -337,18 +337,17 @@ export async function createTicketAction(
       ticketId: newTicket.id,
     };
   } catch (error) {
-    console.error("Error creating ticket in DB:", error);
+    console.error("createTicketAction Error:", error);
     return {
       success: false,
-      message: "Error de base de datos al crear el ticket.",
+      message: "Error de base de datos al crear el ticket. Por favor, intente más tarde.",
     };
   }
 }
 
-// --- Add Comment ---
 export async function addCommentAction(
   ticketId: string,
-  commenter: Pick<UserTypePrisma, 'id' | 'name' | 'email' | 'avatarUrl'>,
+  commenter: Pick<PrismaUser, 'id' | 'name' | 'email' | 'avatarUrl'>,
   values: z.infer<typeof AddCommentClientSchema>
 ) {
   const validatedFields = AddCommentClientSchema.safeParse(values);
@@ -371,20 +370,19 @@ export async function addCommentAction(
         text: validatedFields.data.text,
         ticketId,
         userId: commenter.id,
-        userName: commenter.name || "Usuario Desconocido",
-        userAvatarUrl: commenter.avatarUrl,
+        userName: commenter.name || "Usuario Desconocido", // Denormalized
+        userAvatarUrl: commenter.avatarUrl, // Denormalized
       }
     });
     await prisma.ticket.update({
       where: { id: ticketId },
-      data: { updatedAt: new Date() }
+      data: { updatedAt: new Date() } // Touch the ticket's updatedAt timestamp
     });
 
     await logAuditEvent(commenter.email, "Adición de Comentario", `Ticket ID: ${ticketId}, Usuario: ${commenter.name}`);
     revalidatePath(`/tickets/${ticketId}`);
     revalidatePath("/tickets");
     revalidatePath("/dashboard");
-    revalidatePath("/admin/analytics");
 
     return {
       success: true,
@@ -392,15 +390,14 @@ export async function addCommentAction(
       comment: newComment,
     };
   } catch (error) {
-    console.error("Error adding comment to DB:", error);
+    console.error("addCommentAction Error:", error);
     return {
       success: false,
-      message: "Error de base de datos al añadir comentario.",
+      message: "Error de base de datos al añadir comentario. Por favor, intente más tarde.",
     };
   }
 }
 
-// --- Update Ticket Status ---
 export async function updateTicketStatusAction(
   ticketId: string,
   values: z.infer<typeof UpdateTicketStatusClientSchema>
@@ -432,18 +429,19 @@ export async function updateTicketStatusAction(
     revalidatePath("/dashboard");
     revalidatePath("/admin/analytics");
     revalidatePath("/admin/reports");
+    
+    const statusDisplayMap: Record<string, string> = TICKET_STATUSES_ENGLISH.reduce((acc, s) => {
+        acc[s] = s; // Simple map for now, can be localized if needed
+        return acc;
+    }, {} as Record<string, string>);
 
-    const statusDisplayMap: Record<string, string> = {
-      Open: "Abierto", InProgress: "En Progreso", Resolved: "Resuelto", Closed: "Cerrado",
-    };
-    return { success: true, message: `Estado del ticket actualizado a ${statusDisplayMap[status]}.` };
+    return { success: true, message: `Estado del ticket actualizado a ${statusDisplayMap[status] || status}.` };
   } catch (error) {
-    console.error("Error updating ticket status in DB:", error);
-    return { success: false, message: "Error de base de datos al actualizar estado." };
+    console.error("updateTicketStatusAction Error:", error);
+    return { success: false, message: "Error de base de datos al actualizar estado. Por favor, intente más tarde." };
   }
 }
 
-// --- Fetch Ticket by ID ---
 export async function getTicketById(ticketId: string): Promise<(TicketTypePrisma & { comments: CommentTypePrisma[], attachments: AttachmentTypePrisma[], user: { name: string | null, email: string | null } | null }) | null> {
   try {
     const ticket = await prisma.ticket.findUnique({
@@ -451,35 +449,53 @@ export async function getTicketById(ticketId: string): Promise<(TicketTypePrisma
       include: {
         comments: { orderBy: { createdAt: 'asc' }},
         attachments: true,
-        user: { select: { name: true, email: true }}
+        user: { select: { name: true, email: true }} // Only select needed fields
       }
     });
     return ticket;
   } catch (error) {
-    console.error(`Error fetching ticket by ID ${ticketId}:`, error);
+    console.error(`getTicketById Error for ticket ID ${ticketId}:`, error);
     return null;
   }
 }
 
-// --- Fetch All Tickets ---
 export async function getAllTickets(): Promise<(TicketTypePrisma & { comments: CommentTypePrisma[], attachments: AttachmentTypePrisma[], user: { name: string | null } | null })[]> {
   try {
     const tickets = await prisma.ticket.findMany({
-      orderBy: [{priority: 'desc'}, {createdAt: 'desc'}],
+      orderBy: [
+        { 
+          priority: {
+            _relevance: {
+              fields: ['priority'],
+              search: '"High" "Medium" "Low"', // This is not standard Prisma order, adjust if needed
+              sort: 'desc'
+            }
+          } as any // Prisma might not directly support relevance sort on enum like this; adjust
+        },
+        { createdAt: 'desc' }
+      ],
       include: {
         user: { select: { name: true }},
-        comments: true,
-        attachments: true
+        comments: { select: { id: true } }, // Only fetch comment count or essential fields
+        attachments: { select: { id: true, fileName: true, url: true, size: true }} // Fetch necessary attachment fields
       }
     });
-    return tickets;
+    // A more standard priority sort (High first):
+    const priorityOrder: Record<TicketPriority, number> = { High: 0, Medium: 1, Low: 2 };
+    tickets.sort((a, b) => {
+        if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
+            return priorityOrder[a.priority] - priorityOrder[b.priority];
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    return tickets.map(t => ({...t, comments: t.comments || [], attachments: t.attachments || []})); // Ensure comments/attachments are arrays
   } catch (error) {
-    console.error("Error fetching all tickets:", error);
+    console.error("getAllTickets Error:", error);
     return [];
   }
 }
 
-// --- Fetch Dashboard Stats ---
 export async function getDashboardStats() {
   try {
     const total = await prisma.ticket.count();
@@ -492,26 +508,32 @@ export async function getDashboardStats() {
 
     const byPriorityDb = await prisma.ticket.groupBy({
       by: ['priority'],
-      _count: { id: true },
+      _count: { id: true }, // Use _count: { _all: true } or _count: { priority: true }
     });
     const byStatusDb = await prisma.ticket.groupBy({
       by: ['status'],
       _count: { id: true },
     });
+    
+    const priorityMap = TICKET_PRIORITIES_ENGLISH.reduce((acc, p) => { acc[p] = 0; return acc; }, {} as Record<TicketPriority, number>);
+    byPriorityDb.forEach(p => { priorityMap[p.priority] = p._count.id; });
+
+    const statusMap = TICKET_STATUSES_ENGLISH.reduce((acc, s) => { acc[s] = 0; return acc; }, {} as Record<TicketStatus, number>);
+    byStatusDb.forEach(s => { statusMap[s.status] = s._count.id; });
 
     const stats = {
       byPriority: TICKET_PRIORITIES_ENGLISH.map(pKey => ({
-        name: pKey as string,
-        value: byPriorityDb.find(p => p.priority === pKey)?._count.id || 0,
+        name: pKey as string, // Adjust if you have localized names
+        value: priorityMap[pKey],
       })),
       byStatus: TICKET_STATUSES_ENGLISH.map(sKey => ({
-        name: sKey as string,
-        value: byStatusDb.find(s => s.status === sKey)?._count.id || 0,
+        name: sKey as string, // Adjust if you have localized names
+        value: statusMap[sKey],
       })),
     };
     return { summary, stats };
   } catch (error) {
-    console.error("Error fetching dashboard stats:", error);
+    console.error("getDashboardStats Error:", error);
     const placeholderSummary = { total: 0, open: 0, inProgress: 0, resolved: 0, closed: 0 };
     const placeholderStats = {
       byPriority: TICKET_PRIORITIES_ENGLISH.map(pKey => ({ name: pKey as string, value: 0 })),
@@ -522,6 +544,7 @@ export async function getDashboardStats() {
 }
 
 // --- Inventory Actions ---
+
 export async function getAllInventoryItems(): Promise<(InventoryItemTypePrisma & { addedByUser: { name: string | null } | null })[]> {
   try {
     const items = await prisma.inventoryItem.findMany({
@@ -530,43 +553,72 @@ export async function getAllInventoryItems(): Promise<(InventoryItemTypePrisma &
     });
     return items;
   } catch (error) {
-    console.error("Error fetching all inventory items:", error);
+    console.error("getAllInventoryItems Error:", error);
     return [];
   }
 }
 
 export async function addInventoryItemAction(
-  currentUser: Pick<UserTypePrisma, 'id' | 'name' | 'email'>,
+  currentUser: Pick<User, 'id' | 'name' | 'email'>,
   values: z.infer<typeof BaseInventoryItemSchema>
-) {
+): Promise<{ success: boolean; message: string; item?: InventoryItemTypePrisma, errors?: any }> {
+  if (!currentUser || !currentUser.id || !currentUser.name || !currentUser.email) {
+    console.error("addInventoryItemAction: currentUser is invalid", currentUser);
+    return { success: false, message: "Información del usuario actual incompleta o inválida." };
+  }
+
   const validatedFields = BaseInventoryItemSchema.safeParse(values);
   if (!validatedFields.success) {
-    return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Fallo al añadir artículo debido a errores de validación." };
+    console.error("addInventoryItemAction: Validation failed", validatedFields.error.flatten().fieldErrors);
+    return {
+      success: false,
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: "Fallo al añadir artículo debido a errores de validación.",
+    };
   }
   const data = validatedFields.data;
 
-  if (!currentUser.id || !currentUser.name || !currentUser.email) {
-    return { success: false, message: "Información del usuario actual incompleta." };
-  }
-
   try {
+    const dataToCreate = {
+      name: data.name,
+      category: data.category,
+      brand: data.brand || null,
+      model: data.model || null,
+      serialNumber: data.serialNumber || null,
+      processor: data.processor || null,
+      ram: data.ram || null,
+      storageType: data.storageType || null,
+      storage: data.storage || null,
+      quantity: data.quantity,
+      location: data.location || null,
+      status: data.status,
+      notes: data.notes || null,
+      addedByUserId: currentUser.id,
+      addedByUserName: currentUser.name,
+    };
+    
     const newItem = await prisma.inventoryItem.create({
-      data: {
-        ...data,
-        addedByUserId: currentUser.id,
-        addedByUserName: currentUser.name,
-      }
+      data: dataToCreate,
     });
 
-    await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo Nombre: ${data.name}, ID: ${newItem.id}`);
+    try {
+      await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo Nombre: ${data.name}, ID: ${newItem.id}`);
+    } catch (auditError) {
+      console.error("addInventoryItemAction: Failed to log audit event", auditError);
+    }
+    
     revalidatePath("/inventory");
     return { success: true, message: `Artículo "${data.name}" con ID "${newItem.id}" añadido exitosamente.`, item: newItem };
   } catch (error: any) {
-    console.error("Error adding inventory item to DB:", error);
-     if (error.code === 'P2002' && error.meta?.target?.includes('serialNumber')) {
+    console.error("addInventoryItemAction: Error adding inventory item to DB:", error);
+    if (error.code === 'P2002' && error.meta?.target?.includes('serialNumber')) {
       return { success: false, message: "Error: El número de serie ya existe en el inventario." };
     }
-    return { success: false, message: "Error de base de datos al añadir artículo." };
+    let errorMessage = "Error de base de datos al añadir artículo.";
+    if (error instanceof Error && error.message) {
+        errorMessage += ` Detalles: ${error.message}`;
+    }
+    return { success: false, message: errorMessage };
   }
 }
 
@@ -585,23 +637,37 @@ export async function updateInventoryItemAction(
     const itemToUpdate = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
     if (!itemToUpdate) return { success: false, message: "Artículo no encontrado." };
 
+    const dataToUpdate = {
+        name: data.name,
+        category: data.category,
+        brand: data.brand || null,
+        model: data.model || null,
+        serialNumber: data.serialNumber || null,
+        processor: data.processor || null,
+        ram: data.ram || null,
+        storageType: data.storageType || null,
+        storage: data.storage || null,
+        quantity: data.quantity,
+        location: data.location || null,
+        status: data.status,
+        notes: data.notes || null,
+        updatedAt: new Date()
+      };
+
     const updatedItem = await prisma.inventoryItem.update({
       where: { id: itemId },
-      data: {
-        ...data,
-        updatedAt: new Date()
-      }
+      data: dataToUpdate
     });
 
     await logAuditEvent(actingUserEmail, "Actualización de Artículo de Inventario", `Artículo ID: ${itemId}, Nombre: ${data.name}`);
     revalidatePath("/inventory");
     return { success: true, message: `Artículo "${data.name}" actualizado exitosamente.`, item: updatedItem };
   } catch (error: any) {
-    console.error("Error updating inventory item in DB:", error);
+    console.error("updateInventoryItemAction Error:", error);
      if (error.code === 'P2002' && error.meta?.target?.includes('serialNumber')) {
       return { success: false, message: "Error: El número de serie ya existe en el inventario para otro artículo." };
     }
-    return { success: false, message: "Error de base de datos al actualizar artículo." };
+    return { success: false, message: "Error de base de datos al actualizar artículo. Por favor, intente más tarde." };
   }
 }
 
@@ -616,8 +682,8 @@ export async function deleteInventoryItemAction(itemId: string, actingUserEmail:
     revalidatePath("/inventory");
     return { success: true, message: "Artículo eliminado exitosamente." };
   } catch (error) {
-    console.error("Error deleting inventory item from DB:", error);
-    return { success: false, message: "Error de base de datos al eliminar artículo." };
+    console.error("deleteInventoryItemAction Error:", error);
+    return { success: false, message: "Error de base de datos al eliminar artículo. Por favor, intente más tarde." };
   }
 }
 
@@ -644,33 +710,38 @@ const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Part
     const internalField = excelToInternalFieldMap[lowerExcelHeader] as keyof z.infer<typeof BaseInventoryItemSchema>;
     if (internalField) {
       let value = row[excelHeader];
-      if (internalField === 'quantity' && typeof value === 'string') {
-        const parsedQuantity = parseInt(value, 10);
+      if (value === null || value === undefined || String(value).trim() === "") {
+        (mapped as any)[internalField] = undefined; // Treat empty/null as undefined for optional fields
+        continue;
+      }
+      
+      if (internalField === 'quantity') {
+        const parsedQuantity = parseInt(String(value), 10);
         (mapped as any)[internalField] = isNaN(parsedQuantity) ? undefined : parsedQuantity;
       } else if (internalField === 'category') {
-        const normalizedValue = String(value).toLowerCase().replace(/\s/g,"").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const foundValue = INVENTORY_ITEM_CATEGORIES.find(opt => opt.toLowerCase().replace(/\s/g,"").replace(" ","").normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
+        const normalizedValue = String(value).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "");
+        const foundValue = INVENTORY_ITEM_CATEGORIES.find(opt => opt.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "") === normalizedValue);
         (mapped as any)[internalField] = foundValue || undefined;
       } else if (internalField === 'status') {
-         const normalizedValue = String(value).toLowerCase().replace(/\s/g,"").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-         const foundValue = INVENTORY_ITEM_STATUSES.find(opt => opt.toLowerCase().replace(/\s/g,"").replace(" ","").normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalizedValue);
+         const normalizedValue = String(value).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "");
+         const foundValue = INVENTORY_ITEM_STATUSES.find(opt => opt.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "") === normalizedValue);
         (mapped as any)[internalField] = foundValue || undefined;
       } else if (internalField === 'ram') {
-        const normalizedValue = String(value).toUpperCase().replace(/\s/g,"");
-        const foundValue = RAM_OPTIONS.find(opt => opt.toUpperCase().replace(/\s/g,"") === normalizedValue);
+        const normalizedValue = String(value).trim().toUpperCase().replace(/\s+/g,"");
+        const foundValue = RAM_OPTIONS.find(opt => opt.toUpperCase().replace(/\s+/g,"") === normalizedValue);
         (mapped as any)[internalField] = foundValue || undefined;
       } else if (internalField === 'storageType') {
-        const normalizedValue = String(value).toUpperCase().replace(/\s/g,"");
-        const foundValue = STORAGE_TYPES_ZOD_ENUM.find(opt => opt.toUpperCase().replace(/\s/g,"") === normalizedValue);
+        const normalizedValue = String(value).trim().toUpperCase().replace(/\s+/g,"");
+        const foundValue = STORAGE_TYPES_ZOD_ENUM.find(opt => opt.toUpperCase().replace(/\s+/g,"") === normalizedValue);
         (mapped as any)[internalField] = foundValue || undefined;
       }
       else {
-         (mapped as any)[internalField] = value === null || value === undefined ? undefined : String(value).trim();
+         (mapped as any)[internalField] = String(value).trim();
       }
     }
   }
   if (mapped.quantity === undefined || isNaN(Number(mapped.quantity))) mapped.quantity = 1;
-  if (mapped.status === undefined) mapped.status = "En Uso" as typeof INVENTORY_ITEM_STATUSES[number]; // Corrected to "En Uso"
+  if (mapped.status === undefined) mapped.status = "En Uso" as InventoryItemStatus;
   return mapped;
 };
 
@@ -708,27 +779,29 @@ export async function importInventoryItemsAction(
 
         const dataToCreate = {
           ...validatedFields.data,
+          serialNumber: validatedFields.data.serialNumber || null, // Ensure null if empty for unique constraint
+          brand: validatedFields.data.brand || null,
+          model: validatedFields.data.model || null,
+          processor: validatedFields.data.processor || null,
+          ram: validatedFields.data.ram || null,
+          storageType: validatedFields.data.storageType || null,
+          storage: validatedFields.data.storage || null,
+          location: validatedFields.data.location || null,
+          notes: validatedFields.data.notes || null,
           addedByUserId: currentUserId,
           addedByUserName: currentUserName,
         };
-
-        if (dataToCreate.serialNumber && dataToCreate.serialNumber.trim() !== "") {
-            const existingItemBySerial = await prisma.inventoryItem.findFirst({ // Changed to findFirst
-                where: { serialNumber: dataToCreate.serialNumber },
-            });
-            if (existingItemBySerial) {
-                errorCount++;
-                errors.push({ row: i + 2, message: `Error: Número de serie '${dataToCreate.serialNumber}' ya existe.`, data: rawRow });
-                continue;
-            }
-        }
 
         const newItem = await prisma.inventoryItem.create({ data: dataToCreate as any });
         importedItems.push(newItem);
         successCount++;
       } catch (e: any) {
         errorCount++;
-        errors.push({ row: i + 2, message: `Error procesando fila: ${e.message || String(e)}`, data: rawRow });
+        if (e.code === 'P2002' && e.meta?.target?.includes('serialNumber')) {
+             errors.push({ row: i + 2, message: `Error: Número de serie '${mappedData.serialNumber}' ya existe.`, data: rawRow });
+        } else {
+            errors.push({ row: i + 2, message: `Error procesando fila: ${e.message || String(e)}`, data: rawRow });
+        }
       }
     }
 
@@ -753,7 +826,7 @@ export async function importInventoryItemsAction(
     await logAuditEvent(currentUserEmail, "Error Crítico en Importación Masiva de Inventario", globalError.message || "Error desconocido");
     return {
       success: false,
-      message: `Error general durante la importación: ${globalError.message || "Error desconocido"}`,
+      message: `Error general durante la importación: ${globalError.message || "Error desconocido. Por favor, intente más tarde."}`,
       successCount,
       errorCount: itemDataArray.length - successCount,
       errors: itemDataArray.map((row, index) => ({ row: index + 2, message: "Error global durante la importación.", data: row})),
@@ -779,22 +852,20 @@ export async function createApprovalRequestAction(
       const approvalData: any = {
         type: data.type,
         subject: data.subject,
-        description: data.description,
+        description: data.description || null,
         status: "Pendiente",
         requesterId: data.requesterId,
-        // Storing denormalized requester name and email for easier display
         requesterName: data.requesterName,
-        requesterEmail: data.requesterEmail,
+        requesterEmail: data.requesterEmail || null,
       };
 
       if (data.type === "Compra") {
         approvalData.itemDescription = data.itemDescription;
         approvalData.estimatedPrice = data.estimatedPrice;
-        approvalData.supplierCompra = data.supplierCompra;
+        approvalData.supplierCompra = data.supplierCompra || null;
       } else if (data.type === "PagoProveedor") {
         approvalData.supplierPago = data.supplierPago;
         approvalData.totalAmountToPay = data.totalAmountToPay;
-        // approvalData.paymentDueDate = data.paymentDueDate; // Removed, handled in description
       }
 
       newApproval = await tx.approvalRequest.create({
@@ -805,9 +876,9 @@ export async function createApprovalRequestAction(
         await tx.attachment.createMany({
           data: data.attachmentsData.map(att => ({
             fileName: att.fileName,
-            url: "placeholder/url/" + att.fileName,
+            url: "placeholder/url/" + att.fileName, // Placeholder, replace with actual storage URL
             size: att.size,
-            type: att.type,
+            type: att.type || 'application/octet-stream',
             approvalRequestId: newApproval!.id,
           }))
         });
@@ -818,7 +889,7 @@ export async function createApprovalRequestAction(
           approvalRequestId: newApproval!.id,
           action: "Solicitud Creada",
           userId: data.requesterId,
-          userName: data.requesterName, // Using directly passed name
+          userName: data.requesterName,
           comment: "Solicitud creada inicialmente.",
         }
       });
@@ -839,8 +910,8 @@ export async function createApprovalRequestAction(
       approvalId: newApproval?.id,
     };
   } catch (error) {
-    console.error("Error creating approval request in DB:", error);
-    return { success: false, message: "Error de base de datos al crear solicitud de aprobación." };
+    console.error("createApprovalRequestAction Error:", error);
+    return { success: false, message: "Error de base de datos al crear solicitud de aprobación. Por favor, intente más tarde." };
   }
 }
 
@@ -853,12 +924,13 @@ export async function getApprovalRequestsForUser(userId: string, userRole: Role)
         orderBy: { createdAt: 'desc' }
       });
     }
+    // For Admin and specific approvers, show requests they created
     return await prisma.approvalRequest.findMany({
       where: { requesterId: userId },
       orderBy: { createdAt: 'desc' }
     });
   } catch (error) {
-    console.error("Error fetching approval requests for user:", error);
+    console.error("getApprovalRequestsForUser Error:", error);
     return [];
   }
 }
@@ -877,14 +949,14 @@ export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRe
       }
     });
   } catch (error) {
-    console.error(`Error fetching approval request details for ID ${id}:`, error);
+    console.error(`getApprovalRequestDetails Error for ID ${id}:`, error);
     return null;
   }
 }
 
 
 export async function approveRequestAction(
-  values: any
+  values: any // Type will be validated internally
 ): Promise<{ success: boolean; message: string }> {
   const { requestId, approverId, approverName, approverEmail, comment, approvedPaymentType, approvedAmount, installments } = values;
 
@@ -909,7 +981,7 @@ export async function approveRequestAction(
             return { success: false, message: "Tipo de pago no válido para Pago a Proveedor." };
         }
     } else if (request.type === "Compra") {
-        validatedData = ApproveCompraSchema.parse(values);
+        validatedData = ApproveCompraSchema.parse(values); // Uses the base action data
     } else {
         return { success: false, message: "Tipo de solicitud desconocida." };
     }
@@ -918,9 +990,8 @@ export async function approveRequestAction(
         const updateData: any = {
             status: "Aprobado" as ApprovalStatus,
             approverId,
-            approverComment: validatedData.comment,
+            approverComment: validatedData.comment || null,
             approvedAt: new Date(),
-            // Storing denormalized approver name and email
             approverName: approverName,
             approverEmail: approverEmail,
         };
@@ -929,12 +1000,13 @@ export async function approveRequestAction(
             updateData.approvedPaymentType = validatedData.approvedPaymentType as PaymentType;
             updateData.approvedAmount = validatedData.approvedAmount;
 
+            // Delete existing installments before creating new ones
             await tx.paymentInstallment.deleteMany({ where: { approvalRequestId: requestId }});
             if (validatedData.approvedPaymentType === "Cuotas" && validatedData.installments && validatedData.installments.length > 0) {
                 await tx.paymentInstallment.createMany({
                     data: validatedData.installments.map((inst: { amount: number; dueDate: Date; }) => ({
                         amount: inst.amount,
-                        dueDate: new Date(inst.dueDate),
+                        dueDate: new Date(inst.dueDate), // Ensure it's a Date object
                         approvalRequestId: requestId,
                     }))
                 });
@@ -960,11 +1032,11 @@ export async function approveRequestAction(
     revalidatePath('/dashboard');
     return { success: true, message: "Solicitud aprobada exitosamente." };
   } catch (error: any) {
-    console.error("Error approving request:", error);
+    console.error("approveRequestAction Error:", error);
     if (error instanceof z.ZodError) {
         return { success: false, message: "Error de validación: " + error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ') };
     }
-    return { success: false, message: "Error de base de datos al aprobar la solicitud." };
+    return { success: false, message: "Error de base de datos al aprobar la solicitud. Por favor, intente más tarde." };
   }
 }
 
@@ -1015,8 +1087,8 @@ export async function rejectRequestAction(
     revalidatePath('/dashboard');
     return { success: true, message: "Solicitud rechazada." };
   } catch (error) {
-    console.error("Error rejecting request:", error);
-    return { success: false, message: "Error de base de datos al rechazar solicitud." };
+    console.error("rejectRequestAction Error:", error);
+    return { success: false, message: "Error de base de datos al rechazar solicitud. Por favor, intente más tarde." };
   }
 }
 
@@ -1041,9 +1113,7 @@ export async function requestMoreInfoAction(
             where: { id: requestId },
             data: {
                 status: "InformacionSolicitada" as ApprovalStatus,
-                // approverId is not set here, as the request is still pending action from the approver
                 infoRequestedAt: new Date(),
-                // approverComment is part of the log entry
             }
         });
 
@@ -1064,8 +1134,8 @@ export async function requestMoreInfoAction(
     revalidatePath('/dashboard');
     return { success: true, message: "Se solicitó más información." };
   } catch (error) {
-    console.error("Error requesting more info:", error);
-    return { success: false, message: "Error de base de datos al solicitar más información." };
+    console.error("requestMoreInfoAction Error:", error);
+    return { success: false, message: "Error de base de datos al solicitar más información. Por favor, intente más tarde." };
   }
 }
 
@@ -1089,7 +1159,7 @@ export async function createCasoMantenimientoAction(
         title: data.title,
         description: data.description,
         location: data.location,
-        equipment: data.equipment,
+        equipment: data.equipment || null,
         priority: data.priority,
         assignedProviderName: data.assignedProviderName,
         currentStatus: "Registrado",
@@ -1110,6 +1180,8 @@ export async function createCasoMantenimientoAction(
 
     await logAuditEvent(currentUserEmail, "Registro de Nuevo Caso de Mantenimiento", `Título: ${data.title}, ID: ${newCaso.id}`);
     revalidatePath("/mantenimiento");
+    revalidatePath(`/mantenimiento/${newCaso.id}`);
+
 
     return {
       success: true,
@@ -1117,8 +1189,8 @@ export async function createCasoMantenimientoAction(
       casoId: newCaso.id,
     };
   } catch (error) {
-    console.error("Error creating caso de mantenimiento:", error);
-    return { success: false, message: "Error de base de datos al crear caso de mantenimiento." };
+    console.error("createCasoMantenimientoAction Error:", error);
+    return { success: false, message: "Error de base de datos al crear caso de mantenimiento. Por favor, intente más tarde." };
   }
 }
 
@@ -1132,25 +1204,25 @@ export async function getAllCasosMantenimientoAction(): Promise<(CasoDeMantenimi
       orderBy: { registeredAt: 'desc' }
     });
   } catch (error) {
-    console.error("Error fetching casos de mantenimiento:", error);
+    console.error("getAllCasosMantenimientoAction Error:", error);
     return [];
   }
 }
 
-export async function getCasoMantenimientoByIdAction(id: string): Promise<(CasoDeMantenimientoTypePrisma & { log: (CasoMantenimientoLogEntryTypePrisma & {user: { name: string | null }})[], registeredByUser: { name: string | null } | null }) | null> {
+export async function getCasoMantenimientoByIdAction(id: string): Promise<(CasoDeMantenimientoTypePrisma & { log: (CasoMantenimientoLogEntryTypePrisma & {user: { name: string | null } | null})[], registeredByUser: { name: string | null } | null }) | null> {
    try {
     return await prisma.casoDeMantenimiento.findUnique({
       where: { id },
       include: {
         registeredByUser: { select: { name: true }},
         log: {
-          include: { user: { select: { name: true }}},
+          include: { user: { select: { name: true }}}, // user relation must exist on CasoMantenimientoLogEntry
           orderBy: { timestamp: 'desc' }
         }
       }
     });
   } catch (error) {
-    console.error(`Error fetching caso de mantenimiento by ID ${id}:`, error);
+    console.error(`getCasoMantenimientoByIdAction Error for ID ${id}:`, error);
     return null;
   }
 }
@@ -1173,7 +1245,7 @@ export async function updateCasoMantenimientoAction(
     const casoToUpdate = await prisma.casoDeMantenimiento.findUnique({ where: { id: casoId }});
     if (!casoToUpdate) return { success: false, message: "Caso no encontrado." };
 
-    const dataToUpdate: any = { // Use 'any' for Partial<Prisma.CasoDeMantenimientoUpdateInput> for flexibility
+    const dataToUpdate: any = { 
         currentStatus: currentStatus,
         assignedProviderName,
         nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : null,
@@ -1186,7 +1258,7 @@ export async function updateCasoMantenimientoAction(
         }
         dataToUpdate.resolutionDetails = resolutionDetails;
         dataToUpdate.cost = cost;
-        dataToUpdate.invoicingDetails = invoicingDetails;
+        dataToUpdate.invoicingDetails = invoicingDetails || null;
         dataToUpdate.resolvedAt = new Date(resolvedAt);
     } else {
         dataToUpdate.resolutionDetails = null;
@@ -1204,7 +1276,7 @@ export async function updateCasoMantenimientoAction(
             data: {
                 casoId: casoId,
                 action: `Actualización de Estado: ${currentStatus}`,
-                notes: notes,
+                notes: notes, // This is now the main note for the update
                 userId: actingUserId,
                 userName: actingUserName,
                 statusAfterAction: currentStatus
@@ -1217,7 +1289,9 @@ export async function updateCasoMantenimientoAction(
     revalidatePath("/mantenimiento");
     return { success: true, message: `Caso de mantenimiento actualizado a ${currentStatus}.` };
    } catch (error) {
-     console.error("Error updating caso de mantenimiento:", error);
-     return { success: false, message: "Error de base de datos al actualizar caso de mantenimiento." };
+     console.error("updateCasoMantenimientoAction Error:", error);
+     return { success: false, message: "Error de base de datos al actualizar caso de mantenimiento. Por favor, intente más tarde." };
    }
 }
+
+    
