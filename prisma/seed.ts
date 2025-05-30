@@ -15,7 +15,7 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'sistemas@clinicaieq.com' },
-    update: {},
+    update: {}, // No updates if user exists, just ensures it's there
     create: {
       name: 'Sistemas ClinicaIEQ',
       email: 'sistemas@clinicaieq.com',
@@ -52,7 +52,7 @@ async function main() {
       email: "proveedoresvarios@clinicaieq.com",
       role: Role.User,
       department: "Tesoreria",
-      password: "123456789", // Temporary password
+      password: "123456789", 
       avatarUrl: "https://placehold.co/100x100.png?text=MM",
     },
     {
@@ -81,7 +81,7 @@ async function main() {
     },
     {
       name: "Pina Aulino",
-      email: "suministros@clinicaieq.com", 
+      email: "suministros@clinicaieq.com", // Corrected email from cliniciaeq.com to clinicaieq.com
       role: Role.User,
       department: "Suministros",
       password: "123456789",
@@ -105,7 +105,6 @@ async function main() {
     });
     console.log(`Approver user ${approver.email} created/ensured.`);
   }
-
 
   console.log('Seeding finished.');
 }
