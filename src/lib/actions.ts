@@ -6,35 +6,42 @@ import { prisma } from "./db";
 import bcrypt from 'bcryptjs';
 
 // Keep User from types.ts for client-side compatibility
-import type { AttachmentClientData, ExcelInventoryItemData, User as UserType } from "./types"; 
+import type { AttachmentClientData, ExcelInventoryItemData, User as UserType } from "./types";
 import type {
-  User as PrismaUser,
-  Ticket as TicketTypePrisma,
-  Comment as CommentTypePrisma,
-  Attachment as AttachmentTypePrisma,
-  InventoryItem as InventoryItemTypePrisma,
-  ApprovalRequest as ApprovalRequestTypePrisma,
-  PaymentInstallment as PaymentInstallmentTypePrisma,
-  ApprovalActivityLogEntry as ApprovalActivityLogEntryTypePrisma,
-  CasoDeMantenimiento as CasoDeMantenimientoTypePrisma,
-  CasoMantenimientoLogEntry as CasoMantenimientoLogEntryTypePrisma,
-  AuditLogEntry as AuditLogEntryTypePrisma,
-  Role,
-  TicketPriority,
-  TicketStatus,
-  ApprovalRequestType,
-  ApprovalStatus,
-  PaymentType,
-  InventoryItemCategory,
-  InventoryItemStatus,
-  StorageType,
-  CasoMantenimientoStatus,
-  CasoMantenimientoPriority
+  Role as PrismaRole, // aliased
+  TicketPriority as PrismaTicketPriority, // aliased
+  TicketStatus as PrismaTicketStatus, // aliased
+  ApprovalRequestType as PrismaApprovalRequestType, // aliased
+  ApprovalStatus as PrismaApprovalStatus, // aliased
+  PaymentType as PrismaPaymentType, // aliased
+  InventoryItemCategory as PrismaInventoryItemCategory, // aliased
+  InventoryItemStatus as PrismaInventoryItemStatus, // aliased
+  StorageType as PrismaStorageType, // aliased
+  RamOption as PrismaRamOption, // aliased
+  CasoMantenimientoStatus as PrismaCasoMantenimientoStatus, // aliased
+  CasoMantenimientoPriority as PrismaCasoMantenimientoPriority // aliased
 } from "@prisma/client";
 
-import { revalidatePath } from "next/cache";
-import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "../lib/constants";
-import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES, RAM_OPTIONS, STORAGE_TYPES_ZOD_ENUM, CASO_STATUSES, CASO_PRIORITIES } from "./types";
+import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
+import {
+  INVENTORY_ITEM_CATEGORIES,
+  INVENTORY_ITEM_STATUSES,
+  RAM_OPTIONS,
+  STORAGE_TYPES_ZOD_ENUM,
+  CASO_STATUSES,
+  CASO_PRIORITIES,
+  TicketPriority, // Client-side string type
+  TicketStatus,   // Client-side string type
+  InventoryItemCategory, // Client-side string type
+  InventoryItemStatus,   // Client-side string type
+  RamOption as ClientRamOption, // Client-side string type for RAM
+  StorageType as ClientStorageType, // Client-side string type for Storage
+  CasoMantenimientoStatus, // Client-side string type
+  CasoMantenimientoPriority, // Client-side string type
+  PaymentType as ClientPaymentType, // Client-side string type
+  ApprovalRequestType as ClientApprovalRequestType // Client-side string type
+} from "./types"; // Keep these string types for client-side forms
+
 
 import {
   BaseInventoryItemSchema,
@@ -50,8 +57,9 @@ import {
   AttachmentDataSchema,
   ApproveActionBaseSchema,
   PaymentInstallmentActionSchema,
-} from "../lib/schemas";
+} from "./schemas";
 import { sendNtfyNotification } from "./ntfy";
+import { revalidatePath } from "next/cache";
 
 
 // --- Audit Log Actions ---
@@ -71,7 +79,7 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
   }
 }
 
-export async function getAuditLogs(): Promise<AuditLogEntryTypePrisma[]> {
+export async function getAuditLogs(): Promise<import('@prisma/client').AuditLogEntry[]> {
   try {
     const logs = await prisma.auditLogEntry.findMany({
       orderBy: { timestamp: 'desc' },
@@ -85,7 +93,7 @@ export async function getAuditLogs(): Promise<AuditLogEntryTypePrisma[]> {
 
 // --- Authentication Server Actions (called by AuthContext) ---
 
-export async function loginUserServerAction(email: string, pass: string): Promise<{ success: boolean; user: Omit<PrismaUser, 'password'> | null; message?: string }> {
+export async function loginUserServerAction(email: string, pass: string): Promise<{ success: boolean; user: Omit<import('@prisma/client').User, 'password'> | null; message?: string }> {
   try {
     const dbUser = await prisma.user.findUnique({ where: { email } });
     if (dbUser && dbUser.password) {
@@ -96,40 +104,43 @@ export async function loginUserServerAction(email: string, pass: string): Promis
         return { success: true, user: userToReturn, message: "Inicio de sesión exitoso." };
       }
     }
-    await logAuditEvent(email, "Intento de Inicio de Sesión Fallido");
+    await logAuditEvent(email, "Intento de Inicio de Sesión Fallido", `Intento con email: ${email}`);
     return { success: false, user: null, message: "Correo electrónico o contraseña no válidos." };
   } catch (error) {
     console.error("loginUserServerAction Error:", error);
+    await logAuditEvent(email, "Error en Inicio de Sesión", `Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, user: null, message: "Error del servidor durante el inicio de sesión." };
   }
 }
 
-export async function registerUserServerAction(name: string, email: string, pass: string): Promise<{ success: boolean; user: Omit<PrismaUser, 'password'> | null; message?: string }> {
+export async function registerUserServerAction(name: string, email: string, pass: string): Promise<{ success: boolean; user: Omit<import('@prisma/client').User, 'password'> | null; message?: string }> {
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return { success: false, user: null, message: "Este correo electrónico ya está en uso." };
     }
     const hashedPassword = await bcrypt.hash(pass, 10);
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
     const newUser = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
         role: "User", // Default role
-        avatarUrl: `https://placehold.co/100x100.png?text=${name.substring(0,2).toUpperCase()}`,
+        avatarUrl: `https://placehold.co/100x100.png?text=${initials}`,
       },
     });
     const { password, ...userToReturn } = newUser;
-    await logAuditEvent(email, "Registro de Nuevo Usuario");
+    await logAuditEvent(email, "Registro de Nuevo Usuario", `Usuario: ${name} (${email})`);
     return { success: true, user: userToReturn, message: "Registro exitoso." };
   } catch (error) {
     console.error("registerUserServerAction Error:", error);
+    await logAuditEvent(email, "Error en Registro de Usuario", `Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, user: null, message: "Error del servidor durante el registro." };
   }
 }
 
-export async function getUserByIdServerAction(userId: string): Promise<Omit<PrismaUser, 'password'> | null> {
+export async function getUserByIdServerAction(userId: string): Promise<Omit<import('@prisma/client').User, 'password'> | null> {
   try {
     const dbUser = await prisma.user.findUnique({ where: { id: userId } });
     if (dbUser) {
@@ -143,7 +154,7 @@ export async function getUserByIdServerAction(userId: string): Promise<Omit<Pris
   }
 }
 
-export async function updateUserProfileServerAction(userId: string, name: string, email: string): Promise<{ success: boolean; user: Omit<PrismaUser, 'password'> | null; message?: string }> {
+export async function updateUserProfileServerAction(userId: string, name: string, email: string): Promise<{ success: boolean; user: Omit<import('@prisma/client').User, 'password'> | null; message?: string }> {
   try {
     const currentUserData = await prisma.user.findUnique({ where: { id: userId }});
     if (!currentUserData) {
@@ -161,12 +172,13 @@ export async function updateUserProfileServerAction(userId: string, name: string
       data: { name, email },
     });
     const { password, ...userToReturn } = updatedDbUser;
-    await logAuditEvent(email, "Actualización de Perfil");
+    await logAuditEvent(email, "Actualización de Perfil", `Usuario ID: ${userId}`);
     revalidatePath("/profile");
     revalidatePath("/admin/users");
     return { success: true, user: userToReturn, message: "Perfil actualizado." };
   } catch (error) {
     console.error("updateUserProfileServerAction Error:", error);
+    await logAuditEvent(email, "Error en Actualización de Perfil", `Usuario ID: ${userId}, Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, user: null, message: "Error del servidor al actualizar el perfil." };
   }
 }
@@ -182,10 +194,12 @@ export async function updateUserPasswordServerAction(userId: string, newPassword
       where: { id: userId },
       data: { password: hashedPassword },
     });
-    await logAuditEvent(userToUpdate.email, "Actualización de Contraseña Propia");
+    await logAuditEvent(userToUpdate.email, "Actualización de Contraseña Propia", `Usuario ID: ${userId}`);
     return { success: true, message: "Contraseña actualizada exitosamente." };
   } catch (error) {
     console.error("updateUserPasswordServerAction Error:", error);
+    const userEmail = (await prisma.user.findUnique({where: {id: userId}}))?.email || 'unknown_user_for_password_update';
+    await logAuditEvent(userEmail, "Error en Actualización de Contraseña Propia", `Usuario ID: ${userId}, Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, message: "Error del servidor al actualizar la contraseña." };
   }
 }
@@ -201,15 +215,16 @@ export async function resetUserPasswordByEmailServerAction(email: string, newPas
       where: { email },
       data: { password: hashedPassword },
     });
-    await logAuditEvent(email, "Restablecimiento de Contraseña por Olvido");
+    await logAuditEvent(email, "Restablecimiento de Contraseña por Olvido", `Usuario: ${email}`);
     return { success: true, message: "Contraseña restablecida exitosamente." };
   } catch (error) {
     console.error("resetUserPasswordByEmailServerAction Error:", error);
+    await logAuditEvent(email, "Error en Restablecimiento de Contraseña", `Usuario: ${email}, Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, message: "Error del servidor al restablecer la contraseña." };
   }
 }
 
-export async function getAllUsersServerAction(): Promise<Omit<PrismaUser, 'password'>[]> {
+export async function getAllUsersServerAction(): Promise<Omit<import('@prisma/client').User, 'password'>[]> {
   try {
     const dbUsers = await prisma.user.findMany({
       orderBy: { name: 'asc' }
@@ -224,14 +239,14 @@ export async function getAllUsersServerAction(): Promise<Omit<PrismaUser, 'passw
 export async function updateUserByAdminServerAction(
   adminEmail: string,
   userId: string,
-  data: Partial<Pick<PrismaUser, 'name' | 'role' | 'email' | 'department' | 'password'>>
+  data: Partial<Pick<UserType, 'name' | 'role' | 'email' | 'department' | 'password'>>
 ): Promise<{ success: boolean; message?: string }> {
   try {
     const updateData: any = {
       name: data.name,
-      role: data.role as Role, // Cast is okay as we validate on client
+      role: data.role as PrismaRole,
       email: data.email,
-      department: data.department,
+      department: data.department || null,
     };
     if (data.password && data.password.trim() !== "") {
       updateData.password = await bcrypt.hash(data.password, 10);
@@ -256,6 +271,7 @@ export async function updateUserByAdminServerAction(
     return { success: true, message: "Usuario actualizado." };
   } catch (error) {
     console.error("updateUserByAdminServerAction Error:", error);
+    await logAuditEvent(adminEmail, "Error en Actualización de Usuario por Admin", `Usuario ID: ${userId}, Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, message: "Error del servidor al actualizar usuario." };
   }
 }
@@ -267,8 +283,15 @@ export async function deleteUserByAdminServerAction(adminEmail: string, userId: 
         return { success: false, message: "Usuario no encontrado para eliminar." };
     }
     if (userToDelete.email === adminEmail) {
-        return { success: false, message: "Un administrador no puede eliminar su propia cuenta." };
+        return { success: false, message: "Un administrador no puede eliminar su propia cuenta."}
     }
+
+    // Check for related records before deleting (example for tickets, extend as needed)
+    const relatedTickets = await prisma.ticket.count({ where: { userId } });
+    if (relatedTickets > 0) {
+      return { success: false, message: "No se puede eliminar el usuario porque tiene tickets asociados. Reasigna o elimina esos tickets primero." };
+    }
+    // TODO: Add similar checks for comments, approvals, inventory items, etc.
 
     await prisma.user.delete({ where: { id: userId } });
     await logAuditEvent(adminEmail, "Eliminación de Usuario por Admin", `Usuario ID: ${userId}, Email: ${userToDelete.email}`);
@@ -276,6 +299,7 @@ export async function deleteUserByAdminServerAction(adminEmail: string, userId: 
     return { success: true, message: "Usuario eliminado." };
   } catch (error: any) {
     console.error("deleteUserByAdminServerAction Error:", error);
+    await logAuditEvent(adminEmail, "Error en Eliminación de Usuario por Admin", `Usuario ID: ${userId}, Error: ${error.message || String(error)}`);
     if (error.code === 'P2003' || error.code === 'P2014' ) { // Prisma foreign key constraint violation
       return { success: false, message: "No se puede eliminar el usuario porque tiene registros asociados (tickets, comentarios, etc.). Reasigna o elimina esos registros primero." };
     }
@@ -289,7 +313,7 @@ const CreateTicketClientSchema = z.object({
   subject: z.string().min(5).max(100),
   description: z.string().min(10).max(2000),
   priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]),
-  userEmail: z.string().email(),
+  userEmail: z.string().email(), // userEmail added here
 });
 
 const AddCommentClientSchema = z.object({
@@ -310,6 +334,7 @@ export async function createTicketAction(
   const validatedFields = CreateTicketClientSchema.safeParse(values);
 
   if (!validatedFields.success) {
+    console.error("createTicketAction Validation Errors:", validatedFields.error.flatten().fieldErrors);
     return {
       success: false,
       errors: validatedFields.error.flatten().fieldErrors,
@@ -323,8 +348,8 @@ export async function createTicketAction(
       data: {
         subject,
         description,
-        priority,
-        status: "Open",
+        priority: priority as PrismaTicketPriority,
+        status: "Open" as PrismaTicketStatus,
         userId,
         userName,
         userEmail,
@@ -352,6 +377,7 @@ export async function createTicketAction(
     };
   } catch (error) {
     console.error("createTicketAction Error:", error);
+    await logAuditEvent(userEmail, "Error en Creación de Ticket", `Error: ${error instanceof Error ? error.message : String(error)}`);
     return {
       success: false,
       message: "Error de base de datos al crear el ticket.",
@@ -361,12 +387,13 @@ export async function createTicketAction(
 
 export async function addCommentAction(
   ticketId: string,
-  commenter: Pick<PrismaUser, 'id' | 'name' | 'email' | 'avatarUrl'>,
+  commenter: Pick<UserType, 'id' | 'name' | 'email' | 'avatarUrl'>,
   values: z.infer<typeof AddCommentClientSchema>
 ): Promise<{ success: boolean; message: string; commentId?: string, errors?: any }> {
   const validatedFields = AddCommentClientSchema.safeParse(values);
 
   if (!validatedFields.success) {
+    console.error("addCommentAction Validation Errors:", validatedFields.error.flatten().fieldErrors);
     return {
       success: false,
       errors: validatedFields.error.flatten().fieldErrors,
@@ -375,6 +402,7 @@ export async function addCommentAction(
   }
 
   if (!commenter.id || !commenter.email || !commenter.name) {
+    console.error("addCommentAction: Commenter info incomplete", commenter);
     return { success: false, message: "Información del comentador incompleta." };
   }
 
@@ -411,6 +439,7 @@ export async function addCommentAction(
     };
   } catch (error) {
     console.error("addCommentAction Error:", error);
+    await logAuditEvent(commenter.email, "Error en Adición de Comentario", `Ticket ID: ${ticketId}, Error: ${error instanceof Error ? error.message : String(error)}`);
     return {
       success: false,
       message: "Error de base de datos al añadir comentario.",
@@ -425,6 +454,7 @@ export async function updateTicketStatusAction(
   const validatedFields = UpdateTicketStatusClientSchema.safeParse(values);
 
   if (!validatedFields.success) {
+    console.error("updateTicketStatusAction Validation Errors:", validatedFields.error.flatten().fieldErrors);
     return {
       success: false,
       errors: validatedFields.error.flatten().fieldErrors,
@@ -435,12 +465,15 @@ export async function updateTicketStatusAction(
 
   try {
     const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-    if (!ticket) return { success: false, message: "Ticket no encontrado." };
+    if (!ticket) {
+      console.error(`updateTicketStatusAction: Ticket with ID ${ticketId} not found.`);
+      return { success: false, message: "Ticket no encontrado." };
+    }
     const oldStatus = ticket.status;
 
     await prisma.ticket.update({
       where: { id: ticketId },
-      data: { status, updatedAt: new Date() }
+      data: { status: status as PrismaTicketStatus, updatedAt: new Date() }
     });
 
     await logAuditEvent(actingUserEmail, "Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, De: ${oldStatus}, A: ${status}`);
@@ -449,15 +482,15 @@ export async function updateTicketStatusAction(
       message: `El estado del ticket "${ticket.subject}" cambió de ${oldStatus} a ${status}.`,
       tags: ['ticket', 'actualizacion-estado', ticketId, status.toLowerCase().replace(' ', '-')],
     });
-    
+
     revalidatePath(`/tickets/${ticketId}`);
     revalidatePath("/tickets");
     revalidatePath("/dashboard");
     revalidatePath("/admin/analytics");
     revalidatePath("/admin/reports");
-    
+
     const statusDisplayMap: Record<string, string> = TICKET_STATUSES_ENGLISH.reduce((acc, s) => {
-        acc[s] = s; // Assuming english values are keys for display map in constants too
+        acc[s] = s;
         return acc;
     }, {} as Record<string, string>);
 
@@ -465,11 +498,12 @@ export async function updateTicketStatusAction(
     return { success: true, message: `Estado del ticket actualizado a ${statusDisplayMap[status] || status}.` };
   } catch (error) {
     console.error("updateTicketStatusAction Error:", error);
+    await logAuditEvent(actingUserEmail, "Error en Actualización de Estado de Ticket", `Ticket ID: ${ticketId}, Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, message: "Error de base de datos al actualizar estado." };
   }
 }
 
-export async function getTicketById(ticketId: string): Promise<(TicketTypePrisma & { comments: CommentTypePrisma[], attachments: AttachmentTypePrisma[], user: { name: string | null, email: string | null } | null }) | null> {
+export async function getTicketById(ticketId: string) {
   try {
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
@@ -486,28 +520,19 @@ export async function getTicketById(ticketId: string): Promise<(TicketTypePrisma
   }
 }
 
-export async function getAllTickets(): Promise<(TicketTypePrisma & { comments: {id: string}[], attachments: {id: string, fileName: string, url: string, size: number}[], user: { name: string | null } | null })[]> {
+export async function getAllTickets() {
   try {
     const tickets = await prisma.ticket.findMany({
       include: {
         user: { select: { name: true }},
-        comments: { select: { id: true } }, // Only select id if full comment objects are not needed for list item
+        comments: { select: { id: true } },
         attachments: { select: { id: true, fileName: true, url: true, size: true }}
       },
       orderBy: [
-        { priority: 'asc' }, // Assuming 'High' comes before 'Low' lexicographically if not using custom sort.
+        { priority: 'desc'}, // High, Medium, Low in Prisma enum order
         { createdAt: 'desc'}
       ]
     });
-    // For custom priority sort:
-    // const priorityOrder: Record<TicketPriority, number> = { High: 0, Medium: 1, Low: 2 };
-    // tickets.sort((a, b) => {
-    //     if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
-    //         return priorityOrder[a.priority] - priorityOrder[b.priority];
-    //     }
-    //     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    // });
-
     return tickets;
   } catch (error) {
     console.error("getAllTickets Error:", error);
@@ -533,20 +558,20 @@ export async function getDashboardStats() {
       by: ['status'],
       _count: { id: true },
     });
-    
+
     const priorityMap = TICKET_PRIORITIES_ENGLISH.reduce((acc, p) => { acc[p] = 0; return acc; }, {} as Record<TicketPriority, number>);
-    byPriorityDb.forEach(p => { priorityMap[p.priority] = p._count.id; });
+    byPriorityDb.forEach(p => { priorityMap[p.priority as TicketPriority] = p._count.id; });
 
     const statusMap = TICKET_STATUSES_ENGLISH.reduce((acc, s) => { acc[s] = 0; return acc; }, {} as Record<TicketStatus, number>);
-    byStatusDb.forEach(s => { statusMap[s.status] = s._count.id; });
+    byStatusDb.forEach(s => { statusMap[s.status as TicketStatus] = s._count.id; });
 
     const stats = {
       byPriority: TICKET_PRIORITIES_ENGLISH.map(pKey => ({
-        name: pKey as string, // Or map to Spanish display name
+        name: pKey as string,
         value: priorityMap[pKey],
       })),
       byStatus: TICKET_STATUSES_ENGLISH.map(sKey => ({
-        name: sKey as string, // Or map to Spanish display name
+        name: sKey as string,
         value: statusMap[sKey],
       })),
     };
@@ -564,7 +589,36 @@ export async function getDashboardStats() {
 
 // --- Inventory Actions ---
 
-export async function getAllInventoryItems(): Promise<(InventoryItemTypePrisma & { addedByUser: { name: string | null } | null })[]> {
+const ramStringToPrismaEnumMap: Record<string, PrismaRamOption> = {
+  "No Especificado": PrismaRamOption.NoEspecificado,
+  "2GB": PrismaRamOption.RAM_2GB,
+  "4GB": PrismaRamOption.RAM_4GB,
+  "8GB": PrismaRamOption.RAM_8GB,
+  "12GB": PrismaRamOption.RAM_12GB,
+  "16GB": PrismaRamOption.RAM_16GB,
+  "32GB": PrismaRamOption.RAM_32GB,
+  "64GB": PrismaRamOption.RAM_64GB,
+  "Otro": PrismaRamOption.Otro,
+};
+
+const storageTypeStringToPrismaEnumMap: Record<string, PrismaStorageType> = {
+  "HDD": PrismaStorageType.HDD,
+  "SSD": PrismaStorageType.SSD,
+  "No Especificado": PrismaStorageType.NoEspecificado,
+};
+
+const categoryStringToPrismaEnumMap: Record<string, PrismaInventoryItemCategory> = INVENTORY_ITEM_CATEGORIES.reduce((acc, category) => {
+  acc[category] = category as PrismaInventoryItemCategory; // Prisma enums match TypeScript string literal types here
+  return acc;
+}, {} as Record<string, PrismaInventoryItemCategory>);
+
+const statusStringToPrismaEnumMap: Record<string, PrismaInventoryItemStatus> = INVENTORY_ITEM_STATUSES.reduce((acc, status) => {
+  acc[status] = status as PrismaInventoryItemStatus; // Prisma enums match TypeScript string literal types here
+  return acc;
+}, {} as Record<string, PrismaInventoryItemStatus>);
+
+
+export async function getAllInventoryItems() {
   try {
     const items = await prisma.inventoryItem.findMany({
       orderBy: { createdAt: 'desc' },
@@ -581,53 +635,55 @@ export async function addInventoryItemAction(
   currentUser: Pick<UserType, 'id' | 'name' | 'email'>,
   values: z.infer<typeof BaseInventoryItemSchema>
 ): Promise<{ success: boolean; message: string; itemId?: string, errors?: any }> {
-  if (!currentUser || !currentUser.id || !currentUser.name || !currentUser.email) {
-    console.error("addInventoryItemAction: currentUser is invalid", currentUser);
-    return { success: false, message: "Información del usuario actual incompleta o inválida." };
-  }
-  const validatedFields = BaseInventoryItemSchema.safeParse(values);
-  if (!validatedFields.success) {
-    console.error("addInventoryItemAction: Validation failed", validatedFields.error.flatten().fieldErrors);
-    return {
-      success: false,
-      errors: validatedFields.error.flatten().fieldErrors,
-      message: "Fallo al añadir artículo debido a errores de validación.",
-    };
-  }
-  const data = validatedFields.data;
-
   try {
+    if (!currentUser || !currentUser.id || !currentUser.name || !currentUser.email) {
+      console.error("addInventoryItemAction: currentUser is invalid", currentUser);
+      return { success: false, message: "Información del usuario actual incompleta o inválida." };
+    }
+    const validatedFields = BaseInventoryItemSchema.safeParse(values);
+    if (!validatedFields.success) {
+      console.error("addInventoryItemAction: Validation failed", validatedFields.error.flatten().fieldErrors);
+      return {
+        success: false,
+        errors: validatedFields.error.flatten().fieldErrors,
+        message: "Fallo al añadir artículo debido a errores de validación.",
+      };
+    }
+    const data = validatedFields.data;
+
     const dataToCreate = {
       name: data.name,
-      category: data.category,
+      category: categoryStringToPrismaEnumMap[data.category as ClientInventoryItemCategory],
       brand: data.brand || null,
       model: data.model || null,
       serialNumber: data.serialNumber || null,
       processor: data.processor || null,
-      ram: data.ram || null,
-      storageType: data.storageType || null,
+      ram: (data.ram && data.ram !== "No Especificado" ? ramStringToPrismaEnumMap[data.ram as ClientRamOption] : PrismaRamOption.NoEspecificado) || null,
+      storageType: (data.storageType && data.storageType !== "No Especificado" ? storageTypeStringToPrismaEnumMap[data.storageType as ClientStorageType] : PrismaStorageType.NoEspecificado) || null,
       storage: data.storage || null,
       quantity: data.quantity,
       location: data.location || null,
-      status: data.status,
+      status: statusStringToPrismaEnumMap[data.status as ClientInventoryItemStatus],
       notes: data.notes || null,
       addedByUserId: currentUser.id,
       addedByUserName: currentUser.name,
     };
-    
+
     const newItem = await prisma.inventoryItem.create({
       data: dataToCreate,
     });
 
     await logAuditEvent(currentUser.email, "Adición de Artículo de Inventario", `Artículo Nombre: ${data.name}, ID: ${newItem.id}`);
     revalidatePath("/inventory");
-    return { success: true, message: `Artículo "${data.name}" con ID "${newItem.id}" añadido exitosamente.`, itemId: newItem.id };
+    return { success: true, message: `Artículo "${data.name}" añadido exitosamente.`, itemId: newItem.id };
   } catch (error: any) {
     console.error("addInventoryItemAction Error:", error);
+    const userEmail = currentUser?.email || 'unknown_user_for_add_item';
+    await logAuditEvent(userEmail, "Error en Adición de Artículo de Inventario", `Error: ${error.message || String(error)}`);
     if (error.code === 'P2002' && error.meta?.target?.includes('serialNumber')) {
       return { success: false, message: "Error: El número de serie ya existe en el inventario." };
     }
-    return { success: false, message: `Error de base de datos al añadir artículo. ${error.message}` };
+    return { success: false, message: `Error de base de datos al añadir artículo: ${error.message || "Error desconocido"}` };
   }
 }
 
@@ -636,29 +692,29 @@ export async function updateInventoryItemAction(
   actingUserEmail: string,
   values: z.infer<typeof BaseInventoryItemSchema>
 ): Promise<{ success: boolean; message: string; itemId?: string, errors?: any }> {
-  const validatedFields = BaseInventoryItemSchema.safeParse(values);
-  if (!validatedFields.success) {
-    return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Fallo al actualizar artículo debido a errores de validación." };
-  }
-  const data = validatedFields.data;
-
   try {
+    const validatedFields = BaseInventoryItemSchema.safeParse(values);
+    if (!validatedFields.success) {
+      return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Fallo al actualizar artículo debido a errores de validación." };
+    }
+    const data = validatedFields.data;
+
     const itemToUpdate = await prisma.inventoryItem.findUnique({ where: { id: itemId } });
     if (!itemToUpdate) return { success: false, message: "Artículo no encontrado." };
 
     const dataToUpdate = {
         name: data.name,
-        category: data.category,
+        category: categoryStringToPrismaEnumMap[data.category as ClientInventoryItemCategory],
         brand: data.brand || null,
         model: data.model || null,
         serialNumber: data.serialNumber || null,
         processor: data.processor || null,
-        ram: data.ram || null,
-        storageType: data.storageType || null,
+        ram: (data.ram && data.ram !== "No Especificado" ? ramStringToPrismaEnumMap[data.ram as ClientRamOption] : PrismaRamOption.NoEspecificado) || null,
+        storageType: (data.storageType && data.storageType !== "No Especificado" ? storageTypeStringToPrismaEnumMap[data.storageType as ClientStorageType] : PrismaStorageType.NoEspecificado) || null,
         storage: data.storage || null,
         quantity: data.quantity,
         location: data.location || null,
-        status: data.status,
+        status: statusStringToPrismaEnumMap[data.status as ClientInventoryItemStatus],
         notes: data.notes || null,
         updatedAt: new Date()
       };
@@ -673,10 +729,11 @@ export async function updateInventoryItemAction(
     return { success: true, message: `Artículo "${data.name}" actualizado exitosamente.`, itemId: updatedItem.id };
   } catch (error: any) {
     console.error("updateInventoryItemAction Error:", error);
+    await logAuditEvent(actingUserEmail, "Error en Actualización de Artículo de Inventario", `Artículo ID: ${itemId}, Error: ${error.message || String(error)}`);
      if (error.code === 'P2002' && error.meta?.target?.includes('serialNumber')) {
       return { success: false, message: "Error: El número de serie ya existe en el inventario para otro artículo." };
     }
-    return { success: false, message: `Error de base de datos al actualizar artículo. ${error.message}` };
+    return { success: false, message: `Error de base de datos al actualizar artículo: ${error.message || "Error desconocido"}` };
   }
 }
 
@@ -692,6 +749,7 @@ export async function deleteInventoryItemAction(itemId: string, actingUserEmail:
     return { success: true, message: "Artículo eliminado exitosamente." };
   } catch (error) {
     console.error("deleteInventoryItemAction Error:", error);
+    await logAuditEvent(actingUserEmail, "Error en Eliminación de Artículo de Inventario", `Artículo ID: ${itemId}, Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, message: "Error de base de datos al eliminar artículo." };
   }
 }
@@ -718,39 +776,40 @@ const mapExcelRowToInventoryItemFormValues = (row: ExcelInventoryItemData): Part
     const lowerExcelHeader = excelHeader.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const internalField = excelToInternalFieldMap[lowerExcelHeader] as keyof z.infer<typeof BaseInventoryItemSchema>;
     if (internalField) {
-      let value = row[excelHeader];
+      let value: any = row[excelHeader];
       if (value === null || value === undefined || String(value).trim() === "") {
-        (mapped as any)[internalField] = undefined;
+        mapped[internalField] = undefined;
         continue;
       }
-      
+
       if (internalField === 'quantity') {
         const parsedQuantity = parseInt(String(value), 10);
-        (mapped as any)[internalField] = isNaN(parsedQuantity) ? undefined : parsedQuantity;
+        mapped[internalField] = isNaN(parsedQuantity) ? undefined : parsedQuantity;
       } else if (internalField === 'category') {
         const normalizedValue = String(value).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "");
         const foundValue = INVENTORY_ITEM_CATEGORIES.find(opt => opt.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "") === normalizedValue);
-        (mapped as any)[internalField] = foundValue || undefined;
+        mapped[internalField] = foundValue || undefined;
       } else if (internalField === 'status') {
          const normalizedValue = String(value).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "");
          const foundValue = INVENTORY_ITEM_STATUSES.find(opt => opt.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "") === normalizedValue);
-        (mapped as any)[internalField] = foundValue || undefined;
+        mapped[internalField] = foundValue || undefined;
       } else if (internalField === 'ram') {
-        const normalizedValue = String(value).trim().toUpperCase().replace(/\s+/g,"");
-        const foundValue = RAM_OPTIONS.find(opt => opt.toUpperCase().replace(/\s+/g,"") === normalizedValue);
-        (mapped as any)[internalField] = foundValue || undefined;
+        const normalizedValue = String(value).trim().toUpperCase().replace(/\s+/g,"").replace('GB','');
+        const foundRamValue = RAM_OPTIONS.find(opt => opt.toUpperCase().replace(/\s+/g,"").replace('GB','') === normalizedValue);
+        mapped[internalField] = foundRamValue || "No Especificado" as ClientRamOption;
       } else if (internalField === 'storageType') {
         const normalizedValue = String(value).trim().toUpperCase().replace(/\s+/g,"");
-        const foundValue = STORAGE_TYPES_ZOD_ENUM.find(opt => opt.toUpperCase().replace(/\s+/g,"") === normalizedValue);
-        (mapped as any)[internalField] = foundValue || undefined;
+        const foundStorageType = STORAGE_TYPES_ZOD_ENUM.find(opt => opt.toUpperCase().replace(/\s+/g,"") === normalizedValue);
+        mapped[internalField] = foundStorageType || "No Especificado" as ClientStorageType;
       }
       else {
-         (mapped as any)[internalField] = String(value).trim();
+         mapped[internalField] = String(value).trim();
       }
     }
   }
   if (mapped.quantity === undefined || isNaN(Number(mapped.quantity))) mapped.quantity = 1;
   if (mapped.status === undefined) mapped.status = "En Uso" as InventoryItemStatus;
+  if (mapped.category === undefined) mapped.category = "Otro" as InventoryItemCategory;
   return mapped;
 };
 
@@ -786,24 +845,42 @@ export async function importInventoryItemsAction(
           continue;
         }
 
+        const data = validatedFields.data;
         const dataToCreate = {
-          ...validatedFields.data,
-          serialNumber: validatedFields.data.serialNumber || null,
-          brand: validatedFields.data.brand || null,
-          model: validatedFields.data.model || null,
-          processor: validatedFields.data.processor || null,
-          ram: validatedFields.data.ram || null,
-          storageType: validatedFields.data.storageType || null,
-          storage: validatedFields.data.storage || null,
-          location: validatedFields.data.location || null,
-          notes: validatedFields.data.notes || null,
-          addedByUserId: currentUserId,
-          addedByUserName: currentUserName,
+            name: data.name,
+            category: categoryStringToPrismaEnumMap[data.category as ClientInventoryItemCategory],
+            brand: data.brand || null,
+            model: data.model || null,
+            serialNumber: data.serialNumber || null,
+            processor: data.processor || null,
+            ram: (data.ram && data.ram !== "No Especificado" ? ramStringToPrismaEnumMap[data.ram as ClientRamOption] : PrismaRamOption.NoEspecificado) || null,
+            storageType: (data.storageType && data.storageType !== "No Especificado" ? storageTypeStringToPrismaEnumMap[data.storageType as ClientStorageType] : PrismaStorageType.NoEspecificado) || null,
+            storage: data.storage || null,
+            quantity: data.quantity,
+            location: data.location || null,
+            status: statusStringToPrismaEnumMap[data.status as ClientInventoryItemStatus],
+            notes: data.notes || null,
+            addedByUserId: currentUserId,
+            addedByUserName: currentUserName,
         };
-        
-        if (!INVENTORY_ITEM_CATEGORIES.includes(dataToCreate.category as InventoryItemCategory)) { // Ensure category is valid
-            throw new Error(`Categoría inválida '${dataToCreate.category}' encontrada.`);
+
+        if (!dataToCreate.category) {
+             errorCount++;
+             errors.push({ row: i + 2, message: `Error de mapeo: Categoría inválida '${mappedData.category}' no encontrada en el sistema.`, data: rawRow });
+             continue;
         }
+        if (!dataToCreate.status) {
+             errorCount++;
+             errors.push({ row: i + 2, message: `Error de mapeo: Estado inválido '${mappedData.status}' no encontrado en el sistema.`, data: rawRow });
+             continue;
+        }
+         if (dataToCreate.ram === undefined) {
+            dataToCreate.ram = PrismaRamOption.NoEspecificado;
+        }
+        if (dataToCreate.storageType === undefined) {
+            dataToCreate.storageType = PrismaStorageType.NoEspecificado;
+        }
+
         await prisma.inventoryItem.create({ data: dataToCreate });
         successCount++;
       } catch (e: any) {
@@ -849,19 +926,20 @@ export async function importInventoryItemsAction(
 export async function createApprovalRequestAction(
   values: z.infer<typeof CreateApprovalRequestActionSchema>
 ): Promise<{ success: boolean; message: string; approvalId?: string; errors?: any }> {
-  const validatedFields = CreateApprovalRequestActionSchema.safeParse(values);
-  if (!validatedFields.success) {
-    return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
-  }
-  const data = validatedFields.data;
-
   try {
+    const validatedFields = CreateApprovalRequestActionSchema.safeParse(values);
+    if (!validatedFields.success) {
+      console.error("createApprovalRequestAction Validation Errors:", validatedFields.error.flatten().fieldErrors);
+      return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación." };
+    }
+    const data = validatedFields.data;
+
     const newApproval = await prisma.approvalRequest.create({
       data: {
-        type: data.type,
+        type: data.type as PrismaApprovalRequestType,
         subject: data.subject,
         description: data.description || null,
-        status: "Pendiente",
+        status: "Pendiente" as PrismaApprovalStatus,
         requesterId: data.requesterId,
         requesterName: data.requesterName,
         requesterEmail: data.requesterEmail || null,
@@ -873,18 +951,7 @@ export async function createApprovalRequestAction(
         ...(data.type === "PagoProveedor" && {
           supplierPago: data.supplierPago,
           totalAmountToPay: data.totalAmountToPay,
-          // paymentDueDate is intentionally not set here, as it's part of description
         }),
-        attachments: data.attachmentsData && data.attachmentsData.length > 0 ? {
-          createMany: {
-            data: data.attachmentsData.map(att => ({
-              fileName: att.fileName,
-              url: "uploads/placeholder/" + Date.now() + "_" + att.fileName, // Placeholder URL
-              size: att.size,
-              type: att.type || 'application/octet-stream',
-            }))
-          }
-        } : undefined,
         activityLog: {
           create: [{
             action: "Solicitud Creada",
@@ -892,7 +959,17 @@ export async function createApprovalRequestAction(
             userName: data.requesterName,
             comment: "Solicitud creada inicialmente.",
           }]
-        }
+        },
+        attachments: data.attachmentsData && data.attachmentsData.length > 0 ? {
+          createMany: {
+            data: data.attachmentsData.map(att => ({
+              fileName: att.fileName,
+              url: "uploads/placeholder/" + Date.now() + "_" + att.fileName.replace(/\s+/g, '_'), // Placeholder URL, ensure filename is safe
+              size: att.size,
+              type: att.type || 'application/octet-stream',
+            }))
+          }
+        } : undefined,
       }
     });
 
@@ -917,12 +994,14 @@ export async function createApprovalRequestAction(
     };
   } catch (error) {
     console.error("createApprovalRequestAction Error:", error);
+    const userEmail = values.requesterEmail || 'unknown_user_for_approval_creation';
+    await logAuditEvent(userEmail, `Error en Creación de Solicitud de Aprobación (${values.type})`, `Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, message: "Error de base de datos al crear solicitud de aprobación." };
   }
 }
 
 
-export async function getApprovalRequestsForUser(userId: string, userRole: Role): Promise<ApprovalRequestTypePrisma[]> {
+export async function getApprovalRequestsForUser(userId: string, userRole: PrismaRole) {
   try {
     if (userRole === "PresidenteIEQ") {
       return await prisma.approvalRequest.findMany({
@@ -930,7 +1009,6 @@ export async function getApprovalRequestsForUser(userId: string, userRole: Role)
         orderBy: { createdAt: 'desc' }
       });
     }
-    // For Admin and specific approvers who submitted requests
     return await prisma.approvalRequest.findMany({
       where: { requesterId: userId },
       orderBy: { createdAt: 'desc' }
@@ -941,14 +1019,14 @@ export async function getApprovalRequestsForUser(userId: string, userRole: Role)
   }
 }
 
-export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRequestTypePrisma & { attachments: AttachmentTypePrisma[], activityLog: (ApprovalActivityLogEntryTypePrisma & { user: { name: string | null } | null })[], paymentInstallments: PaymentInstallmentTypePrisma[] }) | null> {
+export async function getApprovalRequestDetails(id: string) {
   try {
     return await prisma.approvalRequest.findUnique({
       where: { id },
       include: {
         attachments: true,
         activityLog: {
-            include: { user: { select: { name: true }}}, // user might be null if userId is not a foreign key
+            include: { user: { select: { name: true }}},
             orderBy: { timestamp: 'desc' }
         },
         paymentInstallments: { orderBy: { dueDate: 'asc' }}
@@ -963,42 +1041,49 @@ export async function getApprovalRequestDetails(id: string): Promise<(ApprovalRe
 
 export async function approveRequestAction(
   values: z.infer<typeof ApproveActionBaseSchema> & {
-    approvedPaymentType?: PaymentType;
+    approvedPaymentType?: ClientPaymentType;
     approvedAmount?: number;
     installments?: z.infer<typeof PaymentInstallmentActionSchema>[];
   }
 ): Promise<{ success: boolean; message: string }> {
   const { requestId, approverId, approverName, approverEmail, comment, approvedPaymentType, approvedAmount, installments } = values;
 
-  if (!requestId || !approverId || !approverName || !approverEmail) {
-    return { success: false, message: "Información del aprobador incompleta."};
-  }
-
   try {
+    if (!requestId || !approverId || !approverName || !approverEmail) {
+      console.error("approveRequestAction: Approver info incomplete", values);
+      return { success: false, message: "Información del aprobador incompleta."};
+    }
+
     const request = await prisma.approvalRequest.findUnique({ where: { id: requestId } });
-    if (!request) return { success: false, message: "Solicitud no encontrada." };
+    if (!request) {
+      console.error(`approveRequestAction: Request with ID ${requestId} not found.`);
+      return { success: false, message: "Solicitud no encontrada." };
+    }
     if (request.status !== "Pendiente" && request.status !== "InformacionSolicitada") {
+      console.warn(`approveRequestAction: Request ${requestId} is not in a state that allows approval. Status: ${request.status}`);
       return { success: false, message: "La solicitud no está en un estado que permita aprobación." };
     }
 
-    let validatedData: any; // Holds validated data from specific schemas
+    let validatedData: any;
     if (request.type === "PagoProveedor") {
         if (approvedPaymentType === "Contado") {
             validatedData = ApprovePagoProveedorContadoSchema.parse(values);
         } else if (approvedPaymentType === "Cuotas") {
             validatedData = ApprovePagoProveedorCuotasSchema.parse(values);
         } else {
+            console.error(`approveRequestAction: Invalid payment type for PagoProveedor: ${approvedPaymentType}`);
             return { success: false, message: "Tipo de pago no válido para Pago a Proveedor." };
         }
     } else if (request.type === "Compra") {
-        validatedData = ApproveCompraSchema.parse(values); // This doesn't expect payment type details
+        validatedData = ApproveCompraSchema.parse(values);
     } else {
+        console.error(`approveRequestAction: Unknown request type: ${request.type}`);
         return { success: false, message: "Tipo de solicitud desconocida." };
     }
 
     await prisma.$transaction(async (tx) => {
         const updateData: any = {
-            status: "Aprobado" as ApprovalStatus,
+            status: "Aprobado" as PrismaApprovalStatus,
             approverId,
             approverComment: validatedData.comment || null,
             approvedAt: new Date(),
@@ -1007,16 +1092,16 @@ export async function approveRequestAction(
         };
 
         if (request.type === "PagoProveedor") {
-            updateData.approvedPaymentType = validatedData.approvedPaymentType as PaymentType;
+            updateData.approvedPaymentType = validatedData.approvedPaymentType as PrismaPaymentType;
             updateData.approvedAmount = validatedData.approvedAmount;
 
-            // Delete existing installments before creating new ones
             await tx.paymentInstallment.deleteMany({ where: { approvalRequestId: requestId }});
+
             if (validatedData.approvedPaymentType === "Cuotas" && validatedData.installments && validatedData.installments.length > 0) {
                 await tx.paymentInstallment.createMany({
                     data: validatedData.installments.map((inst: { amount: number; dueDate: Date; }) => ({
                         amount: inst.amount,
-                        dueDate: new Date(inst.dueDate), // Ensure it's a Date object
+                        dueDate: new Date(inst.dueDate),
                         approvalRequestId: requestId,
                     }))
                 });
@@ -1029,13 +1114,13 @@ export async function approveRequestAction(
             data: {
                 approvalRequestId: requestId,
                 action: "Solicitud Aprobada",
-                userId: approverId, // FK to User table
+                userId: approverId,
                 userName: approverName,
                 comment: validatedData.comment || "Aprobado sin comentarios adicionales.",
             }
         });
     });
-    
+
     await sendNtfyNotification({
       title: `Solicitud Aprobada: #${requestId}`,
       message: `La solicitud "${request.subject}" ha sido APROBADA por ${approverName}.`,
@@ -1049,10 +1134,11 @@ export async function approveRequestAction(
     return { success: true, message: "Solicitud aprobada exitosamente." };
   } catch (error: any) {
     console.error("approveRequestAction Error:", error);
+    await logAuditEvent(approverEmail, "Error en Aprobación de Solicitud", `ID Solicitud: ${requestId}, Error: ${error.message || String(error)}`);
     if (error instanceof z.ZodError) {
         return { success: false, message: "Error de validación: " + error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ') };
     }
-    return { success: false, message: "Error de base de datos al aprobar la solicitud." };
+    return { success: false, message: `Error de base de datos al aprobar la solicitud: ${error.message || "Error desconocido"}` };
   }
 }
 
@@ -1062,14 +1148,19 @@ export async function rejectRequestAction(
 ): Promise<{ success: boolean; message: string }> {
   const validatedFields = RejectOrInfoActionSchema.safeParse(values);
   if (!validatedFields.success) {
+    console.error("rejectRequestAction Validation Errors:", validatedFields.error.flatten().fieldErrors);
     return { success: false, message: validatedFields.error.flatten().fieldErrors.comment?.[0] || "Error de validación." };
   }
   const { requestId, approverId, approverName, approverEmail, comment } = validatedFields.data;
 
   try {
     const request = await prisma.approvalRequest.findUnique({ where: { id: requestId } });
-    if (!request) return { success: false, message: "Solicitud no encontrada." };
+    if (!request) {
+      console.error(`rejectRequestAction: Request with ID ${requestId} not found.`);
+      return { success: false, message: "Solicitud no encontrada." };
+    }
      if (request.status !== "Pendiente" && request.status !== "InformacionSolicitada") {
+      console.warn(`rejectRequestAction: Request ${requestId} is not in a state that allows rejection. Status: ${request.status}`);
       return { success: false, message: "La solicitud no está en un estado que permita rechazo." };
     }
 
@@ -1077,7 +1168,7 @@ export async function rejectRequestAction(
         await tx.approvalRequest.update({
             where: { id: requestId },
             data: {
-                status: "Rechazado" as ApprovalStatus,
+                status: "Rechazado" as PrismaApprovalStatus,
                 approverId,
                 approverComment: comment,
                 rejectedAt: new Date(),
@@ -1090,13 +1181,13 @@ export async function rejectRequestAction(
             data: {
                 approvalRequestId: requestId,
                 action: "Solicitud Rechazada",
-                userId: approverId, // FK to User table
+                userId: approverId,
                 userName: approverName,
                 comment: comment,
             }
         });
     });
-    
+
     await sendNtfyNotification({
       title: `Solicitud Rechazada: #${requestId}`,
       message: `La solicitud "${request.subject}" ha sido RECHAZADA por ${approverName}. Motivo: ${comment}`,
@@ -1111,6 +1202,7 @@ export async function rejectRequestAction(
     return { success: true, message: "Solicitud rechazada." };
   } catch (error) {
     console.error("rejectRequestAction Error:", error);
+    await logAuditEvent(approverEmail, "Error en Rechazo de Solicitud", `ID Solicitud: ${requestId}, Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, message: "Error de base de datos al rechazar solicitud." };
   }
 }
@@ -1120,14 +1212,19 @@ export async function requestMoreInfoAction(
 ): Promise<{ success: boolean; message: string }> {
   const validatedFields = RejectOrInfoActionSchema.safeParse(values);
   if (!validatedFields.success) {
+    console.error("requestMoreInfoAction Validation Errors:", validatedFields.error.flatten().fieldErrors);
     return { success: false, message: validatedFields.error.flatten().fieldErrors.comment?.[0] || "Error de validación." };
   }
   const { requestId, approverId, approverName, approverEmail, comment } = validatedFields.data;
 
   try {
     const request = await prisma.approvalRequest.findUnique({ where: { id: requestId } });
-    if (!request) return { success: false, message: "Solicitud no encontrada." };
+    if (!request) {
+      console.error(`requestMoreInfoAction: Request with ID ${requestId} not found.`);
+      return { success: false, message: "Solicitud no encontrada." };
+    }
      if (request.status !== "Pendiente" && request.status !== "InformacionSolicitada") {
+       console.warn(`requestMoreInfoAction: Request ${requestId} is not in a state that allows requesting more info. Status: ${request.status}`);
       return { success: false, message: "La solicitud no está en un estado que permita solicitar más información." };
     }
 
@@ -1135,8 +1232,11 @@ export async function requestMoreInfoAction(
         await tx.approvalRequest.update({
             where: { id: requestId },
             data: {
-                status: "InformacionSolicitada" as ApprovalStatus,
+                status: "InformacionSolicitada" as PrismaApprovalStatus,
                 infoRequestedAt: new Date(),
+                approverId: request.approverId || approverId,
+                approverName: request.approverName || approverName,
+                approverEmail: request.approverEmail || approverEmail,
             }
         });
 
@@ -1144,13 +1244,13 @@ export async function requestMoreInfoAction(
             data: {
                 approvalRequestId: requestId,
                 action: "Información Adicional Solicitada",
-                userId: approverId, // FK to User table
+                userId: approverId,
                 userName: approverName,
                 comment: comment,
             }
         });
     });
-    
+
     await sendNtfyNotification({
       title: `Información Solicitada para #${requestId}`,
       message: `${approverName} solicitó más información para "${request.subject}": ${comment}`,
@@ -1165,6 +1265,7 @@ export async function requestMoreInfoAction(
     return { success: true, message: "Se solicitó más información." };
   } catch (error) {
     console.error("requestMoreInfoAction Error:", error);
+    await logAuditEvent(approverEmail, "Error en Solicitud de Más Información", `ID Solicitud: ${requestId}, Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, message: "Error de base de datos al solicitar más información." };
   }
 }
@@ -1177,22 +1278,23 @@ export async function createCasoMantenimientoAction(
   currentUserName: string,
   currentUserEmail: string
 ): Promise<{ success: boolean; message: string; casoId?: string; errors?: any }> {
-  const validatedFields = CreateCasoMantenimientoFormSchema.safeParse(values);
-  if (!validatedFields.success) {
-    return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación al crear el caso." };
-  }
-  const data = validatedFields.data;
-
   try {
+    const validatedFields = CreateCasoMantenimientoFormSchema.safeParse(values);
+    if (!validatedFields.success) {
+      console.error("createCasoMantenimientoAction Validation Errors:", validatedFields.error.flatten().fieldErrors);
+      return { success: false, errors: validatedFields.error.flatten().fieldErrors, message: "Errores de validación al crear el caso." };
+    }
+    const data = validatedFields.data;
+
     const newCaso = await prisma.casoDeMantenimiento.create({
       data: {
         title: data.title,
         description: data.description,
         location: data.location,
         equipment: data.equipment || null,
-        priority: data.priority,
+        priority: data.priority as PrismaCasoMantenimientoPriority,
         assignedProviderName: data.assignedProviderName,
-        currentStatus: "Registrado",
+        currentStatus: "Registrado" as PrismaCasoMantenimientoStatus,
         registeredAt: new Date(),
         registeredByUserId: currentUserId,
         registeredByUserName: currentUserName,
@@ -1202,7 +1304,7 @@ export async function createCasoMantenimientoAction(
             notes: "Caso de mantenimiento inicial registrado.",
             userId: currentUserId,
             userName: currentUserName,
-            statusAfterAction: "Registrado"
+            statusAfterAction: "Registrado" as PrismaCasoMantenimientoStatus
           }]
         }
       }
@@ -1213,11 +1315,10 @@ export async function createCasoMantenimientoAction(
       title: `Nuevo Caso de Mantenimiento: ${data.title.substring(0,30)}...`,
       message: `Caso #${newCaso.id} (${data.title}) registrado por ${currentUserName}. Proveedor: ${data.assignedProviderName}.`,
       tags: ['mantenimiento', 'nuevo', data.priority.toLowerCase()],
-      priority: data.priority === 'Crítica' ? 5 : (data.priority === 'Alta' ? 4 : 3),
+      priority: data.priority === 'Critica' ? 5 : (data.priority === 'Alta' ? 4 : 3), // Assuming 'Critica' is the highest
     });
 
     revalidatePath("/mantenimiento");
-    revalidatePath(`/mantenimiento/${newCaso.id}`);
 
     return {
       success: true,
@@ -1226,11 +1327,12 @@ export async function createCasoMantenimientoAction(
     };
   } catch (error) {
     console.error("createCasoMantenimientoAction Error:", error);
+    await logAuditEvent(currentUserEmail, "Error en Registro de Caso de Mantenimiento", `Error: ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, message: "Error de base de datos al crear caso de mantenimiento." };
   }
 }
 
-export async function getAllCasosMantenimientoAction(): Promise<(CasoDeMantenimientoTypePrisma & { log: CasoMantenimientoLogEntryTypePrisma[], registeredByUser: { name: string | null } | null })[]> {
+export async function getAllCasosMantenimientoAction() {
   try {
     return await prisma.casoDeMantenimiento.findMany({
       include: {
@@ -1245,14 +1347,14 @@ export async function getAllCasosMantenimientoAction(): Promise<(CasoDeMantenimi
   }
 }
 
-export async function getCasoMantenimientoByIdAction(id: string): Promise<(CasoDeMantenimientoTypePrisma & { log: (CasoMantenimientoLogEntryTypePrisma & {user: { name: string | null } | null})[], registeredByUser: { name: string | null } | null }) | null> {
+export async function getCasoMantenimientoByIdAction(id: string) {
    try {
     return await prisma.casoDeMantenimiento.findUnique({
       where: { id },
       include: {
         registeredByUser: { select: { name: true }},
         log: {
-          include: { user: { select: { name: true }}}, // user might be null if userId is not a foreign key
+          include: { user: { select: { name: true }}},
           orderBy: { timestamp: 'desc' }
         }
       }
@@ -1271,18 +1373,22 @@ export async function updateCasoMantenimientoAction(
   actingUserName: string,
   actingUserEmail: string
 ): Promise<{ success: boolean; message: string; }> {
+  try {
    const validatedFields = UpdateCasoMantenimientoFormSchema.safeParse(updates);
    if (!validatedFields.success) {
+    console.error("updateCasoMantenimientoAction Validation Errors:", validatedFields.error.flatten().fieldErrors);
      return { success: false, message: "Error de validación: " + JSON.stringify(validatedFields.error.flatten().fieldErrors) };
    }
    const { currentStatus, notes, assignedProviderName, nextFollowUpDate, resolutionDetails, cost, invoicingDetails, resolvedAt } = validatedFields.data;
 
-   try {
     const casoToUpdate = await prisma.casoDeMantenimiento.findUnique({ where: { id: casoId }});
-    if (!casoToUpdate) return { success: false, message: "Caso no encontrado." };
+    if (!casoToUpdate) {
+      console.error(`updateCasoMantenimientoAction: Caso with ID ${casoId} not found.`);
+      return { success: false, message: "Caso no encontrado." };
+    }
 
-    const dataToUpdate: any = { 
-        currentStatus: currentStatus,
+    const dataToUpdate: any = {
+        currentStatus: currentStatus as PrismaCasoMantenimientoStatus,
         assignedProviderName,
         nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : null,
         lastFollowUpDate: new Date(),
@@ -1290,6 +1396,7 @@ export async function updateCasoMantenimientoAction(
 
     if (currentStatus === "Resuelto") {
         if (!resolutionDetails || !resolvedAt) {
+            console.error("updateCasoMantenimientoAction: Resolution details and date are required for 'Resuelto' status.");
             return { success: false, message: "Para el estado 'Resuelto', los Detalles de Resolución y la Fecha de Resolución son obligatorios."};
         }
         dataToUpdate.resolutionDetails = resolutionDetails;
@@ -1310,12 +1417,12 @@ export async function updateCasoMantenimientoAction(
         });
         await tx.casoMantenimientoLogEntry.create({
             data: {
-                casoId: casoId,
+                casoDeMantenimientoId: casoId,
                 action: `Actualización de Estado: ${currentStatus}`,
                 notes: notes,
-                userId: actingUserId, // FK to User table
+                userId: actingUserId,
                 userName: actingUserName,
-                statusAfterAction: currentStatus
+                statusAfterAction: currentStatus as PrismaCasoMantenimientoStatus
             }
         });
     });
@@ -1326,12 +1433,13 @@ export async function updateCasoMantenimientoAction(
       message: `El caso "${casoToUpdate.title}" cambió a estado ${currentStatus}. Notas: ${notes.substring(0,50)}...`,
       tags: ['mantenimiento', 'actualizacion-estado', casoId, currentStatus.toLowerCase().replace(/\s|\//g, '-')],
     });
-    
+
     revalidatePath(`/mantenimiento/${casoId}`);
     revalidatePath("/mantenimiento");
     return { success: true, message: `Caso de mantenimiento actualizado a ${currentStatus}.` };
    } catch (error) {
      console.error("updateCasoMantenimientoAction Error:", error);
+     await logAuditEvent(actingUserEmail, "Error en Actualización de Caso de Mantenimiento", `ID Caso: ${casoId}, Error: ${error instanceof Error ? error.message : String(error)}`);
      return { success: false, message: "Error de base de datos al actualizar caso de mantenimiento." };
    }
 }
