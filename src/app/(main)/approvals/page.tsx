@@ -1,19 +1,19 @@
-
+// src/app/(main)/approvals/page.tsx
 "use client";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileCheck, ShoppingCart, CreditCard, ShieldAlert, ListChecks, Loader2 } from "lucide-react"; // Added Loader2
+import { FileCheck, ShoppingCart, CreditCard, ShieldAlert, ListChecks, Loader2, Printer } from "lucide-react"; // Added Printer icon
 import { useAuth, SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context';
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import type { ApprovalRequest } from "@/lib/types";
 import { CreatePurchaseRequestDialog } from "@/components/approvals/CreatePurchaseRequestDialog";
-import { CreatePaymentRequestDialog } from "@/components/approvals/CreatePaymentRequestDialog"; 
+import { CreatePaymentRequestDialog } from "@/components/approvals/CreatePaymentRequestDialog";
 import { getApprovalRequestsForUser } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
-import Link from 'next/link'; // Import Link
+import Link from 'next/link';
 
 function AccessDeniedMessage() {
   return (
@@ -51,11 +51,11 @@ export default function ApprovalsPage() {
       setPendingApprovals(requests);
       setIsLoadingPresidente(false);
     } else {
-      setPendingApprovals([]); 
+      setPendingApprovals([]);
       setIsLoadingPresidente(false);
     }
   };
-  
+
   const fetchSubmittedRequests = async () => {
     if (user && user.id && user.role && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente") {
       setIsLoadingSubmitted(true);
@@ -98,7 +98,7 @@ export default function ApprovalsPage() {
   };
 
   const handleNewPaymentRequest = () => {
-    setIsCreatePaymentDialogOpen(true); 
+    setIsCreatePaymentDialogOpen(true);
   };
 
   const handleRequestSuccess = async (approvalId: string) => {
@@ -110,6 +110,10 @@ export default function ApprovalsPage() {
     }
     setIsCreatePurchaseDialogOpen(false);
     setIsCreatePaymentDialogOpen(false);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
@@ -132,6 +136,11 @@ export default function ApprovalsPage() {
             <Button onClick={handleNewPaymentRequest} size="lg" variant="outline" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
                 <CreditCard className="mr-2 h-5 w-5" />
                 Pago a Proveedores
+            </Button>
+            {/* Botón de Imprimir */}
+            <Button onClick={handlePrint} size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+                <Printer className="mr-2 h-5 w-5" />
+                Imprimir
             </Button>
         </div>
       </div>
@@ -247,10 +256,10 @@ export default function ApprovalsPage() {
       <CreatePaymentRequestDialog
         isOpen={isCreatePaymentDialogOpen}
         onClose={() => setIsCreatePaymentDialogOpen(false)}
-        onSuccess={handleRequestSuccess} 
+        onSuccess={handleRequestSuccess}
       />
     </div>
   );
 }
 
-    
+

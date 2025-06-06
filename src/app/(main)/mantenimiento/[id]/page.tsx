@@ -1,4 +1,4 @@
-
+// src/app/(main)/mantenimiento/[id]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -23,7 +23,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, CalendarIcon, CheckCircle, DollarSign, Edit, FileText, History, Info, ListChecks, Loader2, LocateFixed, Tag, UserCircle, Wrench, MessageSquare, AlertTriangle, CalendarClock } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, CheckCircle, DollarSign, Edit, FileText, History, Info, ListChecks, Loader2, LocateFixed, Tag, UserCircle, Wrench, MessageSquare, AlertTriangle, CalendarClock, Printer } from 'lucide-react'; // Added Printer icon
 import { cn } from '@/lib/utils';
 import { UpdateCasoMantenimientoFormSchema } from '@/lib/schemas';
 // CORRECCIÓN: Importar Alert y AlertDescription
@@ -165,6 +165,10 @@ export default function CasoMantenimientoDetailPage() {
   const canManageCase = user && user.email === 'electromedicina@clinicaieq.com';
   const watchedStatus = form.watch("currentStatus");
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-[calc(100vh-200px)]"><Loader2 className="h-10 w-10 animate-spin text-primary" /> Cargando detalles...</div>;
   }
@@ -212,9 +216,15 @@ export default function CasoMantenimientoDetailPage() {
           <Wrench className="mr-3 h-7 w-7 text-primary" />
           Detalle del Caso: {caso.title}
         </h1>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/mantenimiento"><ArrowLeft className="mr-2 h-4 w-4" />Volver</Link>
-        </Button>
+        <div className="flex gap-2">
+            <Button onClick={handlePrint} variant="secondary" size="sm">
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
+            </Button>
+            <Button asChild variant="outline" size="sm">
+            <Link href="/mantenimiento"><ArrowLeft className="mr-2 h-4 w-4" />Volver</Link>
+            </Button>
+        </div>
       </div>
 
       <Card className="w-full shadow-lg">
@@ -260,6 +270,7 @@ export default function CasoMantenimientoDetailPage() {
                     <span className="font-semibold text-primary">{entry.action}</span>
                     <span className="text-xs text-muted-foreground">{format(new Date(entry.timestamp), "PPpp", { locale: es })}</span>
                   </div>
+                  {/* CORRECCIÓN: Acceder a log.userName directamente */}
                   <p className="text-muted-foreground">Por: {entry.userName}</p>
                   {entry.notes && <p className="mt-1 italic text-foreground/80">Notas: "{entry.notes}"</p>}
                   {entry.statusAfterAction && <p className="text-xs mt-1">Estado resultante: <Badge variant="secondary" className={`text-white text-xs ${statusColors[entry.statusAfterAction] || 'bg-gray-500'}`}>{CASO_STATUS_DISPLAY_MAP[entry.statusAfterAction] || entry.statusAfterAction}</Badge></p>} {/* CORRECCIÓN: Usar el mapa de visualización */}

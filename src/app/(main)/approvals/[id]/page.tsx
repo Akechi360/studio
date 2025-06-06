@@ -1,264 +1,263 @@
-"use client"; 
+// src/app/(main)/approvals/page.tsx
+"use client";
 
-import { getApprovalRequestDetails } from '@/lib/actions';
-import type { ApprovalRequest, ApprovalActivityLogEntry } from '@/lib/types';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, AlertTriangle, FileText, UserCircle, CalendarDays, Tag, Info, MessageSquare, Paperclip, ShoppingCart, CreditCard, CheckCircle, XCircle, HelpCircle, ListCollapse, Loader2 } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { FileCheck, ShoppingCart, CreditCard, ShieldAlert, ListChecks, Loader2, Printer } from "lucide-react"; // Added Printer icon
+import { useAuth, SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context';
+import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
+import { useToast } from "@/hooks/use-toast";
+import { useEffect, useState } from "react";
+import type { ApprovalRequest } from "@/lib/types";
+import { CreatePurchaseRequestDialog } from "@/components/approvals/CreatePurchaseRequestDialog";
+import { CreatePaymentRequestDialog } from "@/components/approvals/CreatePaymentRequestDialog";
+import { getApprovalRequestsForUser } from "@/lib/actions";
+import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
-import { useRouter, useParams } from 'next/navigation';
-import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { cn } from "@/lib/utils";
-import { ApprovalActionsPanel } from '@/components/approvals/approval-actions-panel'; 
-import { useAuth } from '@/lib/auth-context';
-import { SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context';
-import React, { useEffect, useState, useCallback } from 'react';
 
-const typeDisplayMap: Record<ApprovalRequest["type"], string> = {
-  Compra: "Solicitud de Compra",
-  PagoProveedor: "Solicitud de Pago a Proveedores",
-};
-
-const typeIconMap: Record<ApprovalRequest["type"], React.ElementType> = {
-  Compra: ShoppingCart,
-  PagoProveedor: CreditCard,
-};
-
-const statusDisplayMap: Record<ApprovalRequest["status"], string> = {
-  Pendiente: "Pendiente",
-  Aprobado: "Aprobado",
-  Rechazado: "Rechazado",
-  InformacionSolicitada: "Información Solicitada",
-};
-
-const statusColors: Record<ApprovalRequest["status"], string> = {
-  Pendiente: "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-700/30 dark:text-yellow-300 dark:border-yellow-500",
-  Aprobado: "bg-green-100 text-green-700 border-green-300 dark:bg-green-700/30 dark:text-green-300 dark:border-green-500",
-  Rechazado: "bg-red-100 text-red-700 border-red-300 dark:bg-red-700/30 dark:text-red-300 dark:border-red-500",
-  InformacionSolicitada: "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-700/30 dark:text-blue-300 dark:border-blue-500",
-};
-
-const DetailRow = ({ label, value, icon: Icon }: { label: string; value?: string | number | null | Date; icon?: React.ElementType }) => {
-  // CORRECCIÓN: Verificar si value es null o undefined antes de intentar convertirlo a string
-  if (value === undefined || value === null || value === "") return null;
-  
-  let displayValue: string | React.ReactNode = '';
-  if (value instanceof Date) {
-    displayValue = format(value, "PPpp", { locale: es });
-  } else {
-    displayValue = value.toString();
-  }
-
+function AccessDeniedMessage() {
   return (
-    <div className="flex items-start space-x-3 py-2 border-b border-border/20 last:border-b-0">
-      {Icon && <Icon className="h-5 w-5 text-primary mt-0.5 shrink-0" />}
-      <div className="flex-1">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-        <div className="text-sm text-foreground mt-0.5">{displayValue}</div>
-      </div>
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4">
+      <Alert variant="destructive" className="max-w-md text-center shadow-lg">
+        <ShieldAlert className="h-8 w-8 mx-auto mb-3 text-destructive" />
+        <RadixAlertTitle className="text-xl font-bold">Acceso Denegado</RadixAlertTitle>
+        <AlertDescription className="mb-4">
+          No tienes permiso para acceder a la sección de Aprobaciones.
+        </AlertDescription>
+      </Alert>
     </div>
   );
-};
+}
 
-
-export default function ApprovalDetailPage() {
-  const router = useRouter();
-  const pageParams = useParams<{ id: string }>(); 
-  const id = pageParams.id; 
-
+export default function ApprovalsPage() {
   const { user } = useAuth();
-  const [request, setRequest] = useState<ApprovalRequest | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
+  const [submittedRequests, setSubmittedRequests] = useState<ApprovalRequest[]>([]);
+  const [isLoadingPresidente, setIsLoadingPresidente] = useState(false);
+  const [isLoadingSubmitted, setIsLoadingSubmitted] = useState(false);
+  const [isCreatePurchaseDialogOpen, setIsCreatePurchaseDialogOpen] = useState(false);
+  const [isCreatePaymentDialogOpen, setIsCreatePaymentDialogOpen] = useState(false);
 
-  const fetchRequestDetails = useCallback(async () => {
-    if (!id) { 
-      setIsLoading(false);
-      setRequest(null); 
-      return;
+  const canAccessApprovals =
+    user?.role === "Admin" ||
+    user?.role === "Presidente" ||
+    (user?.email ? SPECIFIC_APPROVER_EMAILS.includes(user.email) : false);
+
+  const fetchPresidenteRequests = async () => {
+    if (user?.role === "Presidente" && user.id) {
+      setIsLoadingPresidente(true);
+      const requests = await getApprovalRequestsForUser(user.id, user.role);
+      setPendingApprovals(requests);
+      setIsLoadingPresidente(false);
+    } else {
+      setPendingApprovals([]);
+      setIsLoadingPresidente(false);
     }
-    setIsLoading(true);
-    const fetchedRequest = await getApprovalRequestDetails(id); 
-    setRequest(fetchedRequest);
-    setIsLoading(false);
-  }, [id]); 
-  
-  useEffect(() => {
-    fetchRequestDetails();
-  }, [fetchRequestDetails]); 
-
-  const handleActionSuccess = () => {
-    fetchRequestDetails(); 
-    // router.refresh(); // Alternative to re-fetch server-side props if needed, but fetchRequestDetails should update client state.
   };
 
-  const canTakeAction = user && request && (
-    user.role === 'Admin' || 
-    user.role === 'Presidente' // CAMBIO: Usar "Presidente" sin espacio
-  );
+  const fetchSubmittedRequests = async () => {
+    if (user && user.id && user.role && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente") {
+      setIsLoadingSubmitted(true);
+      const requests = await getApprovalRequestsForUser(user.id, user.role);
+      setSubmittedRequests(requests);
+      setIsLoadingSubmitted(false);
+    } else {
+      setSubmittedRequests([]);
+      setIsLoadingSubmitted(false);
+    }
+  };
 
-  const shouldShowActionsPanel = canTakeAction && request && (request.status === 'Pendiente' || request.status === 'InformacionSolicitada');
+
+  useEffect(() => {
+    if (!canAccessApprovals) {
+        setPendingApprovals([]);
+        setSubmittedRequests([]);
+        setIsLoadingPresidente(false);
+        setIsLoadingSubmitted(false);
+        return;
+    }
+
+    if (user?.role === "Presidente") {
+        fetchPresidenteRequests();
+        setSubmittedRequests([]); // President doesn't see "submitted by them" here
+    } else if (user && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email)))) {
+        fetchSubmittedRequests();
+        setPendingApprovals([]); // Admins/Approvers don't see "pending for president" here
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, canAccessApprovals]);
 
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Cargando detalles de la solicitud...</p>
-      </div>
-    );
+  if (!canAccessApprovals) {
+    return <AccessDeniedMessage />;
   }
 
-  if (!request) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
-        <Alert variant="destructive" className="max-w-md text-center shadow-lg">
-          <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
-          <AlertTitle className="text-xl font-bold">Solicitud No Encontrada</AlertTitle>
-          <AlertDescription className="mb-4">
-            La solicitud de aprobación que estás buscando no existe o ha sido eliminada (ID: {id}).
-          </AlertDescription>
-          <Button asChild variant="outline">
-            <Link href="/approvals">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Aprobaciones
-            </Link>
-          </Button>
-        </Alert>
-      </div>
-    );
-  }
+  const handleNewPurchaseRequest = () => {
+    setIsCreatePurchaseDialogOpen(true);
+  };
 
-  const RequestTypeIcon = typeIconMap[request.type] || FileText;
+  const handleNewPaymentRequest = () => {
+    setIsCreatePaymentDialogOpen(true);
+  };
+
+  const handleRequestSuccess = async (approvalId: string) => {
+    console.log("Request created successfully with ID:", approvalId);
+    if (user?.role === "Presidente") {
+        fetchPresidenteRequests();
+    } else if (user && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email)))) {
+        fetchSubmittedRequests();
+    }
+    setIsCreatePurchaseDialogOpen(false);
+    setIsCreatePaymentDialogOpen(false);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold tracking-tight flex items-center">
-          <RequestTypeIcon className="mr-3 h-7 w-7 text-primary" />
-          Detalle de Solicitud: {typeDisplayMap[request.type]}
-        </h1>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/approvals">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
-          </Link>
-        </Button>
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center">
+            <FileCheck className="mr-3 h-8 w-8 text-primary" />
+            Aprobaciones
+          </h1>
+          <p className="text-muted-foreground">
+            Gestiona y visualiza las solicitudes pendientes de aprobación.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <Button onClick={handleNewPurchaseRequest} size="lg" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+                <ShoppingCart className="mr-2 h-5 w-5" />
+                Compras
+            </Button>
+            <Button onClick={handleNewPaymentRequest} size="lg" variant="outline" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+                <CreditCard className="mr-2 h-5 w-5" />
+                Pago a Proveedores
+            </Button>
+            {/* Botón de Imprimir */}
+            <Button onClick={handlePrint} size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+                <Printer className="mr-2 h-5 w-5" />
+                Imprimir
+            </Button>
+        </div>
       </div>
 
-      <Card className="w-full shadow-lg">
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <CardTitle className="text-xl">{request.subject}</CardTitle>
-            <Badge className={cn("text-sm px-3 py-1", statusColors[request.status])}>
-              {statusDisplayMap[request.status]}
-            </Badge>
-          </div>
-          <CardDescription>ID de Solicitud: {request.id}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <DetailRow label="Solicitante" value={request.requesterName} icon={UserCircle} />
-          <DetailRow label="Email Solicitante" value={request.requesterEmail} icon={UserCircle} />
-          <DetailRow label="Fecha de Solicitud" value={request.createdAt} icon={CalendarDays} />
-          <DetailRow label="Última Actualización" value={request.updatedAt} icon={CalendarDays} />
-          
-          {request.type === "Compra" && (
-            <>
-              <DetailRow label="Ítem(s) a Comprar" value={request.itemDescription} icon={ShoppingCart} />
-              <DetailRow label="Precio Estimado" value={request.estimatedPrice?.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })} icon={Tag} />
-              <DetailRow label="Proveedor Sugerido" value={request.supplierCompra} icon={Info} />
-            </>
-          )}
-
-          {request.type === "PagoProveedor" && (
-            <>
-              <DetailRow label="Proveedor" value={request.supplierPago} icon={Info} />
-              <DetailRow label="Monto Total a Pagar (Solicitado)" value={request.totalAmountToPay?.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })} icon={Tag} />
-              {/* CORRECCIÓN: Verificar explícitamente si approvedAmount NO es null ni undefined */}
-              {request.approvedAmount !== null && request.approvedAmount !== undefined && (
-                <DetailRow label="Monto Total Aprobado" value={request.approvedAmount.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })} icon={Tag} />
-              )}
-            </>
-          )}
-          
-          {request.description && (
-            <div className="space-y-1">
-                <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center"><MessageSquare className="h-5 w-5 text-primary mr-2 shrink-0"/>Descripción Detallada</h4>
-                <p className="text-sm text-foreground bg-muted/30 p-3 rounded-md whitespace-pre-wrap">{request.description}</p>
-            </div>
-          )}
-
-          {request.paymentInstallments && request.paymentInstallments.length > 0 && (
-            <div className="space-y-2 mt-4">
-              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center">
-                <CreditCard className="h-5 w-5 text-primary mr-2 shrink-0" />Cuotas de Pago Aprobadas
-              </h4>
-              <ul className="list-none p-0 space-y-2">
-                {request.paymentInstallments.map(installment => (
-                  <li key={installment.id} className="p-2 border rounded-md bg-muted/30 text-sm">
-                    Monto: <span className="font-semibold">{installment.amount.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</span> - 
-                    Fecha de Vencimiento: <span className="font-semibold">{format(new Date(installment.dueDate), "PPP", { locale: es })}</span>
-                  </li>
+      {user?.role === "Presidente" && (
+        <Card className="shadow-lg w-full">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+                <ListChecks className="mr-2 h-6 w-6 text-primary" />
+                Mis Solicitudes Pendientes de Aprobación
+            </CardTitle>
+            <CardDescription>
+              Aquí se listarán las solicitudes que requieren tu acción.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingPresidente ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="mr-3 h-5 w-5 animate-spin text-primary" />
+                <span>Cargando solicitudes...</span>
+              </div>
+            ) : pendingApprovals.length === 0 ? (
+              <div className="text-center py-10">
+                <ListChecks className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                <p className="font-semibold">No tienes solicitudes pendientes de aprobación en este momento.</p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {pendingApprovals.map(req => (
+                    <li key={req.id} className="p-4 border rounded-md shadow-sm hover:shadow-md transition-shadow bg-muted/20">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-semibold text-primary">{req.subject}</h3>
+                            <Badge variant={req.type === "Compra" ? "default" : "secondary"}>{req.type}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">Solicitante: {req.requesterName}</p>
+                        <p className="text-sm text-muted-foreground">Fecha Solicitud: {new Date(req.createdAt).toLocaleDateString('es-ES')}</p>
+                        {req.type === "Compra" && req.estimatedPrice && (
+                            <p className="text-sm text-muted-foreground">Monto Est.: {req.estimatedPrice.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
+                        )}
+                        {req.type === "PagoProveedor" && req.totalAmountToPay && (
+                            <p className="text-sm text-muted-foreground">Monto a Pagar: {req.totalAmountToPay.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
+                        )}
+                        <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" asChild>
+                            <Link href={`/approvals/${req.id}`}>Ver Detalles</Link>
+                        </Button>
+                    </li>
                 ))}
               </ul>
-            </div>
-          )}
-
-
-          {request.attachments && request.attachments.length > 0 && (
-            <div className="space-y-1">
-              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center"><Paperclip className="h-5 w-5 text-primary mr-2 shrink-0"/>Archivos Adjuntos</h4>
-              <ul className="list-none p-0 space-y-1">
-                {request.attachments.map(att => (
-                  <li key={att.id}>
-                    <Button variant="link" asChild className="p-0 h-auto text-sm">
-                      <a href={att.url} target="_blank" rel="noopener noreferrer" data-ai-hint="descarga archivo">
-                        <Paperclip className="mr-1.5 h-4 w-4" />{att.fileName} ({(att.size / 1024).toFixed(1)} KB)
-                      </a>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="w-full shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center"><ListCollapse className="mr-2 h-5 w-5 text-primary"/>Historial de Actividad</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {request.activityLog && request.activityLog.length > 0 ? (
-            <ul className="space-y-3">
-              {request.activityLog.slice().sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map(log => (
-                <li key={log.id} className="p-3 border rounded-md bg-muted/20 text-sm">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="font-semibold text-primary">{log.action}</span>
-                    <span className="text-xs text-muted-foreground">{format(new Date(log.timestamp), "PPpp", { locale: es })}</span>
-                  </div>
-                  {/* CORRECCIÓN: Acceder a log.userName directamente */}
-                  <p className="text-muted-foreground">Por: {log.userName}</p> 
-                  {log.comment && <p className="mt-1 italic text-foreground/80">Comentario: "{log.comment}"</p>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted-foreground">No hay actividad registrada para esta solicitud.</p>
-          )}
-        </CardContent>
-      </Card>
-      
-      {shouldShowActionsPanel && request && (
-          <ApprovalActionsPanel
-            key={request.id} 
-            requestId={request.id}
-            currentRequest={request} 
-            requestType={request.type}
-            onActionSuccess={handleActionSuccess}
-          />
+            )}
+          </CardContent>
+        </Card>
       )}
+
+       {(user?.role === "Admin" || (user?.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente" && (
+         <Card className="shadow-lg w-full">
+           <CardHeader>
+             <CardTitle className="flex items-center">
+                <ListChecks className="mr-2 h-6 w-6 text-primary" />
+                Mis Solicitudes Enviadas
+             </CardTitle>
+             <CardDescription>Visualiza el estado de las solicitudes que has creado.</CardDescription>
+           </CardHeader>
+           <CardContent>
+            {isLoadingSubmitted ? (
+                <div className="flex items-center justify-center py-10">
+                    <Loader2 className="mr-3 h-5 w-5 animate-spin text-primary" />
+                    <span>Cargando tus solicitudes enviadas...</span>
+                </div>
+            ) : submittedRequests.length === 0 ? (
+                <div className="text-center py-10">
+                    <ListChecks className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                    <p className="font-semibold">No has enviado ninguna solicitud aún.</p>
+                    <p className="text-sm text-muted-foreground">Utiliza los botones de "Compras" o "Pago a Proveedores" para crear una nueva.</p>
+                </div>
+            ) : (
+                <ul className="space-y-3">
+                    {submittedRequests.map(req => (
+                        <li key={req.id} className="p-4 border rounded-md shadow-sm hover:shadow-md transition-shadow bg-muted/20">
+                            <div className="flex justify-between items-center">
+                                <h3 className="font-semibold text-primary">{req.subject}</h3>
+                                <div className="flex items-center gap-2">
+                                    <Badge variant={req.status === "Aprobado" ? "default" : (req.status === "Rechazado" ? "destructive" : "secondary")}
+                                        className={req.status === "Aprobado" ? "bg-green-500 text-white" : ""}
+                                    >
+                                        {req.status}
+                                    </Badge>
+                                    <Badge variant={req.type === "Compra" ? "outline" : "secondary"}>{req.type}</Badge>
+                                </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">Fecha Solicitud: {new Date(req.createdAt).toLocaleDateString('es-ES')}</p>
+                            <p className="text-sm text-muted-foreground">Última Actualización: {new Date(req.updatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                             {req.type === "Compra" && req.estimatedPrice && (
+                                <p className="text-sm text-muted-foreground">Monto Est.: {req.estimatedPrice.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
+                            )}
+                            {req.type === "PagoProveedor" && req.totalAmountToPay && (
+                                <p className="text-sm text-muted-foreground">Monto a Pagar: {req.totalAmountToPay.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
+                            )}
+                            <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" asChild>
+                               <Link href={`/approvals/${req.id}`}>Ver Detalles</Link>
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+           </CardContent>
+         </Card>
+       )}
+      <CreatePurchaseRequestDialog
+        isOpen={isCreatePurchaseDialogOpen}
+        onClose={() => setIsCreatePurchaseDialogOpen(false)}
+        onSuccess={handleRequestSuccess}
+      />
+      <CreatePaymentRequestDialog
+        isOpen={isCreatePaymentDialogOpen}
+        onClose={() => setIsCreatePaymentDialogOpen(false)}
+        onSuccess={handleRequestSuccess}
+      />
     </div>
   );
 }

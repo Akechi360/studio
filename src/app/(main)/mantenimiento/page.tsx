@@ -1,3 +1,4 @@
+// src/app/(main)/mantenimiento/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -7,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
-import { Wrench, PlusCircle, ShieldAlert, Loader2, Eye, CalendarClock, ListFilter, ServerCrash } from 'lucide-react';
+import { Wrench, PlusCircle, ShieldAlert, Loader2, Eye, CalendarClock, ListFilter, ServerCrash, Printer } from 'lucide-react'; // Added Printer icon
 import Link from 'next/link';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -17,7 +18,7 @@ import { CreateCasoMantenimientoDialog } from '@/components/mantenimiento/Create
 
 const statusColors: Record<CasoMantenimientoStatus, string> = {
   'Registrado': "bg-blue-500",
-  'PendientePresupuesto': "bg-yellow-500",
+  'PendientePresupuesto': "bg-yellow-500 text-black",
   'PresupuestoAprobado': "bg-teal-500",
   'EnServicioReparacion': "bg-orange-500",
   'PendienteRespaldo': "bg-purple-500",
@@ -86,6 +87,10 @@ export default function MantenimientoPage() {
     return logs.reduce((latest, current) => new Date(current.timestamp) > new Date(latest.timestamp) ? current : latest).timestamp;
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-8 w-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -98,12 +103,19 @@ export default function MantenimientoPage() {
             Administra y supervisa los casos de mantenimiento con proveedores externos.
           </p>
         </div>
-        {canCreateOrEdit && (
-          <Button onClick={() => setIsCreateDialogOpen(true)} size="lg" className="shadow-md hover:shadow-lg transition-shadow">
-            <PlusCircle className="mr-2 h-5 w-5" />
-            Registrar Nuevo Caso
-          </Button>
-        )}
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            {canCreateOrEdit && (
+            <Button onClick={() => setIsCreateDialogOpen(true)} size="lg" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-5 w-5" />
+                Registrar Nuevo Caso
+            </Button>
+            )}
+            {/* Botón de Imprimir */}
+            <Button onClick={handlePrint} size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+                <Printer className="mr-2 h-5 w-5" />
+                Imprimir
+            </Button>
+        </div>
       </div>
 
       {/* Placeholder for Role-Specific Summary Cards (Admin/Presidente) - Future implementation */}

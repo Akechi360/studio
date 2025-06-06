@@ -1,15 +1,16 @@
-
+// src/app/(main)/admin/analytics/page.tsx
 "use client";
 
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldAlert, BarChartBig, TrendingUp, Clock, Users2, PieChart as PieChartLucide, FileDown, AlertTriangle, Ticket, CheckCircle } from 'lucide-react'; // Renamed PieChart to PieChartLucide
+import { ShieldAlert, BarChartBig, TrendingUp, Clock, Users2, PieChart as PieChartLucide, FileDown, AlertTriangle, Ticket, CheckCircle, Printer } from 'lucide-react'; // Renamed PieChart to PieChartLucide, Added Printer icon
 import { useEffect, useState } from 'react';
 import { getDashboardStats } from '@/lib/actions';
 import type { TicketSummary, TicketStats } from '@/lib/types';
 import { TicketStatsCharts } from '@/components/dashboard/ticket-stats-charts';
 import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 function StatCard({ title, value, icon, description, colorClass = "text-primary" }: { title: string, value: string | number, icon: React.ElementType, description: string, colorClass?: string }) {
   const IconComponent = icon;
@@ -44,6 +45,10 @@ export default function AnalyticsPage() {
     }
   }, [role]);
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (role !== "Admin") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4">
@@ -60,15 +65,23 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight flex items-center">
-          <BarChartBig className="mr-3 h-8 w-8 text-primary" />
-          Analíticas del Sistema de Tickets
-        </h1>
-        <p className="text-muted-foreground">
-          Resumen del rendimiento actual y funcionalidades de análisis avanzado planeadas.
-        </p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"> {/* Added flex container */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center">
+            <BarChartBig className="mr-3 h-8 w-8 text-primary" />
+            Analíticas del Sistema de Tickets
+          </h1>
+          <p className="text-muted-foreground">
+            Resumen del rendimiento actual y funcionalidades de análisis avanzado planeadas.
+          </p>
+        </div>
+        {/* Botón de Imprimir */}
+        <Button onClick={handlePrint} size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow">
+            <Printer className="mr-2 h-5 w-5" />
+            Imprimir
+        </Button>
       </div>
+
 
       {isLoading && (
         <div className="flex flex-col items-center justify-center p-8">
@@ -104,7 +117,7 @@ export default function AnalyticsPage() {
           </Card>
         </>
       )}
-      
+
       {!isLoading && !statsData && role === "Admin" && (
          <Card className="shadow-lg">
             <CardHeader>
@@ -186,4 +199,3 @@ function InfoCard({ icon: Icon, title, description }: { icon: React.ElementType,
   );
 }
 
-    

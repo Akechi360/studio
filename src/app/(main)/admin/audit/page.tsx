@@ -1,10 +1,10 @@
-
+// src/app/(main)/admin/audit/page.tsx
 "use client";
 
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldAlert, ClipboardList, History, Search, Loader2 } from 'lucide-react';
+import { ShieldAlert, ClipboardList, History, Search, Loader2, Printer } from 'lucide-react'; // Added Printer icon
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -57,7 +57,7 @@ export default function AuditLogPage() {
     const toDate = dateTo ? new Date(new Date(dateTo).setHours(23, 59, 59, 999)) : null;
 
     const searchTermLower = searchTerm.toLowerCase();
-    
+
     // ***** PUNTO CLAVE DE CORRECCIÓN: Lógica de Filtrado *****
     // Se usa log.userEmail en lugar de log.user
     const matchesSearchTerm = (
@@ -72,6 +72,10 @@ export default function AuditLogPage() {
       (!toDate || logDate <= toDate)
     );
   });
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   if (role !== "Admin") {
     return (
@@ -89,14 +93,21 @@ export default function AuditLogPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight flex items-center">
-          <ClipboardList className="mr-3 h-8 w-8 text-primary" />
-          Historial de Auditoría / Logs de Actividad
-        </h1>
-        <p className="text-muted-foreground">
-          Registro detallado de todas las acciones importantes realizadas en el sistema.
-        </p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"> {/* Added flex container */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center">
+            <ClipboardList className="mr-3 h-8 w-8 text-primary" />
+            Historial de Auditoría / Logs de Actividad
+          </h1>
+          <p className="text-muted-foreground">
+            Registro detallado de todas las acciones importantes realizadas en el sistema.
+          </p>
+        </div>
+        {/* Botón de Imprimir */}
+        <Button onClick={handlePrint} size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow">
+            <Printer className="mr-2 h-5 w-5" />
+            Imprimir
+        </Button>
       </div>
 
       <Card className="shadow-lg">
@@ -108,28 +119,28 @@ export default function AuditLogPage() {
         </CardHeader>
         <CardContent>
           <div className="mb-6 flex flex-col sm:flex-row gap-4">
-            <Input 
+            <Input
               placeholder="Buscar por usuario (email), acción o detalle..."
-              className="max-w-xs" 
+              className="max-w-xs"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <Input 
-              type="date" 
-              placeholder="Fecha Desde" 
+            <Input
+              type="date"
+              placeholder="Fecha Desde"
               className="max-w-xs"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
             />
-            <Input 
-              type="date" 
-              placeholder="Fecha Hasta" 
-              className="max-w-xs" 
+            <Input
+              type="date"
+              placeholder="Fecha Hasta"
+              className="max-w-xs"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
             />
           </div>
-          
+
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -151,7 +162,7 @@ export default function AuditLogPage() {
                     <TableCell>{new Date(log.timestamp).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}</TableCell>
                     {/* ***** PUNTO CLAVE DE CORRECCIÓN: Renderizado en Tabla ***** */}
                     {/* Se usa log.userEmail en lugar de log.user */}
-                    <TableCell>{log.userEmail}</TableCell> 
+                    <TableCell>{log.userEmail}</TableCell>
                     <TableCell>{log.action}</TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-md truncate" title={log.details || undefined}>{log.details}</TableCell>
                   </TableRow>

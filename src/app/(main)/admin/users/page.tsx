@@ -1,10 +1,11 @@
+// src/app/(main)/admin/users/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
-import { ShieldAlert, Users, UserCog, Save, Loader2, Trash2, AlertTriangle, Building, LockKeyhole } from 'lucide-react';
+import { ShieldAlert, Users, UserCog, Save, Loader2, Trash2, AlertTriangle, Building, LockKeyhole, Printer } from 'lucide-react'; // Added Printer icon
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { User, Role } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -404,7 +405,7 @@ function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick
     "User": "Usuario",
     "Admin": "Administrador",
     // CORRECCIÓN: Usar el valor sin espacio para la clave del mapeo
-    "Presidente": "Presidente" // La clave debe ser 'Presidente' (sin espacio)
+    "Presidente": "Presidente"
   };
 
   return (
@@ -420,7 +421,7 @@ function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick
       </TableCell>
       <TableCell>{userEntry.email}</TableCell>
       <TableCell>
-        <Badge variant={userEntry.role === "Admin" ? "default" : (userEntry.role === "Presidente" ? "secondary" : "outline") /* CORRECCIÓN: Comparar con 'Presidente' sin espacio */}>
+        <Badge variant={userEntry.role === "Admin" ? "default" : (userEntry.role === "Presidente" ? "secondary" : "outline")}>
            {/* CORRECCIÓN: Acceder al mapeo con el valor que viene de userEntry.role (que ahora será sin espacio) */}
            {roleDisplayMap[userEntry.role] || userEntry.role}
         </Badge>
@@ -479,6 +480,9 @@ export default function UserManagementPage() {
     fetchUsers(); // Refetch users after an update
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
 
   if (role !== "Admin") {
     return (
@@ -504,7 +508,14 @@ export default function UserManagementPage() {
       </div>
       <Card className="w-full shadow-lg">
         <CardHeader>
-          <CardTitle>Lista de Usuarios</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Lista de Usuarios</CardTitle>
+            {/* Botón de Imprimir */}
+            <Button onClick={handlePrint} size="sm" variant="secondary">
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
+            </Button>
+          </div>
           <CardDescription>Ver y gestionar todos los usuarios del sistema.</CardDescription>
         </CardHeader>
         <CardContent>

@@ -1,10 +1,11 @@
+// src/app/(main)/inventory/page.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input"; // <--- CORRECCIÓN CLAVE AQUÍ: Eliminado el '=>'
 import { Label } from "@/components/ui/label";
-import { Archive, PlusCircle, Loader2, Pencil, Trash2, Eye, ShieldAlert, UploadCloud, Info } from "lucide-react";
+import { Archive, PlusCircle, Loader2, Pencil, Trash2, Eye, ShieldAlert, UploadCloud, Info, Printer } from "lucide-react"; // Added Printer icon
 import React, { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
 import { getAllInventoryItems, deleteInventoryItemAction, importInventoryItemsAction } from "@/lib/actions";
 import type { InventoryItem, ExcelInventoryItemData, InventoryItemCategory, InventoryItemStatus, RamOption, StorageType } from "@/lib/types"; // Importar tipos necesarios
@@ -98,10 +99,10 @@ export default function InventoryPage() {
   const [filteredItems, setFilteredItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogVisible, setIsAddDialogVisible] = useState(false);
-  
+
   const [selectedItemForEdit, setSelectedItemForEdit] = useState<InventoryItem | null>(null);
   const [isEditDialogVisible, setIsEditDialogVisible] = useState(false);
-  
+
   const [selectedItemForDelete, setSelectedItemForDelete] = useState<InventoryItem | null>(null);
   const [isConfirmDeleteDialogVisible, setIsConfirmDeleteDialogVisible] = useState(false);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
@@ -109,7 +110,7 @@ export default function InventoryPage() {
   const [selectedItemForView, setSelectedItemForView] = useState<InventoryItem | null>(null);
   const [isViewDetailsDialogVisible, setIsViewDetailsDialogVisible] = useState(false);
 
-  const [searchTerm, setSearchTerm] = useState(''); 
+  const [searchTerm, setSearchTerm] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,7 +123,7 @@ export default function InventoryPage() {
   }, []);
 
   useEffect(() => {
-    if (role === "Admin") { 
+    if (role === "Admin") {
       fetchItems();
     }
   }, [fetchItems, role]);
@@ -134,16 +135,16 @@ export default function InventoryPage() {
       item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (CATEGORY_DISPLAY_MAP[item.category] || item.category).toLowerCase().includes(searchTerm.toLowerCase()) ||
       (STATUS_DISPLAY_MAP[item.status] || item.status).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.ram ? RAM_DISPLAY_MAP[item.ram] : "").toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (item.storageType ? STORAGE_DISPLAY_MAP[item.storageType] : "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (item.ram ? RAM_DISPLAY_MAP[item.ram] : "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.storageType ? STORAGE_DISPLAY_MAP[item.storageType] : "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.location?.toLowerCase().includes(searchTerm.toLowerCase())
     ));
-  }, [allItems, searchTerm]); 
+  }, [allItems, searchTerm]);
 
   const handleItemAddedOrUpdated = () => {
-    fetchItems(); 
+    fetchItems();
     setIsAddDialogVisible(false);
     setIsEditDialogVisible(false);
   };
@@ -170,7 +171,7 @@ export default function InventoryPage() {
 
     if (result.success) {
       toast({ title: "Artículo Eliminado", description: result.message });
-      fetchItems(); 
+      fetchItems();
     } else {
       toast({ title: "Fallo al Eliminar", description: result.message, variant: "destructive" });
     }
@@ -192,7 +193,7 @@ export default function InventoryPage() {
       toast({ title: "Sin Archivo", description: "No se seleccionó ningún archivo.", variant: "destructive" });
       return;
     }
-    if (!user || !user.email || !user.id || !user.name) { 
+    if (!user || !user.email || !user.id || !user.name) {
       toast({ title: "Error de Autenticación", description: "Debes iniciar sesión para importar.", variant: "destructive"});
       return;
     }
@@ -205,12 +206,12 @@ export default function InventoryPage() {
       try {
         const data = e.target?.result;
         if (!data) throw new Error("No se pudo leer el archivo.");
-        
+
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonDataFromExcel = XLSX.utils.sheet_to_json<ExcelInventoryItemData>(worksheet);
-        
+
         const plainJsonData = jsonDataFromExcel.map(item => ({ ...item }));
 
 
@@ -220,7 +221,7 @@ export default function InventoryPage() {
             if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
-        
+
         const result = await importInventoryItemsAction(plainJsonData, user.email, user.id, user.name);
 
         if (result.success) {
@@ -243,10 +244,10 @@ export default function InventoryPage() {
             title: result.successCount > 0 ? "Importación Parcial con Errores" : "Fallo en la Importación",
             description: description,
             variant: "destructive",
-            duration: 10000, 
+            duration: 10000,
           });
         }
-        
+
         if (result.errors && result.errors.length > 0) {
            console.warn("Detalles de errores de importación (filas que no pudieron procesarse):", result.errors);
         }
@@ -256,10 +257,14 @@ export default function InventoryPage() {
         toast({ title: "Error de Importación", description: `No se pudo procesar el archivo. Asegúrate de que el formato es correcto. Error: ${error instanceof Error ? error.message : String(error)}`, variant: "destructive" });
       } finally {
         setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = ""; 
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
     reader.readAsArrayBuffer(file);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
 
@@ -288,7 +293,7 @@ export default function InventoryPage() {
 
   return (
     <TooltipProvider>
-    <div className="space-y-8 w-full"> 
+    <div className="space-y-8 w-full">
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center">
@@ -306,9 +311,9 @@ export default function InventoryPage() {
               Añadir Nuevo Artículo
               </Button>
           )}
-           <Button 
-            onClick={() => fileInputRef.current?.click()} 
-            size="lg" 
+           <Button
+            onClick={() => fileInputRef.current?.click()}
+            size="lg"
             variant="outline"
             className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto"
             disabled={isImporting}
@@ -316,14 +321,19 @@ export default function InventoryPage() {
             {isImporting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
             {isImporting ? "Importando..." : "Importar Excel"}
           </Button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileImport} 
-            accept=".xlsx, .xls" 
-            className="hidden" 
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileImport}
+            accept=".xlsx, .xls"
+            className="hidden"
             disabled={isImporting}
           />
+          {/* Botón de Imprimir */}
+          <Button onClick={handlePrint} size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+              <Printer className="mr-2 h-5 w-5" />
+              Imprimir
+          </Button>
         </div>
       </div>
       <Alert variant="default" className="bg-primary/5 border-primary/20">
@@ -338,7 +348,7 @@ export default function InventoryPage() {
       {/* Si usas InventoryFilters, asegúrate de que esté configurado para usar los nuevos tipos */}
       {/* <InventoryFilters allItems={allItems} onFilterChange={handleFilterChange} /> */}
 
-      <Card className="shadow-lg w-full"> 
+      <Card className="shadow-lg w-full">
         <CardHeader>
           <CardTitle>Lista de Artículos</CardTitle>
           <CardDescription>Visualiza los artículos del inventario según los filtros aplicados. Haz clic en el nombre para ver detalles.</CardDescription>
@@ -356,7 +366,7 @@ export default function InventoryPage() {
                 {allItems.length === 0 ? "Inventario Vacío" : "No Se Encontraron Artículos"}
               </h3>
               <p className="mb-4 mt-2 text-sm text-muted-foreground">
-                {allItems.length === 0 
+                {allItems.length === 0
                   ? "Aún no se han añadido artículos al inventario."
                   : "No hay artículos que coincidan con tus filtros actuales."
                 }
@@ -392,8 +402,8 @@ export default function InventoryPage() {
                           <AvatarImage src={`https://placehold.co/40x40.png?text=${getInitialsForItem(item.name)}`} alt={item.name} data-ai-hint="item activo" />
                           <AvatarFallback>{getInitialsForItem(item.name)}</AvatarFallback>
                         </Avatar>
-                        <Button 
-                            variant="link" 
+                        <Button
+                            variant="link"
                             className="font-medium p-0 h-auto hover:underline text-foreground text-left"
                             onClick={() => handleViewItemDetails(item)}
                             title={`Ver detalles de ${item.name}`}
@@ -448,14 +458,14 @@ export default function InventoryPage() {
           )}
         </CardContent>
       </Card>
-      
+
       {user && (
-        <AddItemDialog 
-          isOpen={isAddDialogVisible} 
-          onClose={() => setIsAddDialogVisible(false)} 
+        <AddItemDialog
+          isOpen={isAddDialogVisible}
+          onClose={() => setIsAddDialogVisible(false)}
           onItemAdded={handleItemAddedOrUpdated}
           currentUser={user}
-        /> 
+        />
       )}
 
       {selectedItemForEdit && user && (
