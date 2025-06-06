@@ -65,7 +65,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"> {/* Added flex container */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 bg-background">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center">
             <BarChartBig className="mr-3 h-8 w-8 text-primary" />
@@ -75,13 +75,18 @@ export default function AnalyticsPage() {
             Resumen del rendimiento actual y funcionalidades de análisis avanzado planeadas.
           </p>
         </div>
-        {/* Botón de Imprimir */}
-        <Button onClick={handlePrint} size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow">
-            <Printer className="mr-2 h-5 w-5" />
-            Imprimir
-        </Button>
+        <div className="flex items-center">
+          <Button
+            onClick={handlePrint}
+            size="lg"
+            variant="secondary"
+            className="shadow-md hover:shadow-lg transition-shadow flex items-center gap-2"
+          >
+            <Printer className="h-5 w-5" />
+            <span>Imprimir</span>
+          </Button>
+        </div>
       </div>
-
 
       {isLoading && (
         <div className="flex flex-col items-center justify-center p-8">
@@ -119,20 +124,19 @@ export default function AnalyticsPage() {
       )}
 
       {!isLoading && !statsData && role === "Admin" && (
-         <Card className="shadow-lg">
-            <CardHeader>
-                <CardTitle>Resumen de Tickets Actual</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="flex flex-col items-center justify-center min-h-[200px] p-4 text-center">
-                    <BarChartBig className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                    <p className="font-semibold">No hay datos de reportes disponibles actualmente.</p>
-                    <p className="text-sm text-muted-foreground">Los datos aparecerán aquí una vez que haya actividad en el sistema.</p>
-                </div>
-            </CardContent>
-         </Card>
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle>Resumen de Tickets Actual</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center justify-center min-h-[200px] p-4 text-center">
+              <BarChartBig className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+              <p className="font-semibold">No hay datos de reportes disponibles actualmente.</p>
+              <p className="text-sm text-muted-foreground">Los datos aparecerán aquí una vez que haya actividad en el sistema.</p>
+            </div>
+          </CardContent>
+        </Card>
       )}
-
 
       <Card className="shadow-lg">
         <CardHeader>
@@ -168,13 +172,13 @@ export default function AnalyticsPage() {
               title="Exportación de Datos"
               description="Opción para exportar los datos de los reportes en formatos como CSV o PDF."
             />
-             <InfoCard
-              icon={BarChartBig} // Using BarChartBig as BarChart is also a component name
+            <InfoCard
+              icon={BarChartBig}
               title="Gráficos Interactivos"
               description="Presentación de datos mediante gráficos dinámicos y fáciles de interpretar."
             />
           </div>
-           <Alert className="mt-6 border-primary/50 bg-primary/5">
+          <Alert className="mt-6 border-primary/50 bg-primary/5">
             <AlertTriangle className="h-5 w-5 text-primary" />
             <AlertTitle className="font-semibold text-primary">En Desarrollo</AlertTitle>
             <AlertDescription className="text-primary/80">
