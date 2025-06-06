@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -38,7 +37,7 @@ import type { User, InventoryItemCategory, InventoryItemStatus, StorageType } fr
 import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from '@/lib/types';
 import { Loader2, PlusCircle, Save } from 'lucide-react';
 
-const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
+const RAM_OPTIONS = ["NoEspecificado", "RAM_2GB", "RAM_4GB", "RAM_8GB", "RAM_12GB", "RAM_16GB", "RAM_32GB", "RAM_64GB", "Otro"] as const;
 const STORAGE_TYPES_WITH_NONE = ["No Especificado", "HDD", "SSD"] as const;
 const STORAGE_TYPES_ZOD_ENUM = ["HDD", "SSD"] as [StorageType, ...StorageType[]];
 
@@ -81,12 +80,12 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
       model: "",
       serialNumber: "",
       processor: "",
-      ram: "No Especificado",
+      ram: "NoEspecificado",
       storageType: undefined,
       storage: "",
       quantity: 1,
       location: "",
-      status: "En Uso",
+      status: "EnUso",
       notes: "",
     },
   });
@@ -95,7 +94,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
 
   useEffect(() => {
     if (watchedCategory !== "Computadora") {
-      form.setValue("ram", "No Especificado");
+      form.setValue("ram", "NoEspecificado");
       form.setValue("storageType", undefined);
       form.setValue("storage", "");
       form.setValue("processor", ""); 
@@ -112,7 +111,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
     let dataToSend: Partial<InventoryItemFormValues> = { ...data };
     
     if (data.category === "Computadora") {
-        dataToSend.ram = data.ram === "No Especificado" ? undefined : data.ram;
+        dataToSend.ram = data.ram === "NoEspecificado" ? undefined : data.ram;
         dataToSend.storageType = data.storageType; 
         dataToSend.storage = data.storage;
         dataToSend.processor = data.processor;
@@ -145,7 +144,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
       });
        if (result.errors) {
         Object.entries(result.errors).forEach(([fieldName, errors]) => {
-          if (errors && errors.length > 0) {
+          if (errors && Array.isArray(errors) && errors.length > 0) {
             form.setError(fieldName as keyof InventoryItemFormValues, {
               type: 'server',
               message: errors.join(', '),
@@ -269,7 +268,7 @@ export function AddItemDialog({ isOpen, onClose, onItemAdded, currentUser }: Add
                         render={({ field }) => (
                             <FormItem>
                             <FormLabel>Memoria RAM</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || "No Especificado"}>
+                            <Select onValueChange={field.onChange} value={field.value || "NoEspecificado"}>
                                 <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecciona RAM" />

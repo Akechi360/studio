@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useEffect, useCallback } from 'react';
 import { getAuditLogs } from '@/lib/actions'; // Import server action to get logs
-import type { AuditLogEntry as AuditLogEntryType } from '@/lib/mock-data'; // Import type
+import type { AuditLogEntry as AuditLogEntryPrismaType } from '@prisma/client';
 
 // Interface for AuditLog moved to mock-data.ts for consistency
 // interface AuditLogEntry {
@@ -21,26 +21,23 @@ import type { AuditLogEntry as AuditLogEntryType } from '@/lib/mock-data'; // Im
 //   details?: string;
 // }
 
-const initialLogs: AuditLogEntryType[] = [];
-
+const initialLogs: AuditLogEntryPrismaType[] = [];
 
 export default function AuditLogPage() {
   const { role } = useAuth();
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntryType[]>(initialLogs);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntryPrismaType[]>(initialLogs);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-
   const fetchAuditLogs = useCallback(async () => {
     setIsLoading(true);
     try {
-      const logs = await getAuditLogs();
-      setAuditLogs(logs);
+      const logsFromServer = await getAuditLogs(); // Esto devuelve AuditLogEntryPrismaType[]
+      setAuditLogs(logsFromServer); // Asignación directa
     } catch (error) {
       console.error("Error fetching audit logs:", error);
-      // Optionally, show a toast or error message to the user
     } finally {
       setIsLoading(false);
     }
@@ -53,20 +50,28 @@ export default function AuditLogPage() {
   }, [role, fetchAuditLogs]);
 
   const filteredLogs = auditLogs.filter(log => {
-    const logDate = new Date(log.timestamp);
+    // log ahora es de tipo AuditLogEntryPrismaType
+    // log.timestamp de Prisma es un objeto Date
+    const logDate = log.timestamp; // No es necesario new Date() si ya es un objeto Date
     const fromDate = dateFrom ? new Date(dateFrom) : null;
-    // Adjust toDate to include the whole day
     const toDate = dateTo ? new Date(new Date(dateTo).setHours(23, 59, 59, 999)) : null;
 
+    const searchTermLower = searchTerm.toLowerCase();
+    
+    // ***** PUNTO CLAVE DE CORRECCIÓN: Lógica de Filtrado *****
+    // Se usa log.userEmail en lugar de log.user
+    const matchesSearchTerm = (
+      (log.userEmail && log.userEmail.toLowerCase().includes(searchTermLower)) ||
+      log.action.toLowerCase().includes(searchTermLower) ||
+      (log.details && log.details.toLowerCase().includes(searchTermLower))
+    );
+
     return (
-      (log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       (log.details && log.details.toLowerCase().includes(searchTerm.toLowerCase()))) &&
+      matchesSearchTerm &&
       (!fromDate || logDate >= fromDate) &&
       (!toDate || logDate <= toDate)
     );
   });
-
 
   if (role !== "Admin") {
     return (
@@ -104,7 +109,7 @@ export default function AuditLogPage() {
         <CardContent>
           <div className="mb-6 flex flex-col sm:flex-row gap-4">
             <Input 
-              placeholder="Buscar por usuario, acción o detalle..." 
+              placeholder="Buscar por usuario (email), acción o detalle..."
               className="max-w-xs" 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -123,8 +128,6 @@ export default function AuditLogPage() {
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
             />
-            {/* Filter button can be re-added if manual trigger is preferred over live filtering */}
-            {/* <Button variant="outline"><Search className="mr-2 h-4 w-4" /> Filtrar</Button> */}
           </div>
           
           {isLoading ? (
@@ -137,18 +140,20 @@ export default function AuditLogPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha y Hora</TableHead>
-                  <TableHead>Usuario</TableHead>
+                  <TableHead>Usuario (Email)</TableHead>
                   <TableHead>Acción</TableHead>
                   <TableHead>Detalles Adicionales</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.map((log) => (
+                {filteredLogs.map((log) => ( // log aquí es AuditLogEntryPrismaType
                   <TableRow key={log.id}>
                     <TableCell>{new Date(log.timestamp).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}</TableCell>
-                    <TableCell>{log.user}</TableCell>
+                    {/* ***** PUNTO CLAVE DE CORRECCIÓN: Renderizado en Tabla ***** */}
+                    {/* Se usa log.userEmail en lugar de log.user */}
+                    <TableCell>{log.userEmail}</TableCell> 
                     <TableCell>{log.action}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-md truncate" title={log.details}>{log.details}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-md truncate" title={log.details || undefined}>{log.details}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

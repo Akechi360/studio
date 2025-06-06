@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -120,7 +119,7 @@ export function CreatePurchaseRequestDialog({ isOpen, onClose, onSuccess }: Crea
     }));
 
     const requestData = {
-      type: "Compra" as ApprovalRequestType,
+      type: "Compra" as const,
       subject: data.asunto,
       description: data.descripcion,
       requesterId: user.id,

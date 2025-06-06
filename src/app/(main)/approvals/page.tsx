@@ -41,11 +41,11 @@ export default function ApprovalsPage() {
 
   const canAccessApprovals =
     user?.role === "Admin" ||
-    user?.role === "Presidente IEQ" ||
+    user?.role === "Presidente" ||
     (user?.email ? SPECIFIC_APPROVER_EMAILS.includes(user.email) : false);
 
   const fetchPresidenteRequests = async () => {
-    if (user?.role === "Presidente IEQ" && user.id) {
+    if (user?.role === "Presidente" && user.id) {
       setIsLoadingPresidente(true);
       const requests = await getApprovalRequestsForUser(user.id, user.role);
       setPendingApprovals(requests);
@@ -57,7 +57,7 @@ export default function ApprovalsPage() {
   };
   
   const fetchSubmittedRequests = async () => {
-    if (user && user.id && user.role && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente IEQ") {
+    if (user && user.id && user.role && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente") {
       setIsLoadingSubmitted(true);
       const requests = await getApprovalRequestsForUser(user.id, user.role);
       setSubmittedRequests(requests);
@@ -78,7 +78,7 @@ export default function ApprovalsPage() {
         return;
     }
 
-    if (user?.role === "Presidente IEQ") {
+    if (user?.role === "Presidente") {
         fetchPresidenteRequests();
         setSubmittedRequests([]); // President doesn't see "submitted by them" here
     } else if (user && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email)))) {
@@ -103,7 +103,7 @@ export default function ApprovalsPage() {
 
   const handleRequestSuccess = async (approvalId: string) => {
     console.log("Request created successfully with ID:", approvalId);
-    if (user?.role === "Presidente IEQ") {
+    if (user?.role === "Presidente") {
         fetchPresidenteRequests();
     } else if (user && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email)))) {
         fetchSubmittedRequests();
@@ -136,7 +136,7 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
-      {user?.role === "Presidente IEQ" && (
+      {user?.role === "Presidente" && (
         <Card className="shadow-lg w-full">
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -185,7 +185,7 @@ export default function ApprovalsPage() {
         </Card>
       )}
 
-       {(user?.role === "Admin" || (user?.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente IEQ" && (
+       {(user?.role === "Admin" || (user?.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente" && (
          <Card className="shadow-lg w-full">
            <CardHeader>
              <CardTitle className="flex items-center">

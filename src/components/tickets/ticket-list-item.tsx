@@ -28,14 +28,14 @@ const priorityColors: Record<TicketPriority, string> = {
 
 const statusDisplayMap: Record<TicketStatus, string> = {
   Open: "Abierto",
-  "In Progress": "En Progreso",
+  "InProgress": "En Progreso",
   Resolved: "Resuelto",
   Closed: "Cerrado",
 };
 
 const statusColors: Record<TicketStatus, string> = {
   Open: "bg-blue-500 hover:bg-blue-600",
-  "In Progress": "bg-orange-500 hover:bg-orange-600",
+  "InProgress": "bg-orange-500 hover:bg-orange-600",
   Resolved: "bg-emerald-500 hover:bg-emerald-600",
   Closed: "bg-gray-500 hover:bg-gray-600",
 };

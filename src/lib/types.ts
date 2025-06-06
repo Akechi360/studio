@@ -1,5 +1,4 @@
-
-export type Role = "User" | "Admin" | "Presidente IEQ";
+export type Role = "User" | "Admin" | "Presidente"; // Corregido a "Presidente"
 
 export interface User {
   id: string;
@@ -12,14 +11,14 @@ export interface User {
 }
 
 export type TicketPriority = "Low" | "Medium" | "High";
-export type TicketStatus = "Open" | "In Progress" | "Resolved" | "Closed";
+export type TicketStatus = "Open" | "InProgress" | "Resolved" | "Closed";
 
 export interface Attachment {
   id: string;
   fileName: string;
-  url: string;
+  url: string; // In a real app, this might point to a cloud storage URL
   size: number;
-  type?: string;
+  type: string | null; // Corregido: puede ser null
   ticketId?: string | null; // Relation to Ticket
   approvalRequestId?: string | null; // Relation to ApprovalRequest
 }
@@ -29,7 +28,7 @@ export interface Comment {
   text: string;
   userId: string;
   userName: string;
-  userAvatarUrl?: string;
+  userAvatarUrl: string | null; // Corregido: puede ser null
   createdAt: Date;
   ticketId: string; // Relation to Ticket
 }
@@ -43,7 +42,7 @@ export interface Ticket {
   attachments: Attachment[];
   userId: string;
   userName: string;
-  userEmail?: string;
+  userEmail: string | null; // Corregido: puede ser null
   createdAt: Date;
   updatedAt: Date;
   comments: Comment[];
@@ -62,22 +61,43 @@ export interface TicketStats {
   byStatus: { name: string; value: number }[];
 }
 
+// --- INVENTORY ENUMS (Alineados con Prisma: sin espacios ni acentos) ---
 export const INVENTORY_ITEM_CATEGORIES = [
   "Computadora", "Monitor", "Teclado", "Mouse", "Impresora", "Escaner",
   "Router", "Switch", "Servidor", "Laptop", "Tablet", "Proyector",
-  "Telefono IP", "Otro Periferico", "Software", "Licencia", "Otro"
+  "TelefonoIP", // Sin espacio
+  "OtroPeriferico", // Sin espacio
+  "Software", "Licencia", "Otro"
 ] as const;
 export type InventoryItemCategory = typeof INVENTORY_ITEM_CATEGORIES[number];
 
 export const INVENTORY_ITEM_STATUSES = [
-  "En Uso", "En Almacen", "En Reparacion", "De Baja", "Perdido"
+  "EnUso", // Sin espacio
+  "EnAlmacen", // Sin espacio
+  "EnReparacion", // Sin espacio
+  "DeBaja", // Sin espacio
+  "Perdido"
 ] as const;
 export type InventoryItemStatus = typeof INVENTORY_ITEM_STATUSES[number];
 
-export const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
+export const RAM_OPTIONS = [
+  "NoEspecificado", // Sin espacio
+  "RAM_2GB", // Nombre del enum de Prisma
+  "RAM_4GB",
+  "RAM_8GB",
+  "RAM_12GB",
+  "RAM_16GB",
+  "RAM_32GB",
+  "RAM_64GB",
+  "Otro"
+] as const;
 export type RamOption = typeof RAM_OPTIONS[number];
 
-export const STORAGE_TYPES_ZOD_ENUM = ["HDD", "SSD", "No Especificado"] as const; // Updated
+export const STORAGE_TYPES_ZOD_ENUM = [
+  "HDD",
+  "SSD",
+  "NoEspecificado" // Sin espacio
+] as const;
 export type StorageType = (typeof STORAGE_TYPES_ZOD_ENUM)[number];
 
 
@@ -88,17 +108,17 @@ export interface InventoryItem {
   brand?: string | null;
   model?: string | null;
   serialNumber?: string | null;
-  ram?: RamOption | null;
+  processor?: string | null;
+  ram?: RamOption | null; // Tipo alineado con el enum de Prisma
   storageType?: StorageType | null;
   storage?: string | null;
-  processor?: string | null;
   screenSize?: string | null;
   ipAddress?: string | null;
   quantity: number;
   location?: string | null;
-  purchaseDate?: string | null; // Consider using Date type if more manipulation is needed
+  purchaseDate?: Date | null; // Corregido: puede ser Date o null
   supplier?: string | null;
-  warrantyEndDate?: string | null; // Consider using Date type
+  warrantyEndDate?: Date | null; // Corregido: puede ser Date o null
   status: InventoryItemStatus;
   notes?: string | null;
   addedByUserId: string;
@@ -201,24 +221,35 @@ export interface AuditLogEntry {
   details?: string | null;
 }
 
-// --- Gestión de Casos de Mantenimiento Types ---
+// --- Gestión de Casos de Mantenimiento Types (Alineados con Prisma: sin espacios ni acentos) ---
 export const CASO_STATUSES = [
-  'Registrado', 'Pendiente Presupuesto', 'Presupuesto Aprobado', 'En Servicio/Reparación', 'Pendiente Respaldo', 'Resuelto', 'Cancelado'
+  'Registrado',
+  'PendientePresupuesto', // Sin espacio
+  'PresupuestoAprobado', // Sin espacio
+  'EnServicioReparacion', // Sin espacio/acentos
+  'PendienteRespaldo', // Sin espacio
+  'Resuelto',
+  'Cancelado'
 ] as const;
 export type CasoMantenimientoStatus = typeof CASO_STATUSES[number];
 
-export const CASO_PRIORITIES = ['Baja', 'Media', 'Alta', 'Crítica'] as const;
+export const CASO_PRIORITIES = [
+  'Baja',
+  'Media',
+  'Alta',
+  'Critica' // Sin acento
+] as const;
 export type CasoMantenimientoPriority = typeof CASO_PRIORITIES[number];
 
 export interface CasoMantenimientoLogEntry {
-  id: string; // Added from schema
+  id: string;
   timestamp: Date;
   action: string;
   notes: string;
   userId: string;
   userName: string;
   statusAfterAction?: CasoMantenimientoStatus | null;
-  casoDeMantenimientoId: string; // Relation to CasoDeMantenimiento
+  casoId: string; // Cambiado de casoDeMantenimientoId a casoId para coincidir con la estructura real
 }
 
 export interface CasoDeMantenimiento {
@@ -227,8 +258,8 @@ export interface CasoDeMantenimiento {
   description: string;
   location: string;
   equipment?: string | null;
-  priority: CasoMantenimientoPriority;
-  currentStatus: CasoMantenimientoStatus;
+  priority: CasoMantenimientoPriority; // Tipo alineado con el enum de Prisma
+  currentStatus: CasoMantenimientoStatus; // Tipo alineado con el enum de Prisma
   registeredAt: Date;
   registeredByUserId: string;
   registeredByUserName: string;

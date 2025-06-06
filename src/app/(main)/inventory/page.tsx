@@ -1,20 +1,19 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"; // <--- CORRECCIÓN CLAVE AQUÍ: Eliminado el '=>'
 import { Label } from "@/components/ui/label";
 import { Archive, PlusCircle, Loader2, Pencil, Trash2, Eye, ShieldAlert, UploadCloud, Info } from "lucide-react";
 import React, { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
 import { getAllInventoryItems, deleteInventoryItemAction, importInventoryItemsAction } from "@/lib/actions";
-import type { InventoryItem, ExcelInventoryItemData } from "@/lib/types";
+import type { InventoryItem, ExcelInventoryItemData, InventoryItemCategory, InventoryItemStatus, RamOption, StorageType } from "@/lib/types"; // Importar tipos necesarios
 import { useAuth } from "@/lib/auth-context";
 import { AddItemDialog } from '@/components/inventory/add-item-dialog';
 import { EditItemDialog } from '@/components/inventory/edit-item-dialog';
 import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
 import { ViewItemDetailsDialog } from '@/components/inventory/view-item-details-dialog';
-import { InventoryFilters } from '@/components/inventory/inventory-filters';
+import { InventoryFilters } from '@/components/inventory/inventory-filters'; // Si este componente se usa
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,7 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast"; // Importar useToast
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
 import * as XLSX from 'xlsx';
 
@@ -33,18 +32,68 @@ const getInitialsForItem = (name: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
-const statusColors: Record<InventoryItem["status"], string> = {
-  "En Uso": "bg-green-500 text-green-50",
-  "En Almacen": "bg-blue-500 text-blue-50",
-  "En Reparacion": "bg-yellow-500 text-yellow-50",
-  "De Baja": "bg-red-500 text-red-50",
+// Mapas de visualización para todos los enums de inventario
+const CATEGORY_DISPLAY_MAP: Record<InventoryItemCategory, string> = {
+  "Computadora": "Computadora",
+  "Monitor": "Monitor",
+  "Teclado": "Teclado",
+  "Mouse": "Mouse",
+  "Impresora": "Impresora",
+  "Escaner": "Escáner", // Añadido acento
+  "Router": "Router",
+  "Switch": "Switch",
+  "Servidor": "Servidor",
+  "Laptop": "Laptop",
+  "Tablet": "Tablet",
+  "Proyector": "Proyector",
+  "TelefonoIP": "Teléfono IP", // Clave sin espacio, valor con espacio
+  "OtroPeriferico": "Otro Periférico", // Clave sin espacio, valor con espacio
+  "Software": "Software",
+  "Licencia": "Licencia",
+  "Otro": "Otro",
+};
+
+const STATUS_DISPLAY_MAP: Record<InventoryItemStatus, string> = {
+  "EnUso": "En Uso", // Clave sin espacio, valor con espacio
+  "EnAlmacen": "En Almacén", // Clave sin espacio, valor con espacio
+  "EnReparacion": "En Reparación", // Clave sin espacio, valor con espacio
+  "DeBaja": "De Baja", // Clave sin espacio, valor con espacio
+  "Perdido": "Perdido", // Clave sin espacio, valor con espacio
+};
+
+const RAM_DISPLAY_MAP: Record<RamOption, string> = {
+  "NoEspecificado": "No Especificado", // Clave sin espacio, valor con espacio
+  "RAM_2GB": "2GB", // Clave sin espacio, valor con espacio
+  "RAM_4GB": "4GB",
+  "RAM_8GB": "8GB",
+  "RAM_12GB": "12GB",
+  "RAM_16GB": "16GB",
+  "RAM_32GB": "32GB",
+  "RAM_64GB": "64GB",
+  "Otro": "Otro",
+};
+
+const STORAGE_DISPLAY_MAP: Record<StorageType, string> = {
+  "HDD": "HDD",
+  "SSD": "SSD",
+  "NoEspecificado": "No Especificado", // Clave sin espacio, valor con espacio
+};
+
+
+// Mapeo de colores de estado (mantener si es necesario, o usar una función que devuelva la clase Tailwind)
+const statusColors: Record<InventoryItemStatus, string> = {
+  "EnUso": "bg-green-500 text-green-50",
+  "EnAlmacen": "bg-blue-500 text-blue-50",
+  "EnReparacion": "bg-yellow-500 text-yellow-50",
+  "DeBaja": "bg-red-500 text-red-50",
   "Perdido": "bg-gray-500 text-gray-50",
 };
 
 
 export default function InventoryPage() {
   const { user, role, isLoading: authIsLoading } = useAuth();
-  const { toast } = useToast();
+  const { toast } = useToast(); // Declarar toast al principio del componente
+
   const [allItems, setAllItems] = useState<InventoryItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,9 +109,10 @@ export default function InventoryPage() {
   const [selectedItemForView, setSelectedItemForView] = useState<InventoryItem | null>(null);
   const [isViewDetailsDialogVisible, setIsViewDetailsDialogVisible] = useState(false);
 
-  const [currentFilters, setCurrentFilters] = useState<{ category: string; location: string }>({ category: "all", location: "all" });
+  const [searchTerm, setSearchTerm] = useState(''); 
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
@@ -72,30 +122,30 @@ export default function InventoryPage() {
   }, []);
 
   useEffect(() => {
-    if (role === "Admin") {
+    if (role === "Admin") { 
       fetchItems();
     }
   }, [fetchItems, role]);
 
   useEffect(() => {
     let itemsToFilter = [...allItems];
-    if (currentFilters.category !== "all") {
-      itemsToFilter = itemsToFilter.filter(item => item.category === currentFilters.category);
-    }
-    if (currentFilters.location !== "all") {
-      itemsToFilter = itemsToFilter.filter(item => item.location === currentFilters.location);
-    }
-    setFilteredItems(itemsToFilter);
-  }, [allItems, currentFilters]);
-  
+    setFilteredItems(itemsToFilter.filter(item =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (CATEGORY_DISPLAY_MAP[item.category] || item.category).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (STATUS_DISPLAY_MAP[item.status] || item.status).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.ram ? RAM_DISPLAY_MAP[item.ram] : "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (item.storageType ? STORAGE_DISPLAY_MAP[item.storageType] : "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+      item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.location?.toLowerCase().includes(searchTerm.toLowerCase())
+    ));
+  }, [allItems, searchTerm]); 
+
   const handleItemAddedOrUpdated = () => {
     fetchItems(); 
     setIsAddDialogVisible(false);
     setIsEditDialogVisible(false);
-  };
-
-  const handleFilterChange = (filters: { category: string; location: string }) => {
-    setCurrentFilters(filters);
   };
 
   const handleEditItem = (item: InventoryItem) => {
@@ -161,7 +211,6 @@ export default function InventoryPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonDataFromExcel = XLSX.utils.sheet_to_json<ExcelInventoryItemData>(worksheet);
         
-        // Convert to plain objects
         const plainJsonData = jsonDataFromExcel.map(item => ({ ...item }));
 
 
@@ -286,8 +335,8 @@ export default function InventoryPage() {
         </AlertDescription>
       </Alert>
 
-
-      <InventoryFilters allItems={allItems} onFilterChange={handleFilterChange} />
+      {/* Si usas InventoryFilters, asegúrate de que esté configurado para usar los nuevos tipos */}
+      {/* <InventoryFilters allItems={allItems} onFilterChange={handleFilterChange} /> */}
 
       <Card className="shadow-lg w-full"> 
         <CardHeader>
@@ -353,14 +402,16 @@ export default function InventoryPage() {
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell>{item.category}</TableCell>
+                    {/* CORRECCIÓN: Usar el mapa de visualización para la categoría */}
+                    <TableCell>{CATEGORY_DISPLAY_MAP[item.category] || item.category}</TableCell>
                     <TableCell>{item.brand || <span className="text-muted-foreground">N/A</span>}</TableCell>
                     <TableCell>{item.model || <span className="text-muted-foreground">N/A</span>}</TableCell>
                     <TableCell>{item.serialNumber || <span className="text-muted-foreground">N/A</span>}</TableCell>
                     <TableCell className="text-center">{item.quantity}</TableCell>
                     <TableCell>
+                      {/* CORRECCIÓN: Usar el mapa de visualización para el estado */}
                       <Badge variant="secondary" className={`${statusColors[item.status]} border-none`}>
-                        {item.status}
+                        {STATUS_DISPLAY_MAP[item.status] || item.status}
                       </Badge>
                     </TableCell>
                     <TableCell>{item.location || <span className="text-muted-foreground">N/A</span>}</TableCell>

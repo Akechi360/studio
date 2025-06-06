@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Ticket, TicketStatus, TicketPriority as TicketPriorityType } from "@/lib/types";
@@ -43,14 +42,14 @@ const priorityColors: Record<TicketPriorityType, string> = {
 
 const statusDisplayMap: Record<TicketStatus, string> = {
   Open: "Abierto",
-  "In Progress": "En Progreso",
+  InProgress: "En Progreso",
   Resolved: "Resuelto",
   Closed: "Cerrado",
 };
 
 const statusColors: Record<TicketStatus, string> = {
   Open: "bg-blue-100 text-blue-700 border-blue-300",
-  "In Progress": "bg-orange-100 text-orange-700 border-orange-300",
+  InProgress: "bg-orange-100 text-orange-700 border-orange-300",
   Resolved: "bg-emerald-100 text-emerald-700 border-emerald-300",
   Closed: "bg-gray-100 text-gray-700 border-gray-300",
 };

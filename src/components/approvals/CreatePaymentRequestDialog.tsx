@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -123,7 +122,7 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
     }));
 
     const requestData = {
-      type: "PagoProveedor" as ApprovalRequestType,
+      type: "PagoProveedor" as const,
       subject: data.asunto,
       description: data.descripcion,
       requesterId: user.id,
@@ -131,7 +130,6 @@ export function CreatePaymentRequestDialog({ isOpen, onClose, onSuccess }: Creat
       requesterEmail: user.email,
       supplierPago: data.proveedor,
       totalAmountToPay: data.montoTotal,
-      // paymentDueDate: data.fechaRequerida, // Removed
       attachmentsData: attachmentsData,
     };
 

@@ -12,7 +12,7 @@ export default function FallasPage() {
   const canAccessModule =
     user &&
     (user.role === "Admin" ||
-      user.role === "Presidente IEQ" ||
+      user.role === "Presidente" ||
       user.email === "electromedicina@clinicaieq.com");
 
   if (!canAccessModule) {

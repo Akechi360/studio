@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -87,14 +86,16 @@ const DEPARTMENT_DISPLAY_MAP: { [key: string]: string } = {
   "Suministros": "Suministros",
 };
 
-const ROLES_OPTIONS_BASE: Role[] = ["User", "Admin", "Presidente IEQ"];
-const ROLES_OPTIONS_ZOD = ROLES_OPTIONS_BASE as [Role, ...Role[]];
+// ROLES_OPTIONS_BASE se mantiene para mostrar el texto en el frontend
+const ROLES_OPTIONS_BASE: Role[] = ["User", "Admin", "Presidente"]; // Valores que se mostrarán en la UI
+// ROLES_OPTIONS_ZOD DEBE contener los valores exactos del enum de Prisma (sin espacios)
+const ROLES_OPTIONS_ZOD = ["User", "Admin", "Presidente"] as const; // Definir los valores de Zod/Prisma sin espacio
 
 
 const userEditFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
   email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
-  role: z.enum(ROLES_OPTIONS_ZOD, { required_error: "El rol es obligatorio." }),
+  role: z.enum(ROLES_OPTIONS_ZOD, { required_error: "El rol es obligatorio." }), // Usar la lista con el valor sin espacio
   department: z.string().optional(),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }).optional().or(z.literal('')),
 });
@@ -123,8 +124,10 @@ function DeleteUserConfirmationDialog({ isOpen, onClose, onConfirm, userName, is
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting} size="sm">Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" size="sm">
+          {/* CORRECCIÓN: Eliminar la prop 'size' */}
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          {/* CORRECCIÓN: Eliminar la prop 'size' */}
+          <AlertDialogAction onClick={onConfirm} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
             {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
             Eliminar
           </AlertDialogAction>
@@ -155,9 +158,10 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
     defaultValues: {
       name: userToEdit?.name || "",
       email: userToEdit?.email || "",
-      role: userToEdit?.role || "User",
+      // Mapear el rol que viene del `userToEdit` para que coincida con Zod
+      role: userToEdit?.role === "Presidente" ? "Presidente" : (userToEdit?.role || "User"),
       department: userToEdit?.department || NO_DEPARTMENT_VALUE,
-      password: "", 
+      password: "",
     },
   });
 
@@ -166,9 +170,10 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
       form.reset({
         name: userToEdit.name,
         email: userToEdit.email,
-        role: userToEdit.role,
+        // Mapear en el reset también
+        role: userToEdit.role === "Presidente" ? "Presidente" : userToEdit.role,
         department: userToEdit.department || NO_DEPARTMENT_VALUE,
-        password: userToEdit.password || "", 
+        password: userToEdit.password || "",
       });
     }
   }, [userToEdit, form]);
@@ -182,7 +187,8 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
     const updateData: Partial<UserEditFormValues> = {
         name: data.name,
         email: data.email,
-        role: data.role,
+        // Asegurarse de que el rol enviado sea "Presidente" sin espacio
+        role: data.role === "Presidente" ? "Presidente" : data.role,
         department: departmentToSave
     };
     if (data.password && data.password.trim() !== "") {
@@ -301,8 +307,12 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
                       </FormControl>
                       <SelectContent>
                         {ROLES_OPTIONS_BASE.map((roleOption) => (
-                           <SelectItem key={roleOption} value={roleOption}>
-                             {roleOption === "Presidente IEQ" ? "Presidente IEQ" : roleOption}
+                           // El 'value' debe ser 'Presidente' sin espacio para la validación/DB
+                           <SelectItem key={roleOption} value={
+                               roleOption === "Presidente" ? "Presidente" : roleOption
+                           }>
+                             {/* El texto que se muestra al usuario puede seguir siendo con espacio */}
+                             {roleOption}
                            </SelectItem>
                         ))}
                       </SelectContent>
@@ -355,7 +365,7 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
                 <Button
                     type="button"
                     variant="destructive"
-                    size="sm"
+                    // CORRECCIÓN: Eliminar la prop 'size'
                     onClick={() => setIsDeleteConfirmOpen(true)}
                     disabled={isSubmitting || isDeleting || !canDelete}
                 >
@@ -393,7 +403,8 @@ function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick
   const roleDisplayMap: Record<Role, string> = {
     "User": "Usuario",
     "Admin": "Administrador",
-    "Presidente IEQ": "Presidente IEQ"
+    // CORRECCIÓN: Usar el valor sin espacio para la clave del mapeo
+    "Presidente": "Presidente" // La clave debe ser 'Presidente' (sin espacio)
   };
 
   return (
@@ -409,7 +420,8 @@ function UserRow({ user: userEntry, onManageClick }: { user: User; onManageClick
       </TableCell>
       <TableCell>{userEntry.email}</TableCell>
       <TableCell>
-        <Badge variant={userEntry.role === "Admin" ? "default" : (userEntry.role === "Presidente IEQ" ? "secondary" : "outline")}>
+        <Badge variant={userEntry.role === "Admin" ? "default" : (userEntry.role === "Presidente" ? "secondary" : "outline") /* CORRECCIÓN: Comparar con 'Presidente' sin espacio */}>
+           {/* CORRECCIÓN: Acceder al mapeo con el valor que viene de userEntry.role (que ahora será sin espacio) */}
            {roleDisplayMap[userEntry.role] || userEntry.role}
         </Badge>
       </TableCell>
@@ -539,5 +551,3 @@ export default function UserManagementPage() {
     </div>
   );
 }
-
-    

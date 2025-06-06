@@ -35,9 +35,9 @@ async function main() {
     where: { email: 'presidente@clinicaieq.com' },
     update: {},
     create: {
-      name: 'Presidente IEQ',
+      name: 'Presidente',
       email: 'presidente@clinicaieq.com',
-      role: Role.PresidenteIEQ,
+      role: Role.Presidente,
       department: 'Presidente',
       password: hashedPasswordPresidente,
       avatarUrl: 'https://placehold.co/100x100.png?text=PI',

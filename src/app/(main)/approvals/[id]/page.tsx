@@ -1,4 +1,3 @@
-
 "use client"; 
 
 import { getApprovalRequestDetails } from '@/lib/actions';
@@ -43,6 +42,7 @@ const statusColors: Record<ApprovalRequest["status"], string> = {
 };
 
 const DetailRow = ({ label, value, icon: Icon }: { label: string; value?: string | number | null | Date; icon?: React.ElementType }) => {
+  // CORRECCIÓN: Verificar si value es null o undefined antes de intentar convertirlo a string
   if (value === undefined || value === null || value === "") return null;
   
   let displayValue: string | React.ReactNode = '';
@@ -96,7 +96,7 @@ export default function ApprovalDetailPage() {
 
   const canTakeAction = user && request && (
     user.role === 'Admin' || 
-    user.role === 'Presidente IEQ'
+    user.role === 'Presidente' // CAMBIO: Usar "Presidente" sin espacio
   );
 
   const shouldShowActionsPanel = canTakeAction && request && (request.status === 'Pendiente' || request.status === 'InformacionSolicitada');
@@ -175,7 +175,8 @@ export default function ApprovalDetailPage() {
             <>
               <DetailRow label="Proveedor" value={request.supplierPago} icon={Info} />
               <DetailRow label="Monto Total a Pagar (Solicitado)" value={request.totalAmountToPay?.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })} icon={Tag} />
-               {request.approvedAmount !== undefined && (
+              {/* CORRECCIÓN: Verificar explícitamente si approvedAmount NO es null ni undefined */}
+              {request.approvedAmount !== null && request.approvedAmount !== undefined && (
                 <DetailRow label="Monto Total Aprobado" value={request.approvedAmount.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })} icon={Tag} />
               )}
             </>
@@ -237,7 +238,8 @@ export default function ApprovalDetailPage() {
                     <span className="font-semibold text-primary">{log.action}</span>
                     <span className="text-xs text-muted-foreground">{format(new Date(log.timestamp), "PPpp", { locale: es })}</span>
                   </div>
-                  <p className="text-muted-foreground">Por: {log.userName}</p>
+                  {/* CORRECCIÓN: Acceder a log.userName directamente */}
+                  <p className="text-muted-foreground">Por: {log.userName}</p> 
                   {log.comment && <p className="mt-1 italic text-foreground/80">Comentario: "{log.comment}"</p>}
                 </li>
               ))}

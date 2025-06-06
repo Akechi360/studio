@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -39,8 +38,8 @@ import { INVENTORY_ITEM_CATEGORIES, INVENTORY_ITEM_STATUSES } from '@/lib/types'
 import { Loader2, Save, Edit3 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context'; // Import useAuth
 
-const RAM_OPTIONS = ["No Especificado", "2GB", "4GB", "8GB", "12GB", "16GB", "32GB", "64GB", "Otro"] as const;
-const STORAGE_TYPES_WITH_NONE = ["No Especificado", "HDD", "SSD"] as const;
+const RAM_OPTIONS = ["NoEspecificado", "RAM_2GB", "RAM_4GB", "RAM_8GB", "RAM_12GB", "RAM_16GB", "RAM_32GB", "RAM_64GB", "Otro"] as const;
+const STORAGE_TYPES_WITH_NONE = ["NoEspecificado", "HDD", "SSD"] as const;
 const STORAGE_TYPES_ZOD_ENUM = ["HDD", "SSD"] as [StorageType, ...StorageType[]];
 
 const inventoryItemEditFormSchema = z.object({
@@ -82,12 +81,12 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
       model: "",
       serialNumber: "",
       processor: "",
-      ram: "No Especificado",
+      ram: "NoEspecificado",
       storageType: undefined,
       storage: "",
       quantity: 1,
       location: "",
-      status: "En Uso",
+      status: "EnUso",
       notes: "",
     },
   });
@@ -101,7 +100,7 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
         model: itemToEdit.model || "",
         serialNumber: itemToEdit.serialNumber || "",
         processor: itemToEdit.processor || "",
-        ram: (itemToEdit.ram as typeof RAM_OPTIONS[number]) || "No Especificado",
+        ram: (itemToEdit.ram as typeof RAM_OPTIONS[number]) || "NoEspecificado",
         storageType: itemToEdit.storageType || undefined,
         storage: itemToEdit.storage || "",
         quantity: itemToEdit.quantity,
@@ -116,7 +115,7 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
 
   useEffect(() => {
     if (watchedCategory !== "Computadora") {
-      form.setValue("ram", "No Especificado");
+      form.setValue("ram", "NoEspecificado");
       form.setValue("storageType", undefined);
       form.setValue("storage", "");
       form.setValue("processor", "");
@@ -135,7 +134,7 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
     let dataToSend: Partial<InventoryItemEditFormValues> = { ...data };
     
     if (data.category === "Computadora") {
-        dataToSend.ram = data.ram === "No Especificado" ? undefined : data.ram;
+        dataToSend.ram = data.ram === "NoEspecificado" ? undefined : data.ram;
         dataToSend.storageType = data.storageType;
         dataToSend.storage = data.storage;
         dataToSend.processor = data.processor;
@@ -164,7 +163,7 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
       });
       if (result.errors) {
         Object.entries(result.errors).forEach(([fieldName, errors]) => {
-          if (errors && errors.length > 0) {
+          if (errors && Array.isArray(errors) && errors.length > 0) {
             form.setError(fieldName as keyof InventoryItemEditFormValues, {
               type: 'server',
               message: errors.join(', '),
@@ -288,7 +287,7 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
                         render={({ field }) => (
                             <FormItem>
                             <FormLabel>Memoria RAM</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || "No Especificado"}>
+                            <Select onValueChange={field.onChange} value={field.value || "NoEspecificado"}>
                                 <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecciona RAM" />
@@ -310,7 +309,7 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
                         render={({ field }) => (
                             <FormItem>
                             <FormLabel>Tipo de Disco</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || "No Especificado"}>
+                            <Select onValueChange={field.onChange} value={field.value || "NoEspecificado"}>
                                 <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecciona tipo" />
@@ -318,8 +317,8 @@ export function EditItemDialog({ itemToEdit, isOpen, onClose, onItemUpdated }: E
                                 </FormControl>
                                 <SelectContent>
                                 {STORAGE_TYPES_WITH_NONE.map((type) => (
-                                    <SelectItem key={type} value={type === "No Especificado" ? "No Especificado" : type}>
-                                        {type}
+                                    <SelectItem key={type} value={type}>
+                                        {type === "NoEspecificado" ? "No Especificado" : type}
                                     </SelectItem>
                                 ))}
                                 </SelectContent>

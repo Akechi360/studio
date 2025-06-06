@@ -39,7 +39,7 @@ export default function DashboardPage() {
         }
       }
 
-      if (role === 'Presidente IEQ') {
+      if (role === 'Presidente') {
         setIsLoadingApprovals(true); // Set to true when starting fetch
         try {
           const approvals = await getApprovalRequestsForUser(user.id, user.role);
@@ -95,11 +95,11 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">
           {role === 'Admin' && "Aquí tienes un resumen de los tickets abiertos que requieren tu atención."}
           {role === 'User' && "Aquí puedes ver el estado de los tickets que has creado."}
-          {role === 'Presidente IEQ' && "Revisa y gestiona las aprobaciones pendientes."}
+          {role === 'Presidente' && "Revisa y gestiona las aprobaciones pendientes."}
         </p>
       </div>
 
-      {role === 'Presidente IEQ' && (
+      {role === 'Presidente' && (
         <Card className="shadow-lg w-full">
           <CardHeader>
             <CardTitle className="flex items-center">

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -12,16 +11,16 @@ import { Wrench, PlusCircle, ShieldAlert, Loader2, Eye, CalendarClock, ListFilte
 import Link from 'next/link';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type { CasoDeMantenimiento, CasoMantenimientoStatus, CasoMantenimientoPriority } from '@/lib/types';
+import type { CasoDeMantenimiento, CasoMantenimientoStatus, CasoMantenimientoPriority, CasoMantenimientoLogEntry } from '@/lib/types';
 import { getAllCasosMantenimientoAction } from '@/lib/actions';
 import { CreateCasoMantenimientoDialog } from '@/components/mantenimiento/CreateCasoMantenimientoDialog';
 
 const statusColors: Record<CasoMantenimientoStatus, string> = {
   'Registrado': "bg-blue-500",
-  'Pendiente Presupuesto': "bg-yellow-500",
-  'Presupuesto Aprobado': "bg-teal-500",
-  'En Servicio/Reparación': "bg-orange-500",
-  'Pendiente Respaldo': "bg-purple-500",
+  'PendientePresupuesto': "bg-yellow-500",
+  'PresupuestoAprobado': "bg-teal-500",
+  'EnServicioReparacion': "bg-orange-500",
+  'PendienteRespaldo': "bg-purple-500",
   'Resuelto': "bg-green-500",
   'Cancelado': "bg-gray-500",
 };
@@ -30,7 +29,7 @@ const priorityColors: Record<CasoMantenimientoPriority, string> = {
   'Baja': "border-green-500 text-green-700 bg-green-50",
   'Media': "border-yellow-500 text-yellow-700 bg-yellow-50",
   'Alta': "border-orange-500 text-orange-700 bg-orange-50",
-  'Crítica': "border-red-500 text-red-700 bg-red-50",
+  'Critica': "border-red-500 text-red-700 bg-red-50",
 };
 
 
@@ -40,7 +39,7 @@ export default function MantenimientoPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  const canAccessModule = user && (role === 'Admin' || role === 'Presidente IEQ' || user.email === 'electromedicina@clinicaieq.com');
+  const canAccessModule = user && (role === 'Admin' || role === 'Presidente' || user.email === 'electromedicina@clinicaieq.com');
   const canCreateOrEdit = user && (role === 'Admin' || user.email === 'electromedicina@clinicaieq.com');
 
   const fetchCasos = useCallback(async () => {
@@ -82,7 +81,7 @@ export default function MantenimientoPage() {
     setIsCreateDialogOpen(false);
   };
 
-  const getMostRecentLogDate = (logs: CasoDeMantenimientoLogEntry[]): Date | null => {
+  const getMostRecentLogDate = (logs: CasoMantenimientoLogEntry[]): Date | null => {
     if (!logs || logs.length === 0) return null;
     return logs.reduce((latest, current) => new Date(current.timestamp) > new Date(latest.timestamp) ? current : latest).timestamp;
   };

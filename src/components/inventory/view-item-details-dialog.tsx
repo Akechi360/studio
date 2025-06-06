@@ -31,10 +31,10 @@ const DetailRow = ({ label, value, icon: Icon }: { label: string; value?: string
     displayValue = format(value, "PPpp", { locale: es });
   } else if (label === "Estado") { // Special handling for Status to use Badge
     const statusColors: Record<InventoryItem["status"], string> = {
-        "En Uso": "bg-green-500 text-green-50",
-        "En Almacen": "bg-blue-500 text-blue-50",
-        "En Reparacion": "bg-yellow-500 text-yellow-50",
-        "De Baja": "bg-red-500 text-red-50",
+        "EnUso": "bg-green-500 text-green-50",
+        "EnAlmacen": "bg-blue-500 text-blue-50",
+        "EnReparacion": "bg-yellow-500 text-yellow-50",
+        "DeBaja": "bg-red-500 text-red-50",
         "Perdido": "bg-gray-500 text-gray-50",
     };
     const statusValue = value as InventoryItem["status"];

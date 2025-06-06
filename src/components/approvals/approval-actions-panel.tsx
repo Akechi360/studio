@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -32,6 +31,16 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Función para generar un ID único compatible con el navegador y Node.js
+// Usamos un fallback si crypto.randomUUID no está disponible (ej. en ciertos entornos de prueba o SSR sin polyfill)
+const generateUniqueId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback simple para entornos donde crypto.randomUUID no está disponible
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+};
+
 
 const paymentInstallmentSchema = z.object({
   id: z.string(),
@@ -42,7 +51,9 @@ const paymentInstallmentSchema = z.object({
 const approvalActionsFormSchema = z.object({
   comment: z.string().optional(),
   approvedPaymentType: z.enum(['Contado', 'Cuotas']).optional(),
-  approvedAmount: z.coerce.number().positive("El monto aprobado debe ser positivo.").optional(),
+  // Aseguramos que approvedAmount sea un número o undefined, pero nunca null.
+  // Transformamos null a undefined para consistencia con optional().
+  approvedAmount: z.coerce.number().positive("El monto aprobado debe ser positivo.").optional().nullable().transform(e => e === null ? undefined : e),
   installments: z.array(paymentInstallmentSchema).optional(),
 }).superRefine((data, ctx) => {
   if (data.approvedPaymentType === 'Cuotas') {
@@ -100,7 +111,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
     defaultValues: { // Static initial defaults
       comment: "",
       approvedPaymentType: 'Contado',
-      approvedAmount: 0,
+      approvedAmount: 0, // Aseguramos que sea 0, no undefined o null
       installments: [],
     },
   });
@@ -113,17 +124,18 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   useEffect(() => {
     if (currentRequest) {
       const defaultPaymentType = currentRequest.approvedPaymentType || (requestType === "PagoProveedor" ? 'Contado' : undefined);
-      const defaultApprovedAmount = currentRequest.approvedAmount !== undefined 
+      // Aseguramos que el valor defaultApprovedAmount nunca sea null, sino 0 o undefined
+      const defaultApprovedAmount = currentRequest.approvedAmount !== null && currentRequest.approvedAmount !== undefined 
           ? currentRequest.approvedAmount 
           : (requestType === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : undefined);
 
       form.reset({
         comment: currentRequest.approverComment || "",
         approvedPaymentType: defaultPaymentType,
-        approvedAmount: defaultApprovedAmount,
+        approvedAmount: defaultApprovedAmount, // Aseguramos que sea un número o undefined
         installments: (defaultPaymentType === 'Cuotas' && Array.isArray(currentRequest.paymentInstallments)) ?
             currentRequest.paymentInstallments.map(inst => ({
-                id: inst.id || crypto.randomUUID(),
+                id: inst.id || generateUniqueId(), // Usar la función generateUniqueId
                 amount: inst.amount || 0,
                 dueDate: inst.dueDate && !isNaN(new Date(inst.dueDate).getTime()) ? new Date(inst.dueDate) : new Date(),
             }))
@@ -141,7 +153,9 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
     if (watchedPaymentType === 'Contado') {
       form.setValue('installments', []); 
     } else if (watchedPaymentType === 'Cuotas') {
-      if (!form.getValues('approvedAmount') && currentRequest?.totalAmountToPay) {
+      // Si el monto aprobado no está definido y hay un monto total a pagar en la solicitud, lo establecemos.
+      // Aseguramos que el valor sea un número.
+      if ((form.getValues('approvedAmount') === undefined || form.getValues('approvedAmount') === null) && currentRequest?.totalAmountToPay) {
         form.setValue('approvedAmount', currentRequest.totalAmountToPay);
       }
     }
@@ -158,8 +172,10 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   }, [watchedApprovedAmount, sumOfInstallments]);
 
   const handleActionClick = (action: "approve" | "reject" | "requestInfo") => {
+    // Forzamos la validación del formulario antes de abrir el modal de confirmación
     form.trigger().then(isValid => { 
       if (isValid) {
+        // Validación adicional para comentario si es rechazo o solicitud de info
         if ((action === 'reject' || action === 'requestInfo') && !form.getValues("comment")?.trim()) {
           form.setError("comment", { type: "manual", message: "Se requiere un comentario para esta acción." });
           return;
@@ -169,6 +185,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
       } else {
          const errors = form.formState.errors;
          let errorMsg = "Por favor, corrija los errores del formulario.";
+         // Mensajes de error más específicos para el usuario
          if (errors.approvedAmount?.message) errorMsg = errors.approvedAmount.message;
          else if (errors.installments?.message) errorMsg = errors.installments.message;
          else if (errors.installments?.[0]?.amount?.message) errorMsg = `Cuota 1: ${errors.installments[0].amount.message}`;
@@ -196,9 +213,10 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
 
     try {
       if (actionToConfirm === 'approve') {
-        if (requestType === "PagoProveedor" && isPresidente) {
+        if (requestType === "PagoProveedor" && user.role === 'Presidente') { 
           actionData.approvedPaymentType = formData.approvedPaymentType;
-          actionData.approvedAmount = formData.approvedAmount;
+          // Aseguramos que approvedAmount sea un número antes de enviarlo
+          actionData.approvedAmount = formData.approvedAmount !== undefined ? formData.approvedAmount : 0;
           if (formData.approvedPaymentType === 'Cuotas') {
             actionData.installments = formData.installments;
           } else {
@@ -231,7 +249,11 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   };
 
   if (!currentRequest) {
-    return <div className="flex items-center justify-center p-4"><Loader2 className="h-6 w-6 animate-spin text-primary" /> Cargando datos del panel...</div>;
+    return (
+      <div className="flex items-center justify-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" /> Cargando datos del panel...
+      </div>
+    );
   }
 
   // This check now allows 'InformacionSolicitada' as well
@@ -249,7 +271,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   };
 
   const confirmationDetails = getConfirmationDetails();
-  const isPresidente = user?.role === 'Presidente IEQ';
+  const isPresidente = user?.role === 'Presidente'; 
 
   return (
     <Card className="w-full shadow-lg border-primary/30">
@@ -387,7 +409,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
                             </Button>
                             </div>
                         ))}
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: crypto.randomUUID(), amount: 0, dueDate: new Date() })}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateUniqueId(), amount: 0, dueDate: new Date() })}> {/* Usar generateUniqueId */}
                             <PlusCircle className="mr-2 h-4 w-4" /> Añadir Cuota
                         </Button>
                         <div className="mt-2 text-sm space-y-1">
@@ -427,7 +449,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
                       placeholder="Añade un comentario (requerido para rechazar o solicitar más información)..."
                       className="min-h-[100px]"
                       {...field}
-                      value={field.value || ""}
+                      value={field.value || ""} // Aseguramos que el valor sea "" si es null/undefined
                     />
                   </FormControl>
                   <FormMessage />
@@ -508,5 +530,3 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
     </Card>
   );
 }
-
-    

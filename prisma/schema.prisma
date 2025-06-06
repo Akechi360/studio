@@ -1,36 +1,35 @@
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
 enum Role {
   User
   Admin
-  PresidenteIEQ
+  Presidente
 }
 
 model User {
-  id             String  @id @default(cuid())
-  name           String
-  email          String  @unique
-  password       String // Will store hashed password
-  role           Role    @default(User)
-  avatarUrl      String?
-  department     String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                        String                @id @default(cuid())
+  name                      String
+  email                     String                @unique
+  password                  String // Will store hashed password
+  role                      Role                  @default(User)
+  avatarUrl                 String?
+  department                String?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
 
-  ticketsCreated          Ticket[]                @relation("TicketsCreatedByUser")
-  comments                Comment[]
-  inventoryItemsAdded     InventoryItem[]         @relation("InventoryAddedByUser")
-  approvalRequestsCreated ApprovalRequest[]       @relation("ApprovalRequestedByUser")
-  approvalRequestsApproved ApprovalRequest[]      @relation("ApprovalApprovedByUser")
-  auditLogEntries         AuditLogEntry[]
+  ticketsCreated            Ticket[]              @relation("TicketsCreatedByUser")
+  comments                  Comment[]
+  inventoryItemsAdded       InventoryItem[]       @relation("InventoryAddedByUser")
+  approvalRequestsCreated   ApprovalRequest[]     @relation("ApprovalRequestedByUser")
+  approvalRequestsApproved  ApprovalRequest[]     @relation("ApprovalApprovedByUser")
+  auditLogEntries           AuditLogEntry[]
   casosMantenimientoRegistered CasoDeMantenimiento[] @relation("CasoRegisteredByUser")
   casosMantenimientoLogEntries CasoMantenimientoLogEntry[] @relation("LogEntryByUser")
 
@@ -52,19 +51,18 @@ enum TicketStatus {
 }
 
 model Ticket {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   subject     String
-  description String   @db.Text
+  description String         @db.Text
   priority    TicketPriority
   status      TicketStatus
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   userId      String
-  user        User     @relation("TicketsCreatedByUser", fields: [userId], references: [id])
+  user        User           @relation("TicketsCreatedByUser", fields: [userId], references: [id])
   userName    String // Denormalized for easier display
   userEmail   String?
-
   comments    Comment[]
   attachments Attachment[]
 
@@ -85,7 +83,6 @@ model Comment {
   user      User     @relation(fields: [userId], references: [id])
   userName  String // Denormalized
   userAvatarUrl String?
-
   @@index([ticketId])
   @@index([userId])
 }
@@ -96,7 +93,6 @@ model Attachment {
   url      String // In a real app, this might point to a cloud storage URL
   size     Int
   type     String?
-
   ticketId String?
   ticket   Ticket? @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
@@ -150,6 +146,7 @@ enum RamOption {
 enum StorageType {
   HDD
   SSD
+  NoEspecificado
 }
 
 model InventoryItem {
@@ -162,19 +159,19 @@ model InventoryItem {
   processor     String?
   ram           RamOption?
   storageType   StorageType?
-  storage       String? // e.g., "512GB", "1TB"
+  storage       String?               // e.g., "512GB", "1TB"
   quantity      Int
   location      String?
   status        InventoryItemStatus
   notes         String?               @db.Text
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
-  purchaseDate  DateTime? // Changed from String to DateTime for better querying
+  purchaseDate  DateTime?             // Changed from String to DateTime for better querying
   supplier      String?
-  warrantyEndDate DateTime? // Changed from String to DateTime
+  warrantyEndDate DateTime?           // Changed from String to DateTime
 
   addedByUserId String
-  addedByUser   User   @relation("InventoryAddedByUser", fields: [addedByUserId], references: [id])
+  addedByUser   User                  @relation("InventoryAddedByUser", fields: [addedByUserId], references: [id])
   addedByUserName String // Denormalized
 
   @@index([category])
@@ -213,7 +210,6 @@ model ApprovalRequest {
   requester     User                @relation("ApprovalRequestedByUser", fields: [requesterId], references: [id])
   requesterName String // Denormalized
   requesterEmail String?
-
   approverId    String?
   approver      User?               @relation("ApprovalApprovedByUser", fields: [approverId], references: [id])
   approverName  String?
@@ -226,13 +222,11 @@ model ApprovalRequest {
   itemDescription String?
   estimatedPrice  Float?
   supplierCompra  String?
-
   // Payment specific
   supplierPago     String?
   totalAmountToPay Float?
   approvedAmount   Float?
   approvedPaymentType PaymentType?
-
   attachments       Attachment[]
   activityLog       ApprovalActivityLogEntry[]
   paymentInstallments PaymentInstallment[]
@@ -289,29 +283,29 @@ enum CasoMantenimientoPriority {
 }
 
 model CasoDeMantenimiento {
-  id                String                     @id @default(cuid())
-  title             String
-  description       String                     @db.Text
-  location          String
-  equipment         String?
-  priority          CasoMantenimientoPriority
-  currentStatus     CasoMantenimientoStatus
-  registeredAt      DateTime                   @default(now())
-  assignedProviderName String
-  providerContactPerson String?
-  expectedResolutionDate DateTime?
-  lastFollowUpDate  DateTime?
-  nextFollowUpDate  DateTime?
-  resolutionDetails String?                    @db.Text
-  cost              Float?
-  invoicingDetails  String?                    @db.Text
-  resolvedAt        DateTime?
+  id                       String                     @id @default(cuid())
+  title                    String
+  description              String                     @db.Text
+  location                 String
+  equipment                String?
+  priority                 CasoMantenimientoPriority
+  currentStatus            CasoMantenimientoStatus
+  registeredAt             DateTime                   @default(now())
+  assignedProviderName     String
+  providerContactPerson    String?
+  expectedResolutionDate   DateTime?
+  lastFollowUpDate         DateTime?
+  nextFollowUpDate         DateTime?
+  resolutionDetails        String?                    @db.Text
+  cost                     Float?
+  invoicingDetails         String?                    @db.Text
+  resolvedAt               DateTime?
 
-  registeredByUserId String
-  registeredByUser  User                       @relation("CasoRegisteredByUser", fields: [registeredByUserId], references: [id])
-  registeredByUserName String // Denormalized
+  registeredByUserId       String
+  registeredByUser         User                       @relation("CasoRegisteredByUser", fields: [registeredByUserId], references: [id])
+  registeredByUserName     String // Denormalized
 
-  log               CasoMantenimientoLogEntry[]
+  log                      CasoMantenimientoLogEntry[]
 
   @@index([registeredByUserId])
   @@index([currentStatus])
@@ -339,7 +333,9 @@ model CasoMantenimientoLogEntry {
 model AuditLogEntry {
   id        String   @id @default(cuid())
   timestamp DateTime @default(now())
-  userEmail String   // Email of the user performing the action
+  // CORRECCIÓN: userEmail se hace opcional para permitir onDelete: SetNull
+  userEmail String?  // Email of the user performing the action
+
   action    String
   details   String?  @db.Text
 

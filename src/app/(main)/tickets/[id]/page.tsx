@@ -1,4 +1,3 @@
-
 import { getTicketById } from '@/lib/actions';
 import { TicketDetailView } from '@/components/tickets/ticket-detail-view';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -7,11 +6,14 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 interface TicketDetailPageProps {
-  params: { id: string };
+  // CORRECCIÓN CLAVE: params debe ser un Promise de { id: string }
+  params: Promise<{ id: string }>; 
 }
 
 export default async function TicketDetailPage({ params }: TicketDetailPageProps) {
-  const ticket = await getTicketById(params.id);
+  // Asegúrate de await params para obtener el objeto real
+  const { id } = await params; 
+  const ticket = await getTicketById(id);
 
   if (!ticket) {
     return (
@@ -36,7 +38,9 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
 }
 
 export async function generateMetadata({ params }: TicketDetailPageProps) {
-  const ticket = await getTicketById(params.id);
+  // Asegúrate de await params para obtener el objeto real
+  const { id } = await params;
+  const ticket = await getTicketById(id);
   if (!ticket) {
     return { title: "Ticket No Encontrado" };
   }

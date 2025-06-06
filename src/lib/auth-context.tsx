@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { User, Role } from "@/lib/types";
@@ -43,6 +42,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Utilidad para limpiar el usuario (null -> undefined)
+function cleanUser(user: any): User {
+  return {
+    ...user,
+    avatarUrl: user.avatarUrl ?? undefined,
+    department: user.department ?? undefined,
+  };
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (parsedUserFromStorage && parsedUserFromStorage.id) {
              const freshUser = await getUserByIdServerAction(parsedUserFromStorage.id);
              if (freshUser) {
-                setUser(freshUser);
+                setUser(cleanUser(freshUser));
              } else {
                 localStorage.removeItem("ticketflow_user"); 
                 setUser(null);
@@ -84,7 +92,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const result = await loginUserServerAction(email, pass);
     setIsLoading(false);
     if (result.success && result.user) {
-      setUser(result.user);
+      setUser(cleanUser(result.user));
       localStorage.setItem("ticketflow_user", JSON.stringify(result.user));
       return true;
     }
@@ -106,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const result = await registerUserServerAction(name, email, pass);
     setIsLoading(false);
     if (result.success && result.user) {
-      setUser(result.user);
+      setUser(cleanUser(result.user));
       localStorage.setItem("ticketflow_user", JSON.stringify(result.user));
       return true;
     }
@@ -120,7 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const result = await updateUserProfileServerAction(user.id, name, email);
     setIsLoading(false);
     if (result.success && result.user) {
-      setUser(result.user);
+      setUser(cleanUser(result.user));
       localStorage.setItem("ticketflow_user", JSON.stringify(result.user));
       return true;
     }
@@ -143,10 +151,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getAllUsers = async (): Promise<User[]> => {
-    // setIsLoading(true); // Typically not needed for a simple fetch in admin panel
     const users = await getAllUsersServerAction();
-    // setIsLoading(false);
-    return users;
+    // Convertir los usuarios al tipo User esperado
+    return users.map(user => ({
+      ...user,
+      avatarUrl: user.avatarUrl || undefined,
+      department: user.department || undefined
+    }));
   };
 
   const updateUserByAdmin = async (userId: string, data: Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>): Promise<{ success: boolean; message?: string }> => {
@@ -154,7 +165,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, message: "Acción no permitida o información del administrador incompleta." };
     }
     setIsLoading(true);
-    const result = await updateUserByAdminServerAction(user.email, userId, data);
+    // Asegurar que los campos requeridos estén presentes
+    const updateData = {
+      name: data.name || '',
+      role: data.role || 'User',
+      email: data.email || '',
+      department: data.department,
+      password: data.password
+    };
+    const result = await updateUserByAdminServerAction(user.email, userId, updateData);
     setIsLoading(false);
     return result;
   };

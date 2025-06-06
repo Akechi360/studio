@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -88,10 +87,10 @@ export function CreateCasoMantenimientoDialog({ isOpen, onClose, onCasoCreated, 
       });
       if (result.errors) {
         Object.entries(result.errors).forEach(([fieldName, errors]) => {
-          if (errors && errors.length > 0) {
+          if (errors && Array.isArray(errors) && errors.length > 0) {
             form.setError(fieldName as keyof CreateCasoMantenimientoFormValues, {
               type: 'server',
-              message: (errors as string[]).join(', '),
+              message: errors.join(', '),
             });
           }
         });

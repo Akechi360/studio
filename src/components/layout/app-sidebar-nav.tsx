@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -64,7 +63,7 @@ const navItems: NavItem[] = [
     exact: true,
     specialAccessCheck: (currentUser) =>
       !!currentUser && (currentUser.role === "Admin" ||
-      currentUser.role === "Presidente IEQ" ||
+      currentUser.role === "Presidente" ||
       (currentUser.email ? SPECIFIC_APPROVER_EMAILS.includes(currentUser.email) : false)),
   },
   {
@@ -74,7 +73,7 @@ const navItems: NavItem[] = [
     exact: true,
     specialAccessCheck: (currentUser) =>
       !!currentUser && (currentUser.role === "Admin" ||
-      currentUser.role === "Presidente IEQ" ||
+      currentUser.role === "Presidente" ||
       currentUser.email === "electromedicina@clinicaieq.com"),
   },
   {
@@ -84,7 +83,7 @@ const navItems: NavItem[] = [
     exact: true,
     specialAccessCheck: (currentUser) =>
       !!currentUser && (currentUser.role === "Admin" ||
-      currentUser.role === "Presidente IEQ" ||
+      currentUser.role === "Presidente" ||
       currentUser.email === "electromedicina@clinicaieq.com"),
   },
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
@@ -208,9 +207,7 @@ export function AppSidebarNav() {
                 )}
               </SidebarMenuButton>
               {isSectionOpen && sidebarState === "expanded" && (
-                <SidebarMenuSub
-                  className={cn(sidebarState === "collapsed" ? "hidden" : "", "pl-2")}
-                >
+                <SidebarMenuSub className="pl-2">
                   {visibleSubItems.map((subItem) => {
                     const SubIcon = subItem.icon;
                     const subItemPath = subItem.href.endsWith('/') ? subItem.href.slice(0, -1) : subItem.href;
