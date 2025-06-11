@@ -11,6 +11,7 @@ enum Role {
   User
   Admin
   Presidente
+  Electromedicina
 }
 
 model User {
@@ -23,6 +24,9 @@ model User {
   department                String?
   createdAt                 DateTime              @default(now())
   updatedAt                 DateTime              @updatedAt
+  emailOnNewTicket          Boolean               @default(true)
+  emailOnNewComment         Boolean               @default(true)
+  customAppName             String?
 
   ticketsCreated            Ticket[]              @relation("TicketsCreatedByUser")
   comments                  Comment[]
@@ -33,6 +37,10 @@ model User {
   casosMantenimientoRegistered CasoDeMantenimiento[] @relation("CasoRegisteredByUser")
   casosMantenimientoLogEntries CasoMantenimientoLogEntry[] @relation("LogEntryByUser")
 
+  // Relaciones para gestión de fallas
+  fallasReportadas          Falla[]               @relation("FallasReportadas")
+  fallasAsignadas           Falla[]               @relation("FallaAsignadaA")
+  fallasBitacora            FallaBitacora[]       @relation("FallaBitacoraUsuario")
 
   @@index([email])
 }
@@ -344,4 +352,80 @@ model AuditLogEntry {
 
   @@index([userEmail])
   @@index([action])
+}
+
+// --- MODELO DE GESTIÓN DE FALLAS ---
+
+enum SeveridadFalla {
+  CRITICA
+  ALTA
+  MEDIA
+  BAJA
+}
+
+enum TipoFalla {
+  ELECTRICA
+  MECANICA
+  SOFTWARE
+  SENSOR
+  CALIBRACION
+  RUIDO_VIBRACION
+  FUGA
+  OTRO
+}
+
+enum EstadoFalla {
+  REPORTADA
+  EN_DIAGNOSTICO
+  PENDIENTE_PIEZA
+  EN_REPARACION_INTERNA
+  ESCALADA_EXTERNO
+  EN_CALIBRACION
+  RESUELTA
+  CERRADA
+  DUPLICADA
+  NO_SE_REPRODUCE
+}
+
+model Falla {
+  id                String   @id @default(uuid())
+  titulo            String
+  descripcion       String
+  equipoId          String?  // Relación futura con InventoryItem
+  equipoNombre      String
+  equipoUbicacion   String
+  equipoFabricante  String?
+  equipoModelo      String?
+  equipoNumeroSerie String?
+  ubicacion         String
+  severidad         SeveridadFalla
+  tipoFalla         TipoFalla
+  impacto           String?
+  reportadoPorId    String
+  reportadoPor      User     @relation("FallasReportadas", fields: [reportadoPorId], references: [id])
+  fechaDeteccion    DateTime
+  adjuntos          Json?
+  estado            EstadoFalla
+  asignadoAId       String?
+  asignadoA         User?    @relation("FallaAsignadaA", fields: [asignadoAId], references: [id])
+  bitacora          FallaBitacora[]
+  accionesTomadas   String?
+  piezasUtilizadas  Json?
+  pruebasPost       String?
+  fechaResolucion   DateTime?
+  causaRaiz         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model FallaBitacora {
+  id        String   @id @default(uuid())
+  fallaId   String
+  falla     Falla    @relation(fields: [fallaId], references: [id])
+  usuarioId String
+  usuario   User     @relation("FallaBitacoraUsuario", fields: [usuarioId], references: [id])
+  mensaje   String
+  fecha     DateTime @default(now())
+  adjuntos  Json?
+  tipo      String   // "comentario", "cambio_estado", etc.
 }

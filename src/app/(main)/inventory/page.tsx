@@ -9,7 +9,7 @@ import { Archive, PlusCircle, Loader2, Pencil, Trash2, Eye, ShieldAlert, UploadC
 import React, { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
 import { getAllInventoryItems, deleteInventoryItemAction, importInventoryItemsAction } from "@/lib/actions";
 import type { InventoryItem, ExcelInventoryItemData, InventoryItemCategory, InventoryItemStatus, RamOption, StorageType } from "@/lib/types"; // Importar tipos necesarios
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, SPECIFIC_INVENTORY_EMAILS } from "@/lib/auth-context";
 import { AddItemDialog } from '@/components/inventory/add-item-dialog';
 import { EditItemDialog } from '@/components/inventory/edit-item-dialog';
 import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast"; // Importar useToast
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
 import * as XLSX from 'xlsx';
+import { Loading } from '@/components/ui/loading';
 
 const getInitialsForItem = (name: string) => {
   if (!name) return '??';
@@ -114,19 +115,28 @@ export default function InventoryPage() {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Verificación de acceso
+  const canAccessInventory = role === "Admin" || (user?.email && SPECIFIC_INVENTORY_EMAILS.includes(user.email));
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
     const inventoryItems = await getAllInventoryItems();
-    setAllItems(inventoryItems);
+    if (role === "Admin") {
+      setAllItems(inventoryItems);
+    } else if (user?.email && SPECIFIC_INVENTORY_EMAILS.includes(user.email)) {
+      // Filtrar solo los items añadidos por el usuario actual
+      setAllItems(inventoryItems.filter(item => item.addedByUserId === user.id));
+    } else {
+      setAllItems([]);
+    }
     setIsLoading(false);
-  }, []);
+  }, [role, user?.email, user?.id]);
 
   useEffect(() => {
-    if (role === "Admin") {
+    if (role === "Admin" || (user?.email && SPECIFIC_INVENTORY_EMAILS.includes(user.email))) {
       fetchItems();
     }
-  }, [fetchItems, role]);
+  }, [fetchItems, role, user?.email]);
 
   useEffect(() => {
     let itemsToFilter = [...allItems];
@@ -267,24 +277,23 @@ export default function InventoryPage() {
     window.print();
   };
 
+  const canEditOrDeleteItem = (item: InventoryItem) => {
+    if (!user) return false;
+    return role === "Admin" || (user.id === item.addedByUserId);
+  };
 
   if (authIsLoading) {
-    return (
-      <div className="flex items-center justify-center p-8 min-h-[calc(100vh-200px)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-3 text-muted-foreground">Verificando acceso...</p>
-      </div>
-    );
+    return <Loading message="Verificando acceso..." variant="circles" size="md" className="min-h-screen" />;
   }
 
-  if (role !== "Admin") {
+  if (!canAccessInventory) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4">
-        <Alert variant="destructive" className="max-w-md text-center shadow-lg">
-          <ShieldAlert className="h-8 w-8 mx-auto mb-3 text-destructive" />
-          <RadixAlertTitle className="text-xl font-bold">Acceso Denegado</RadixAlertTitle>
-          <AlertDescription className="mb-4">
-            No tienes permiso para acceder al Inventario. Esta área está restringida a administradores.
+      <div className="container mx-auto p-4">
+        <Alert variant="destructive">
+          <ShieldAlert className="h-4 w-4" />
+          <RadixAlertTitle>Acceso Denegado</RadixAlertTitle>
+          <AlertDescription>
+            No tienes permiso para acceder al Inventario. Esta área está restringida a administradores y usuarios autorizados.
           </AlertDescription>
         </Alert>
       </div>
@@ -355,10 +364,7 @@ export default function InventoryPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-center justify-center py-10 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin mr-3" />
-              Cargando artículos del inventario...
-            </div>
+            <Loading message="Cargando artículos del inventario..." variant="circles" size="md" />
           ) : filteredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
               <Archive className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -426,29 +432,59 @@ export default function InventoryPage() {
                     </TableCell>
                     <TableCell>{item.location || <span className="text-muted-foreground">N/A</span>}</TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => handleEditItem(item)}>
-                              <Pencil className="h-4 w-4" />
-                              <span className="sr-only">Editar Artículo</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Editar Artículo</p>
-                          </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/90" onClick={() => handleDeleteItem(item)}>
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Eliminar Artículo</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Eliminar Artículo</p>
-                          </TooltipContent>
-                        </Tooltip>
+                      <div className="flex justify-end gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleViewItemDetails(item)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Ver detalles</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        {canEditOrDeleteItem(item) && (
+                          <>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditItem(item)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Editar</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteItem(item)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Eliminar</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

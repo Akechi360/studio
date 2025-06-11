@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect } from 'react';
@@ -7,9 +6,8 @@ import { useAuth } from '@/lib/auth-context';
 import { AppHeader } from '@/components/layout/app-header';
 import { AppSidebar } from '@/components/layout/app-sidebar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import { Loader2 } from 'lucide-react';
 import { ThemeProvider as NextThemesProvider } from "next-themes";
-
+import { Loading } from '@/components/ui/loading';
 
 export default function MainAppLayout({
   children,
@@ -27,19 +25,14 @@ export default function MainAppLayout({
 
   if (isLoading || !user) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-foreground">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="text-lg">Autenticando...</p>
-        </div>
-      </div>
+      <Loading message="Autenticando..." variant="circles" size="md" className="min-h-screen" />
     );
   }
 
   return (
     <NextThemesProvider attribute="class" defaultTheme="system" enableSystem>
         <SidebarProvider defaultOpen={true}>
-            <div className="flex min-h-screen flex-col">
+            <div className="flex min-h-screen flex-col w-full">
             <AppHeader />
             <div className="flex flex-1">
                 <AppSidebar />

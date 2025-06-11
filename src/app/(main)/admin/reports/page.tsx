@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useAuth } from '@/lib/auth-context';
@@ -7,9 +6,19 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ShieldAlert, BarChart3, Ticket, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getDashboardStats } from '@/lib/actions';
-import type { TicketSummary, TicketStats } from '@/lib/types';
-import { TicketStatsCharts } from '@/components/dashboard/ticket-stats-charts'; 
-import { Loader2 } from 'lucide-react';
+import type { TicketSummary } from '@/lib/types/index';
+import type { TicketStats } from '@/lib/types/ticket-stats';
+import { TicketStatsCharts } from '@/components/dashboard/ticket-stats-charts';
+import { AnimatedLoader } from '@/components/ui/animated-loader';
+
+interface DashboardStats {
+  summary: TicketSummary;
+  stats: {
+    byPriority: Array<{ name: string; value: number }>;
+    byStatus: Array<{ name: string; value: number }>;
+    byCategory: Array<{ name: string; value: number }>;
+  };
+}
 
 function StatCard({ title, value, icon, description, colorClass = "text-primary" }: { title: string, value: string | number, icon: React.ElementType, description: string, colorClass?: string }) {
   const IconComponent = icon;
@@ -27,19 +36,36 @@ function StatCard({ title, value, icon, description, colorClass = "text-primary"
   );
 }
 
-
 export default function ReportsPage() {
   const { role } = useAuth();
-  const [statsData, setStatsData] = useState<{ summary: TicketSummary; stats: TicketStats } | null>(null);
+  const [statsData, setStatsData] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (role === "Admin") {
       const fetchStats = async () => {
         setIsLoading(true);
-        const data = await getDashboardStats();
-        setStatsData(data);
-        setIsLoading(false);
+        try {
+          const data = await getDashboardStats();
+          setStatsData({
+            summary: {
+              total: data.summary.total,
+              abierto: data.summary.open,
+              enProgreso: data.summary.inProgress,
+              resuelto: data.summary.resolved,
+              cerrado: data.summary.closed
+            },
+            stats: {
+              byStatus: data.stats.byStatus.map(item => ({ name: item.name, value: item.value })),
+              byPriority: data.stats.byPriority.map(item => ({ name: item.name, value: item.value })),
+              byCategory: []
+            }
+          });
+        } catch (error) {
+          console.error('Error al cargar estadísticas:', error);
+        } finally {
+          setIsLoading(false);
+        }
       };
       fetchStats();
     }
@@ -60,12 +86,7 @@ export default function ReportsPage() {
   }
   
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="mt-2 text-muted-foreground">Cargando reportes...</p>
-      </div>
-    );
+    return <AnimatedLoader />;
   }
 
   if (!statsData) {
@@ -76,7 +97,6 @@ export default function ReportsPage() {
       </div>
     );
   }
-
 
   return (
     <div className="space-y-8">
@@ -94,9 +114,9 @@ export default function ReportsPage() {
         <CardContent className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard title="Tickets Totales" value={statsData.summary.total} icon={Ticket} description="Todos los tickets creados" />
-            <StatCard title="Tickets Abiertos" value={statsData.summary.open} icon={AlertTriangle} description="Tickets que necesitan atención" colorClass="text-destructive" />
-            <StatCard title="En Progreso" value={statsData.summary.inProgress} icon={Clock} description="Tickets en los que se está trabajando actualmente" colorClass="text-yellow-500" />
-            <StatCard title="Tickets Resueltos/Cerrados" value={statsData.summary.resolved + statsData.summary.closed} icon={CheckCircle} description="Tickets resueltos o cerrados exitosamente" colorClass="text-green-500" />
+            <StatCard title="Tickets Abiertos" value={statsData.summary.abierto} icon={AlertTriangle} description="Tickets que necesitan atención" colorClass="text-destructive" />
+            <StatCard title="En Progreso" value={statsData.summary.enProgreso} icon={Clock} description="Tickets en los que se está trabajando actualmente" colorClass="text-yellow-500" />
+            <StatCard title="Tickets Resueltos/Cerrados" value={statsData.summary.resuelto + statsData.summary.cerrado} icon={CheckCircle} description="Tickets resueltos o cerrados exitosamente" colorClass="text-green-500" />
           </div>
           
           {statsData.summary.total > 0 ? (

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, ChangeEvent } from 'react';
@@ -10,8 +9,9 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/hooks/use-toast";
-import { ShieldAlert, Settings as SettingsIcon, Save, BellRing, Mail, MessageCircle, Paintbrush } from 'lucide-react'; 
+import { ShieldAlert, Settings as SettingsIcon, Save, BellRing, Mail, MessageCircle, Paintbrush, Loader2 } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
+import { getUserSettingsAction, updateUserSettingsAction } from '@/lib/actions';
 
 interface NotificationPreferences {
   emailOnNewTicket: boolean;
@@ -27,47 +27,45 @@ interface AdminSettings {
   customizationPrefs: CustomizationPreferences;
 }
 
-const defaultSettings: AdminSettings = {
+const initialSettingsState: AdminSettings = {
   notificationPrefs: {
     emailOnNewTicket: true,
     emailOnNewComment: true,
   },
   customizationPrefs: {
-    appName: APP_NAME, 
+    appName: APP_NAME,
   },
 };
 
 export default function SettingsPage() {
-  const { role } = useAuth();
+  const { user, role, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
-  const [settings, setSettings] = useState<AdminSettings>(defaultSettings);
+  const [settings, setSettings] = useState<AdminSettings>(initialSettingsState);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   useEffect(() => {
-    const savedSettingsRaw = localStorage.getItem('adminSettings');
-    if (savedSettingsRaw) {
-      try {
-        const savedSettings = JSON.parse(savedSettingsRaw);
-        setSettings(prev => ({
-          ...defaultSettings,
-          ...savedSettings,
-          customizationPrefs: { // Ensure appName from constants is the default if not saved
-            ...defaultSettings.customizationPrefs,
-            appName: savedSettings.customizationPrefs?.appName || APP_NAME,
-          },
+    const loadUserSettings = async () => {
+      if (user?.id) {
+        setIsLoadingSettings(true);
+        const userDbSettings = await getUserSettingsAction(user.id);
+        setSettings({
           notificationPrefs: {
-            ...defaultSettings.notificationPrefs,
-            ...(savedSettings.notificationPrefs || {}),
+            emailOnNewTicket: userDbSettings.emailOnNewTicket,
+            emailOnNewComment: userDbSettings.emailOnNewComment,
           },
-        }));
-      } catch (error) {
-        console.error("Error al cargar configuración de admin:", error);
-        setSettings({...defaultSettings, customizationPrefs: {...defaultSettings.customizationPrefs, appName: APP_NAME }}); 
+          customizationPrefs: {
+            appName: userDbSettings.customAppName || APP_NAME,
+          },
+        });
+        setIsLoadingSettings(false);
       }
-    } else {
-         setSettings({...defaultSettings, customizationPrefs: {...defaultSettings.customizationPrefs, appName: APP_NAME }});
+    };
+
+    if (!authLoading) {
+      loadUserSettings();
     }
-  }, []);
+  }, [user, authLoading]);
 
   const handleNotificationPrefChange = (key: keyof NotificationPreferences, value: boolean) => {
     setSettings(prev => ({
@@ -75,7 +73,7 @@ export default function SettingsPage() {
       notificationPrefs: { ...prev.notificationPrefs, [key]: value },
     }));
   };
-  
+
   const handleCustomizationPrefChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
     setSettings(prev => ({
@@ -84,26 +82,36 @@ export default function SettingsPage() {
     }));
   };
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
+    if (!user || !user.id || !user.email) {
+      toast({ title: "Error", description: "No se pudo guardar la configuración. Usuario no autenticado.", variant: "destructive" });
+      return;
+    }
+
     setIsSaving(true);
-    localStorage.setItem('adminSettings', JSON.stringify(settings));
-    // Optionally, update the APP_NAME dynamically if needed for immediate effect (more complex)
-    // For now, a page refresh or re-login would show the new name from constants if it's used directly.
-    setTimeout(() => {
-      setIsSaving(false);
+    const result = await updateUserSettingsAction(
+      user.id,
+      user.email,
+      {
+        emailOnNewTicket: settings.notificationPrefs.emailOnNewTicket,
+        emailOnNewComment: settings.notificationPrefs.emailOnNewComment,
+        customAppName: settings.customizationPrefs.appName,
+      }
+    );
+    setIsSaving(false);
+
+    if (result.success) {
       toast({
         title: "Configuración Guardada",
-        description: "Tus preferencias han sido actualizadas.",
+        description: result.message,
       });
-       // If you want the app header to update immediately, you might need to trigger a state update
-       // in a shared context or force a re-render. This is a simple save for now.
-       // For instance, if APP_NAME in constants were a reactive state, this could update it.
-       // Or, if APP_NAME is read from localStorage directly in the header.
-       // As it is, the saved name 'settings.customizationPrefs.appName' is stored,
-       // but APP_NAME constant in src/lib/constants.ts is what is mostly used.
-       // To reflect the change immediately in the header, the header would need to read from settings.
-       // Or, one could update a global state / context variable.
-    }, 700);
+    } else {
+      toast({
+        title: "Error al Guardar",
+        description: result.message,
+        variant: "destructive",
+      });
+    }
   };
 
   if (role !== "Admin") {
@@ -120,8 +128,17 @@ export default function SettingsPage() {
     );
   }
 
+  if (isLoadingSettings) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] p-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="mt-2 text-muted-foreground">Cargando configuración...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8"> 
+    <div className="space-y-8">
       <div className="flex flex-col space-y-2 items-start">
         <h1 className="text-3xl font-bold tracking-tight flex items-center"><SettingsIcon className="mr-3 h-8 w-8 text-primary" />Configuración General</h1>
         <p className="text-muted-foreground">
@@ -129,7 +146,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Card className="shadow-lg"> 
+      <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center"><BellRing className="mr-2 h-5 w-5 text-primary"/>Preferencias de Notificación</CardTitle>
           <CardDescription>Gestiona cómo recibes las notificaciones por correo electrónico (simuladas).</CardDescription>
@@ -152,7 +169,7 @@ export default function SettingsPage() {
 
           <div className="flex items-center justify-between space-x-2 p-4 border rounded-lg shadow-sm bg-muted/20">
             <div className="flex items-center space-x-3">
-             <MessageCircle className="h-5 w-5 text-primary" />
+              <MessageCircle className="h-5 w-5 text-primary" />
               <Label htmlFor="emailOnNewComment" className="font-medium">
                 Recibir correo para nuevos comentarios en mis tickets
               </Label>
@@ -166,8 +183,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-      
-      <Card className="shadow-lg"> 
+
+      <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center"><Paintbrush className="mr-2 h-5 w-5 text-primary"/>Personalización de la Aplicación</CardTitle>
           <CardDescription>Ajusta la apariencia y el nombre de la aplicación.</CardDescription>
@@ -183,7 +200,7 @@ export default function SettingsPage() {
               placeholder="Ej: Mi Sistema de Tickets"
             />
             <p className="text-xs text-muted-foreground pt-1">
-              Este nombre se mostrará en la cabecera y páginas de inicio de sesión/registro. (Para que el cambio sea inmediato en la cabecera actual, se requeriría un manejo de estado global).
+              Este nombre se mostrará en la cabecera y páginas de inicio de sesión/registro.
             </p>
           </div>
         </CardContent>
@@ -193,10 +210,7 @@ export default function SettingsPage() {
         <Button onClick={handleSaveSettings} disabled={isSaving} size="lg">
           {isSaving ? (
             <>
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <Loader2 className="mr-3 h-5 w-5 animate-spin text-white" />
               Guardando...
             </>
           ) : (
@@ -207,7 +221,6 @@ export default function SettingsPage() {
           )}
         </Button>
       </div>
-
     </div>
   );
 }

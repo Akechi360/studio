@@ -8,6 +8,8 @@ export interface User {
   avatarUrl?: string;
   department?: string;
   password?: string; // Should be hashed in DB
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 export type TicketPriority = "Low" | "Medium" | "High";

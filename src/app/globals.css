@@ -1,3 +1,4 @@
+/* stylelint-disable */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,99 +9,80 @@ body {
 
 @layer base {
   :root {
-    /* Minimalist Teal Theme - Light Mode */
-    --background: 180 30% 97%; /* Very light, almost white, cool cyan tint */
-    --foreground: 190 40% 22%; /* Dark teal (Casal), slightly darker for text */
-    
-    --card: 0 0% 100%; /* White */
-    --card-foreground: 190 40% 22%; /* Dark teal text on cards */
-    
-    --popover: 0 0% 100%; /* White */
-    --popover-foreground: 190 40% 22%; /* Dark teal text on popovers */
-    
-    --primary: 175 48% 50%; /* Lighter teal (Java) for primary actions */
-    --primary-foreground: 0 0% 100%; /* White text on primary for high contrast */
-    
-    --secondary: 180 20% 92%; /* Light cool gray for secondary backgrounds */
-    --secondary-foreground: 190 35% 35%; /* Muted dark teal for text on secondary */
-    
-    --muted: 180 15% 94%; /* Very light cool gray, for subtle elements */
-    --muted-foreground: 190 30% 50%; /* Medium dark teal for muted text */
-    
-    --accent: 175 48% 50%; /* Lighter teal (Java), same as primary for minimalism */
-    --accent-foreground: 0 0% 100%; /* White text on accent */
-    
-    --destructive: 0 70% 50%; /* Standard red for destructive actions */
-    --destructive-foreground: 0 0% 100%; /* White text on destructive */
-    
-    --border: 180 20% 88%; /* Light cool gray border */
-    --input: 180 25% 95%; /* Input background, slightly off-white with cyan tint */
-    --ring: 175 48% 50%; /* Lighter teal (Java) for focus rings */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 220 14% 96%;
+    --card-foreground: 222 47% 11%;
+    --popover: 220 14% 96%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 168 74% 60%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 168 74% 60%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 14% 80%;
+    --input: 220 14% 80%;
+    --ring: 168 74% 60%;
+    --radius: 0.75rem;
 
-    --chart-1: 175 48% 50%; /* Primary teal */
-    --chart-2: 190 40% 35%; /* Darker teal */
-    --chart-3: 175 48% 65%; /* Lighter primary teal */
-    --chart-4: 190 30% 50%; /* Mid-tone dark teal */
-    --chart-5: 180 10% 70%; /* Cool gray */
-    
-    --radius: 0.5rem;
+    --chart-1: 168 74% 60%;
+    --chart-2: 222 47% 11%;
+    --chart-3: 210 40% 96.1%;
+    --chart-4: 214 32% 91%;
+    --chart-5: 0 0% 100%;
+    --chart-6: 217 91% 60%; /* Azul brillante para líneas de tendencia */
 
-    /* Sidebar specific colors - Light Mode */
-    --sidebar-background: 180 25% 94%; /* Slightly darker than main background */
-    --sidebar-foreground: 190 40% 22%; /* Dark teal text */
-    --sidebar-primary: 175 48% 50%; /* Lighter teal (Java) */
-    --sidebar-primary-foreground: 0 0% 100%; /* White */
-    --sidebar-accent: 175 48% 50%; /* Lighter teal (Java) */
-    --sidebar-accent-foreground: 0 0% 100%; /* White */
-    --sidebar-border: 180 20% 85%; /* Border for sidebar */
-    --sidebar-ring: 175 48% 50%; /* Lighter teal (Java) for rings */
+    --sidebar-background: 220 14% 96%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 168 74% 60%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 220 14% 80%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 14% 80%;
+    --sidebar-ring: 168 74% 60%;
   }
 
   .dark {
-    /* Minimalist Teal Theme - Dark Mode */
-    --background: 190 30% 12%; /* Very dark teal (based on Casal) */
-    --foreground: 180 20% 90%; /* Light cool gray for text */
+    --background: 240 6% 10%;
+    --foreground: 210 40% 98%;
+    --card: 240 5% 16%;
+    --card-foreground: 210 40% 98%;
+    --popover: 240 5% 16%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 168 74% 60%;
+    --primary-foreground: 240 6% 10%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 168 74% 60%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 240 5% 20%;
+    --input: 240 5% 20%;
+    --ring: 168 74% 60%;
 
-    --card: 190 28% 15%; /* Slightly lighter dark teal for cards */
-    --card-foreground: 180 20% 90%; /* Light cool gray text on cards */
+    --chart-1: 168 74% 60%;
+    --chart-2: 240 5% 16%;
+    --chart-3: 217 33% 17%;
+    --chart-4: 240 5% 20%;
+    --chart-5: 0 0% 100%;
+    --chart-6: 217 91% 60%; /* Azul brillante para líneas de tendencia */
 
-    --popover: 190 28% 15%; /* Popover background */
-    --popover-foreground: 180 20% 90%; /* Popover text */
-
-    --primary: 175 48% 55%; /* Lighter teal (Java), slightly brightened for dark mode */
-    --primary-foreground: 190 40% 10%; /* Very dark teal for text on primary buttons */
-
-    --secondary: 190 25% 20%; /* Muted dark teal for secondary elements */
-    --secondary-foreground: 180 15% 80%; /* Lighter cool gray text on secondary */
-
-    --muted: 190 25% 22%; /* Slightly different muted dark teal */
-    --muted-foreground: 180 15% 65%; /* Medium cool gray text for muted */
-
-    --accent: 175 48% 55%; /* Lighter teal (Java), same as primary */
-    --accent-foreground: 190 40% 10%; /* Very dark teal for text on accent */
-
-    --destructive: 0 60% 50%; /* Standard red for destructive actions */
-    --destructive-foreground: 0 0% 100%; /* White text on destructive */
-
-    --border: 190 25% 25%; /* Border color in dark mode */
-    --input: 190 28% 18%; /* Input background, slightly distinct from card */
-    --ring: 175 48% 55%; /* Lighter teal (Java) for focus rings */
-    
-    --chart-1: 175 48% 55%;
-    --chart-2: 190 40% 70%; /* Lighter shade of dark teal for dark mode chart */
-    --chart-3: 175 48% 40%; /* Darker shade of primary teal for dark mode */
-    --chart-4: 190 30% 60%;
-    --chart-5: 180 10% 50%;
-
-    /* Sidebar specific colors - Dark Mode */
-    --sidebar-background: 190 30% 10%; /* Slightly darker than main dark background */
-    --sidebar-foreground: 180 20% 90%; /* Light cool gray text */
-    --sidebar-primary: 175 48% 55%; /* Lighter teal (Java) */
-    --sidebar-primary-foreground: 190 40% 10%; /* Very dark teal text */
-    --sidebar-accent: 175 48% 55%; /* Lighter teal (Java) */
-    --sidebar-accent-foreground: 190 40% 10%; /* Very dark teal text */
-    --sidebar-border: 190 25% 20%; /* Sidebar border in dark mode */
-    --sidebar-ring: 175 48% 55%; /* Ring color for sidebar */
+    --sidebar-background: 240 5% 16%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 168 74% 60%;
+    --sidebar-primary-foreground: 240 6% 10%;
+    --sidebar-accent: 240 5% 20%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 240 5% 20%;
+    --sidebar-ring: 168 74% 60%;
   }
 }
 
@@ -110,6 +92,19 @@ body {
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Custom shadows for Ammie-like elevation */
+@layer utilities {
+  .shadow-ammie {
+    @apply shadow-[0_4px_20px_-2px_rgba(0,0,0,0.1)];
+  }
+  .shadow-ammie-lg {
+    @apply shadow-[0_8px_30px_-4px_rgba(0,0,0,0.15)];
+  }
+  .shadow-ammie-xl {
+    @apply shadow-[0_12px_40px_-6px_rgba(0,0,0,0.2)];
+  }
+}
+/* stylelint-enable */

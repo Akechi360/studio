@@ -156,7 +156,7 @@ export async function registerUserServerAction(name: string, email: string, pass
         email,
         password: hashedPassword,
         role: PrismaRole.User, // Default role
-        avatarUrl: `https://placehold.co/100x100.png?text=${initials}`,
+        avatarUrl: '/bg-login.jpg',
       },
     }); // [cite: 27]
     const { password, ...userToReturn } = newUser; // [cite: 28]
@@ -1640,4 +1640,67 @@ export async function getAISolutionSuggestion(ticketDescription: string): Promis
   }
   // Simulación de respuesta
   return { suggestion: "Esta es una sugerencia generada por IA para: " + ticketDescription };
+}
+
+// --- NUEVAS ACCIONES PARA LA CONFIGURACIÓN DE USUARIO ---
+export async function getUserSettingsAction(userId: string) {
+  try {
+    const userSettings = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        emailOnNewTicket: true,
+        emailOnNewComment: true,
+        customAppName: true,
+      },
+    });
+
+    return {
+      emailOnNewTicket: userSettings?.emailOnNewTicket ?? true,
+      emailOnNewComment: userSettings?.emailOnNewComment ?? true,
+      customAppName: userSettings?.customAppName ?? null,
+    };
+  } catch (error) {
+    console.error("getUserSettingsAction Error:", error);
+    return {
+      emailOnNewTicket: true,
+      emailOnNewComment: true,
+      customAppName: null,
+    };
+  }
+}
+
+export async function updateUserSettingsAction(
+  userId: string,
+  actingUserEmail: string,
+  data: { emailOnNewTicket?: boolean, emailOnNewComment?: boolean, customAppName?: string | null }
+): Promise<{ success: boolean; message: string }> {
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        emailOnNewTicket: data.emailOnNewTicket,
+        emailOnNewComment: data.emailOnNewComment,
+        customAppName: data.customAppName,
+      },
+    });
+
+    await logAuditEvent(
+      actingUserEmail,
+      "Actualización de Configuración de Usuario",
+      `Usuario ID: ${userId}, Configuración Actualizada: ${JSON.stringify(data)}`
+    );
+
+    revalidatePath("/profile");
+    revalidatePath("/settings");
+
+    return { success: true, message: "Configuración guardada exitosamente." };
+  } catch (error) {
+    console.error("updateUserSettingsAction Error:", error);
+    await logAuditEvent(
+      actingUserEmail,
+      "Error en Actualización de Configuración de Usuario",
+      `Usuario ID: ${userId}, Error: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return { success: false, message: "Error al guardar la configuración." };
+  }
 }

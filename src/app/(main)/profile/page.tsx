@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -19,8 +18,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, UserCircle2, Lock } from 'lucide-react';
+import { Loader2, Save, UserCircle2, Lock, LogOut, Pencil, KeyRound } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const profileFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
@@ -40,10 +44,13 @@ const passwordFormSchema = z.object({
 type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 
 export default function ProfilePage() {
-  const { user, updateProfile, updateSelfPassword, isLoading: authLoading } = useAuth();
+  const { user, updateProfile, updateSelfPassword, isLoading: authLoading, logout } = useAuth();
   const { toast } = useToast();
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const router = useRouter();
+  const [editOpen, setEditOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -120,121 +127,178 @@ export default function ProfilePage() {
     return <div className="p-8">Por favor, inicia sesión para ver tu perfil.</div>;
   }
 
-  return (
-    <div> {/* Root container for the page content */}
-      <div className="max-w-3xl mx-auto space-y-8"> {/* Centering and max-width container */}
-        <div className="flex flex-col items-start"> {/* Title block */}
-          <h1 className="text-3xl font-bold tracking-tight flex items-center">
-            <UserCircle2 className="mr-3 h-8 w-8 text-primary" />Tu Perfil
-          </h1>
-          <p className="text-muted-foreground">
-            Gestiona la configuración de tu cuenta e información personal.
-          </p>
-        </div>
+  // Datos a mostrar
+  const userData = [
+    { label: "Nombre", value: user.name },
+    { label: "Email", value: user.email },
+    { label: "Rol", value: user.role === "Admin" ? "Administrador" : "Usuario" },
+    { label: "Departamento", value: user.department || "-" },
+  ];
 
-        <Card className="shadow-xl"> {/* Card 1: Profile Info */}
-          <CardHeader className="items-center text-center">
-            <Avatar className="h-24 w-24 mb-4 ring-2 ring-primary ring-offset-2 ring-offset-background">
-              <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} data-ai-hint="foto perfil"/>
-              <AvatarFallback className="text-3xl">{getInitials(user.name)}</AvatarFallback>
-            </Avatar>
-            <CardTitle className="text-2xl">{user.name}</CardTitle>
-            <CardDescription>{user.role === "Admin" ? "Administrador" : "Usuario"}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...profileForm}>
-              <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
-                <FormField
-                  control={profileForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nombre</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Tu nombre completo" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={profileForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Dirección de Correo Electrónico</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="tu.email@ejemplo.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="sm:w-auto" disabled={isSubmittingProfile || authLoading}>
+  return (
+    <div className="min-h-screen bg-background py-10">
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center"><Pencil className="mr-2 h-6 w-6 text-primary" />Editar Perfil</DialogTitle>
+            <DialogDescription>Modifica tu nombre y correo electrónico.</DialogDescription>
+          </DialogHeader>
+          <Form {...profileForm}>
+            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6 py-2">
+              <FormField
+                control={profileForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre</FormLabel>
+                    <FormControl>
+                      <Input className="rounded-lg" placeholder="Tu nombre completo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={profileForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dirección de Correo Electrónico</FormLabel>
+                    <FormControl>
+                      <Input className="rounded-lg" type="email" placeholder="tu.email@ejemplo.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter className="pt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancelar</Button>
+                </DialogClose>
+                <Button type="submit" className="rounded-lg px-6 py-2 text-base font-semibold shadow-ammie" disabled={isSubmittingProfile || authLoading}>
                   {isSubmittingProfile ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Save className="mr-2 h-4 w-4" />
                   )}
-                  Guardar Cambios de Perfil
+                  Guardar Cambios
                 </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-xl"> {/* Card 2: Password Change */}
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center">
-              <Lock className="mr-2 h-5 w-5 text-primary" />
-              Cambiar Contraseña
-            </CardTitle>
-            <CardDescription>
-              Actualiza tu contraseña de acceso.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...passwordForm}>
-              <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6">
-                <FormField
-                  control={passwordForm.control}
-                  name="newPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nueva Contraseña</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={passwordForm.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirmar Nueva Contraseña</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <Button type="submit" className="sm:w-auto" disabled={isSubmittingPassword || authLoading}>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center"><KeyRound className="mr-2 h-6 w-6 text-primary" />Cambiar Contraseña</DialogTitle>
+            <DialogDescription>Actualiza tu contraseña de acceso.</DialogDescription>
+          </DialogHeader>
+          <Form {...passwordForm}>
+            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6 py-2">
+              <FormField
+                control={passwordForm.control}
+                name="newPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nueva Contraseña</FormLabel>
+                    <FormControl>
+                      <Input className="rounded-lg" type="password" placeholder="Nueva contraseña" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={passwordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar Contraseña</FormLabel>
+                    <FormControl>
+                      <Input className="rounded-lg" type="password" placeholder="Repite la nueva contraseña" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter className="pt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancelar</Button>
+                </DialogClose>
+                <Button type="submit" className="rounded-lg px-6 py-2 text-base font-semibold shadow-ammie" disabled={isSubmittingPassword || authLoading}>
                   {isSubmittingPassword ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Save className="mr-2 h-4 w-4" />
                   )}
-                  Actualizar Contraseña
+                  Cambiar Contraseña
                 </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      </div> {/* End of centering container */}
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Columna izquierda: Perfil y menú */}
+        <div className="flex flex-col gap-6 md:col-span-1">
+          {/* Card de perfil */}
+          <div className="bg-card rounded-xl shadow-ammie p-8 flex flex-col items-center">
+            <Avatar className="h-28 w-28 mb-4 ring-4 ring-primary ring-offset-4 ring-offset-card shadow-lg bg-background">
+              <AvatarImage src={user.avatarUrl || `https://placehold.co/100x100.png?text=${getInitials(user.name)}`} alt={user.name || 'Usuario'} />
+              <AvatarFallback className="text-3xl">{getInitials(user.name)}</AvatarFallback>
+            </Avatar>
+            <div className="text-xl font-bold text-foreground mb-1">{user.name}</div>
+            <div className="text-muted-foreground mb-2">{user.email}</div>
+            {/* Fechas de creación y actualización */}
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground text-center">
+              <p>
+                <span className="font-medium text-foreground">Fecha de Creación:</span>{' '}
+                {user.createdAt ? format(new Date(user.createdAt), "PPpp", { locale: es }) : 'N/A'}
+              </p>
+              <p>
+                <span className="font-medium text-foreground">Última Actualización:</span>{' '}
+                {user.updatedAt ? format(new Date(user.updatedAt), "PPpp", { locale: es }) : 'N/A'}
+              </p>
+            </div>
+          </div>
+          {/* Menú lateral */}
+          <div className="bg-card rounded-xl shadow-ammie p-6">
+            <ul className="space-y-3">
+              <li className="flex items-center gap-2 font-semibold text-primary"><UserCircle2 className="h-5 w-5" />Mi Perfil</li>
+              <li>
+                <Button variant="outline" className="w-full flex items-center gap-2 justify-start text-foreground" onClick={() => setEditOpen(true)}>
+                  <Pencil className="h-5 w-5 text-primary" />Editar Perfil
+                </Button>
+              </li>
+              <li>
+                <Button variant="outline" className="w-full flex items-center gap-2 justify-start text-foreground" onClick={() => setPasswordOpen(true)}>
+                  <KeyRound className="h-5 w-5 text-primary" />Cambiar Contraseña
+                </Button>
+              </li>
+              <li>
+                <Button variant="destructive" className="w-full flex items-center gap-2 justify-start" onClick={logout}>
+                  <LogOut className="h-5 w-5" />Cerrar Sesión
+                </Button>
+              </li>
+            </ul>
+          </div>
+        </div>
+        {/* Columna derecha: Datos de usuario */}
+        <div className="md:col-span-2">
+          <div className="bg-card rounded-xl shadow-ammie p-8">
+            <div className="text-2xl font-bold mb-6 text-foreground">Mi Perfil</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {userData.map((item) => (
+                <div key={item.label} className="flex flex-col gap-1">
+                  <span className="text-sm text-muted-foreground">{item.label}</span>
+                  <span className="bg-muted/60 rounded-md px-3 py-2 font-semibold text-foreground text-base border border-border">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

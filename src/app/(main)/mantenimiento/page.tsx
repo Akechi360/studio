@@ -15,6 +15,7 @@ import { es } from 'date-fns/locale';
 import type { CasoDeMantenimiento, CasoMantenimientoStatus, CasoMantenimientoPriority, CasoMantenimientoLogEntry } from '@/lib/types';
 import { getAllCasosMantenimientoAction } from '@/lib/actions';
 import { CreateCasoMantenimientoDialog } from '@/components/mantenimiento/CreateCasoMantenimientoDialog';
+import { Loading } from '@/components/ui/loading';
 
 const statusColors: Record<CasoMantenimientoStatus, string> = {
   'Registrado': "bg-blue-500",
@@ -135,10 +136,7 @@ export default function MantenimientoPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-center justify-center py-10 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin mr-3" />
-              Cargando casos de mantenimiento...
-            </div>
+            <Loading message="Cargando casos de mantenimiento..." variant="circles" size="md" />
           ) : casos.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
               <ServerCrash className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -147,12 +145,6 @@ export default function MantenimientoPage() {
                 Actualmente no hay casos de mantenimiento en el sistema.
                 {canCreateOrEdit && " Puedes registrar uno nuevo."}
               </p>
-              {canCreateOrEdit && (
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Registra Tu Primer Caso
-                </Button>
-              )}
             </div>
           ) : (
             <Table>

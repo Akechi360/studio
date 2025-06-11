@@ -66,6 +66,9 @@ export default {
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
+  		fontFamily: {
+  			sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+  		},
   		keyframes: {
   			'accordion-down': {
   				from: {
@@ -87,6 +90,11 @@ export default {
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out'
+  		},
+  		boxShadow: {
+  			'ammie': '0 4px 20px -2px rgba(0, 0, 0, 0.1)',
+  			'ammie-lg': '0 8px 30px -4px rgba(0, 0, 0, 0.15)',
+  			'ammie-xl': '0 12px 40px -6px rgba(0, 0, 0, 0.2)',
   		}
   	}
   },

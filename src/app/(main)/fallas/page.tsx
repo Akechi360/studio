@@ -1,13 +1,18 @@
-
 "use client";
 
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
-import { ShieldAlert, Bug } from 'lucide-react';
+import { ShieldAlert, Bug, Printer } from 'lucide-react';
+import { useState } from 'react';
+import FallaList from '@/components/fallas/FallaList';
+import { Button } from '@/components/ui/button';
+import { CreateFallaDialog } from '@/components/fallas/CreateFallaDialog';
 
 export default function FallasPage() {
   const { user } = useAuth();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [filtros, setFiltros] = useState({});
 
   const canAccessModule =
     user &&
@@ -29,6 +34,11 @@ export default function FallasPage() {
     );
   }
 
+  // Handler para imprimir (puedes personalizarlo)
+  function handlePrint() {
+    window.print();
+  }
+
   return (
     <div className="space-y-8 w-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -38,26 +48,38 @@ export default function FallasPage() {
             Gestión de Fallas
           </h1>
           <p className="text-muted-foreground">
-            Módulo para el reporte y seguimiento de fallas de equipos. (En Desarrollo)
+            Administra y supervisa los reportes de fallas de equipos médicos.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            size="lg"
+            className="shadow-md"
+          >
+            + Reportar Falla
+          </Button>
+          <Button
+            onClick={handlePrint}
+            size="lg"
+            variant="secondary"
+            className="shadow-md hover:shadow-lg transition-shadow flex items-center gap-2"
+          >
+            <Printer className="h-5 w-5" />
+            <span>Imprimir</span>
+          </Button>
+        </div>
       </div>
-
+      <CreateFallaDialog isOpen={isCreateDialogOpen} onClose={() => setIsCreateDialogOpen(false)} onFallaCreated={() => window.location.reload()} />
       <Card className="shadow-lg w-full">
         <CardHeader>
-          <CardTitle>Listado de Fallas</CardTitle>
+          <CardTitle>Lista de Fallas</CardTitle>
           <CardDescription>
-            Aquí se mostrarán las fallas reportadas.
+            Casos reportados y en seguimiento.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
-            <Bug className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h3 className="mt-4 text-xl font-semibold">Módulo en Construcción</h3>
-            <p className="mb-4 mt-2 text-sm text-muted-foreground">
-              La funcionalidad completa para la gestión de fallas se implementará próximamente.
-            </p>
-          </div>
+          <FallaList filtros={filtros} />
         </CardContent>
       </Card>
     </div>

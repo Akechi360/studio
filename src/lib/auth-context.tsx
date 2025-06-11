@@ -25,6 +25,12 @@ export const SPECIFIC_APPROVER_EMAILS = [
   "suministros@clinicaieq.com",
 ];
 
+export const SPECIFIC_INVENTORY_EMAILS = [
+  "electromedicina@clinicaieq.com",
+  "suministros@clinicaieq.com",
+  "gerencia_administracion@clinicaieq.com",
+];
+
 interface AuthContextType {
   user: User | null;
   role: Role | null;
@@ -60,26 +66,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const checkUserSession = async () => {
       setIsLoading(true);
       try {
-        const storedUserJson = localStorage.getItem("ticketflow_user");
-        if (storedUserJson) {
-          const parsedUserFromStorage = JSON.parse(storedUserJson) as User;
-          if (parsedUserFromStorage && parsedUserFromStorage.id) {
-             const freshUser = await getUserByIdServerAction(parsedUserFromStorage.id);
-             if (freshUser) {
-                setUser(cleanUser(freshUser));
-             } else {
-                localStorage.removeItem("ticketflow_user"); 
-                setUser(null);
-             }
-          } else {
-            setUser(null);
-          }
-        } else {
-            setUser(null);
-        }
+        // Eliminar cualquier referencia a localStorage
+        // Siempre obtener el usuario desde la base de datos
+        // Si tienes un token de sesión, úsalo aquí para autenticar la petición
+        // Por ahora, asumimos que el usuario está autenticado y su id está en memoria
+        // Si no hay usuario en memoria, no hay sesión
+        // Si tienes un flujo de autenticación basado en cookies o JWT, aquí deberías validar la sesión
+        setUser(null); // Por defecto, sin usuario
+        // Si tienes un endpoint para obtener el usuario actual autenticado, úsalo aquí
+        // Ejemplo: const freshUser = await getCurrentUserServerAction();
+        // if (freshUser) setUser(cleanUser(freshUser));
       } catch (error) {
         console.error("Error checking user session:", error);
-        localStorage.removeItem("ticketflow_user");
         setUser(null);
       }
       setIsLoading(false);
@@ -93,10 +91,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
     if (result.success && result.user) {
       setUser(cleanUser(result.user));
-      localStorage.setItem("ticketflow_user", JSON.stringify(result.user));
+      // No guardar en localStorage
       return true;
     }
-    // logAuditEvent is called within loginUserServerAction
     return false;
   };
 
@@ -105,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await logAuditEvent(user.email, "Cierre de Sesión");
     }
     setUser(null);
-    localStorage.removeItem("ticketflow_user");
+    // No eliminar de localStorage
     router.push("/login");
   };
 
@@ -115,10 +112,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
     if (result.success && result.user) {
       setUser(cleanUser(result.user));
-      localStorage.setItem("ticketflow_user", JSON.stringify(result.user));
+      // No guardar en localStorage
       return true;
     }
-    // logAuditEvent is called within registerUserServerAction
     return false;
   };
 
@@ -129,7 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
     if (result.success && result.user) {
       setUser(cleanUser(result.user));
-      localStorage.setItem("ticketflow_user", JSON.stringify(result.user));
+      // No guardar en localStorage
       return true;
     }
     return false;
@@ -155,6 +151,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Convertir los usuarios al tipo User esperado
     return users.map(user => ({
       ...user,
+      role: user.role as Role,
       avatarUrl: user.avatarUrl || undefined,
       department: user.department || undefined
     }));

@@ -29,7 +29,7 @@ import {
   Wrench,
   Bug,
 } from "lucide-react";
-import { useAuth, SPECIFIC_APPROVER_EMAILS } from "@/lib/auth-context";
+import { useAuth, SPECIFIC_APPROVER_EMAILS, SPECIFIC_INVENTORY_EMAILS } from "@/lib/auth-context";
 import type { Role, User as UserType } from "@/lib/types";
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -86,7 +86,11 @@ const navItems: NavItem[] = [
       currentUser.role === "Presidente" ||
       currentUser.email === "electromedicina@clinicaieq.com"),
   },
-  { href: "/inventory", label: "Inventario", icon: Archive, exact: true, allowedRoles: ["Admin"] },
+  { href: "/inventory", label: "Inventario", icon: Archive, exact: true, 
+    specialAccessCheck: (currentUser) =>
+      !!currentUser && (currentUser.role === "Admin" ||
+      (currentUser.email ? SPECIFIC_INVENTORY_EMAILS.includes(currentUser.email) : false))
+  },
   { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["Admin"] },
   { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true, allowedRoles: ["User", "Admin"] },
   { href: "/profile", label: "Perfil", icon: User, exact: true },

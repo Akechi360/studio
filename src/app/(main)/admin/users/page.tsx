@@ -195,13 +195,10 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
     if (data.password && data.password.trim() !== "") {
         updateData.password = data.password;
     } else {
-      // If password field is submitted empty, we don't want to send it as part of the update,
-      // implying the password should remain unchanged.
-      // However, our mock logic in auth-context might need specific handling for this.
-      // For now, if it's empty, we don't include it.
-      // If the intent is to *clear* a password, that's a different operation.
+      // Si el campo de contraseña está vacío, no lo enviamos como parte de la actualización,
+      // lo que implica que la contraseña debe permanecer sin cambios.
+      delete updateData.password;
     }
-
 
     const result = await updateUserByAdmin(userToEdit.id, updateData as Partial<Pick<User, 'name' | 'role' | 'email' | 'department' | 'password'>>);
     setIsSubmitting(false);
@@ -353,10 +350,10 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
                   <FormItem>
                     <FormLabel className="flex items-center">
                         <LockKeyhole className="mr-2 h-4 w-4 text-muted-foreground" />
-                        Contraseña (dejar en blanco para no cambiar)
+                        Contraseña (Dejar en blanco para mantener la contraseña actual)
                     </FormLabel>
                     <FormControl>
-                      <Input type="text" placeholder="••••••••" {...field} value={field.value || ''} />
+                      <Input type="password" placeholder="Dejar en blanco para mantener la contraseña actual" showPasswordToggle {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -4,22 +4,13 @@
 import { useAuth } from '@/lib/auth-context';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ShieldAlert, ClipboardList, History, Search, Loader2, Printer } from 'lucide-react'; // Added Printer icon
+import { ShieldAlert, ClipboardList, History, Search, Loader2, Printer } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState, useEffect, useCallback } from 'react';
-import { getAuditLogs } from '@/lib/actions'; // Import server action to get logs
+import { getAuditLogs } from '@/lib/actions';
 import type { AuditLogEntry as AuditLogEntryPrismaType } from '@prisma/client';
-
-// Interface for AuditLog moved to mock-data.ts for consistency
-// interface AuditLogEntry {
-//   id: string;
-//   timestamp: string; // ISO string
-//   user: string; // email or user ID/name
-//   action: string;
-//   details?: string;
-// }
 
 const initialLogs: AuditLogEntryPrismaType[] = [];
 
@@ -34,8 +25,8 @@ export default function AuditLogPage() {
   const fetchAuditLogs = useCallback(async () => {
     setIsLoading(true);
     try {
-      const logsFromServer = await getAuditLogs(); // Esto devuelve AuditLogEntryPrismaType[]
-      setAuditLogs(logsFromServer); // Asignación directa
+      const logsFromServer = await getAuditLogs();
+      setAuditLogs(logsFromServer);
     } catch (error) {
       console.error("Error fetching audit logs:", error);
     } finally {
@@ -50,16 +41,12 @@ export default function AuditLogPage() {
   }, [role, fetchAuditLogs]);
 
   const filteredLogs = auditLogs.filter(log => {
-    // log ahora es de tipo AuditLogEntryPrismaType
-    // log.timestamp de Prisma es un objeto Date
-    const logDate = log.timestamp; // No es necesario new Date() si ya es un objeto Date
+    const logDate = log.timestamp;
     const fromDate = dateFrom ? new Date(dateFrom) : null;
     const toDate = dateTo ? new Date(new Date(dateTo).setHours(23, 59, 59, 999)) : null;
 
     const searchTermLower = searchTerm.toLowerCase();
 
-    // ***** PUNTO CLAVE DE CORRECCIÓN: Lógica de Filtrado *****
-    // Se usa log.userEmail en lugar de log.user
     const matchesSearchTerm = (
       (log.userEmail && log.userEmail.toLowerCase().includes(searchTermLower)) ||
       log.action.toLowerCase().includes(searchTermLower) ||
@@ -93,7 +80,7 @@ export default function AuditLogPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"> {/* Added flex container */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center">
             <ClipboardList className="mr-3 h-8 w-8 text-primary" />
@@ -103,10 +90,9 @@ export default function AuditLogPage() {
             Registro detallado de todas las acciones importantes realizadas en el sistema.
           </p>
         </div>
-        {/* Botón de Imprimir */}
         <Button onClick={handlePrint} size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow">
-            <Printer className="mr-2 h-5 w-5" />
-            Imprimir
+          <Printer className="mr-2 h-5 w-5" />
+          Imprimir
         </Button>
       </div>
 
@@ -157,11 +143,9 @@ export default function AuditLogPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLogs.map((log) => ( // log aquí es AuditLogEntryPrismaType
+                {filteredLogs.map((log) => (
                   <TableRow key={log.id}>
                     <TableCell>{new Date(log.timestamp).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}</TableCell>
-                    {/* ***** PUNTO CLAVE DE CORRECCIÓN: Renderizado en Tabla ***** */}
-                    {/* Se usa log.userEmail en lugar de log.user */}
                     <TableCell>{log.userEmail}</TableCell>
                     <TableCell>{log.action}</TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-md truncate" title={log.details || undefined}>{log.details}</TableCell>

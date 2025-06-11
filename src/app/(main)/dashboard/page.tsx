@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -6,12 +5,13 @@ import { useAuth } from '@/lib/auth-context';
 import { getAllTickets, getApprovalRequestsForUser } from '@/lib/actions';
 import type { Ticket, TicketPriority, ApprovalRequest } from '@/lib/types';
 import { TicketListItem } from '@/components/tickets/ticket-list-item';
-import { ApprovalRequestListItem } from '@/components/approvals/approval-request-list-item'; // Import the new component
-import { Loader2, Ticket as TicketIcon, ListChecks, AlertCircle, FileCheck } from 'lucide-react';
+import { ApprovalRequestListItem } from '@/components/approvals/approval-request-list-item';
+import { Ticket as TicketIcon, ListChecks, AlertCircle, FileCheck } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Loading } from '@/components/ui/loading';
 
 export default function DashboardPage() {
   const { user, role } = useAuth();
@@ -77,7 +77,7 @@ export default function DashboardPage() {
   if (isLoadingTickets && !user) { 
     return (
       <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <Loading message="Cargando tickets..." variant="circles" size="md" />
       </div>
     );
   }
@@ -113,8 +113,7 @@ export default function DashboardPage() {
           <CardContent>
             {isLoadingApprovals ? (
               <div className="flex items-center justify-center py-10">
-                <Loader2 className="mr-3 h-5 w-5 animate-spin text-primary" />
-                <span>Cargando aprobaciones pendientes...</span>
+                <Loading message="Cargando aprobaciones pendientes..." variant="circles" size="md" />
               </div>
             ) : pendingApprovals.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground">
@@ -134,10 +133,7 @@ export default function DashboardPage() {
       )}
 
       {(isLoadingTickets && (role === 'Admin' || role === 'User')) && (
-        <div className="flex flex-col items-center justify-center p-8">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="mt-2 text-muted-foreground">Cargando tickets...</p>
-        </div>
+        <Loading message="Cargando tickets..." variant="circles" size="md" />
       )}
 
       {!isLoadingTickets && role === 'Admin' && (

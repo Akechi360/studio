@@ -1,4 +1,3 @@
-
 import { PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -22,7 +21,7 @@ async function main() {
       role: Role.Admin,
       department: 'Sistemas',
       password: hashedPasswordAdmin,
-      avatarUrl: 'https://placehold.co/100x100.png?text=SC',
+      avatarUrl: '/bg-login.jpg',
     },
   });
   console.log('Admin user sistemas@clinicaieq.com created/ensured.');
@@ -40,7 +39,7 @@ async function main() {
       role: Role.Presidente,
       department: 'Presidente',
       password: hashedPasswordPresidente,
-      avatarUrl: 'https://placehold.co/100x100.png?text=PI',
+      avatarUrl: '/bg-login.jpg',
     },
   });
   console.log('User presidente@clinicaieq.com created/ensured.');
@@ -100,7 +99,7 @@ async function main() {
         role: approver.role,
         department: approver.department,
         password: hashedPassword,
-        avatarUrl: approver.avatarUrl,
+        avatarUrl: '/bg-login.jpg',
       },
     });
     console.log(`Approver user ${approver.email} created/ensured.`);

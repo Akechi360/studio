@@ -1,12 +1,12 @@
-
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -21,7 +21,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import { APP_NAME } from '@/lib/constants';
-import { LogIn, Loader2, Hospital } from 'lucide-react';
+import { LogIn, Loader2, Hospital, Sun, Moon } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce una dirección de correo válida." }),
@@ -35,6 +37,12 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const { theme, setTheme } = useTheme() ?? { theme: 'light', setTheme: () => {} };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -64,11 +72,33 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="text-center">
+    <div className="relative min-h-screen flex items-center justify-center">
+      {/* Fondo de imagen */}
+      <div className="absolute inset-0 -z-10">
+        <img
+          src="/bg-login.jpg"
+          alt="Fondo IEQ"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-black/60" />
+      </div>
+      {/* Card principal */}
+      <Card className="w-full max-w-md bg-background/80 backdrop-blur-sm shadow-md relative">
+        {mounted && typeof setTheme === 'function' && (
+          <div className="absolute top-6 right-6 flex items-center space-x-2 text-foreground">
+            <Label htmlFor="dark-mode-login-switch" className="text-sm font-medium">
+              {theme === 'dark' ? "Modo Claro" : "Modo Oscuro"}
+            </Label>
+            <Switch
+              id="dark-mode-login-switch"
+              checked={theme === 'dark'}
+              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+            />
+          </div>
+        )}
+        <CardHeader className="text-center pt-10">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-             <Hospital className="h-8 w-8" />
+            <Hospital className="h-8 w-8" />
           </div>
           <CardTitle className="text-3xl font-bold">{APP_NAME}</CardTitle>
           <CardDescription>Tu Centro de Soluciones Administrativas.</CardDescription>
@@ -104,7 +134,7 @@ export default function LoginPage() {
                         </Link>
                     </div>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
+                      <Input type="password" placeholder="••••••••" showPasswordToggle {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

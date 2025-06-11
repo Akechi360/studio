@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -13,21 +12,21 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
-import { LogOut, UserCircle, Settings, Sun, Moon, Hospital } from 'lucide-react';
+import { LogOut, UserCircle, Settings, Hospital } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { APP_NAME } from '@/lib/constants';
-import { useTheme } from 'next-themes'; 
+import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from 'react';
-
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 export function AppHeader() {
   const { user, logout } = useAuth();
   const { isMobile } = useSidebar();
   const [mounted, setMounted] = useState(false);
-  const { theme, setTheme } = useTheme() ?? { theme: 'light', setTheme: () => {} }; 
+  const { theme, setTheme } = useTheme() ?? { theme: 'light', setTheme: () => {} };
 
   useEffect(() => setMounted(true), []);
-
 
   const getInitials = (name?: string) => {
     if (!name) return '??';
@@ -35,7 +34,7 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-md md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-md w-full">
       {isMobile && <SidebarTrigger />}
       <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold md:text-base">
         <Hospital className="h-7 w-7 text-primary"/>
@@ -43,15 +42,18 @@ export function AppHeader() {
       </Link>
       <div className="ml-auto flex items-center gap-4">
         {mounted && typeof setTheme === 'function' && (
-            <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                aria-label="Cambiar tema"
-            >
-                {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-            </Button>
+          <div className="flex items-center space-x-2 text-foreground">
+            <Label htmlFor="dark-mode-header-switch" className="text-sm font-medium">
+              {theme === 'dark' ? "Modo Claro" : "Modo Oscuro"}
+            </Label>
+            <Switch
+              id="dark-mode-header-switch"
+              checked={theme === 'dark'}
+              onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+            />
+          </div>
         )}
+        
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
