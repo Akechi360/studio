@@ -29,8 +29,6 @@ export interface ApprovalRequest {
   status: ApprovalStatus;
   createdAt: Date;
   updatedAt: Date;
-  totalPaidAmount: number;
-  remainingAmount: number;
   nextDueDate?: Date;
   hasOverduePayments: boolean;
   // ... resto de campos existentes

@@ -10,19 +10,66 @@ export function cn(...inputs: ClassValue[]) {
 
 export async function generateSequentialId(prefix: string): Promise<string> {
   // Obtener el último ID de la base de datos según el prefijo
-  const lastItem = await prisma.$queryRaw`
-    SELECT "displayId" FROM "${prefix.toLowerCase()}"
-    ORDER BY CAST(SUBSTRING("displayId" FROM LENGTH('${prefix}-') + 1) AS INTEGER) DESC
-    LIMIT 1
-  `;
+  let lastNumber = 0;
   
-  // Extraer el número del último ID o empezar desde 1
-  const lastNumber = lastItem?.[0]?.displayId 
-    ? parseInt(lastItem[0].displayId.split('-')[1])
-    : 0;
+  try {
+    switch(prefix.toLowerCase()) {
+      case 'ticket':
+        const lastTicket = await prisma.ticket.findFirst({
+          select: { displayId: true },
+          orderBy: { displayId: 'desc' }
+        });
+        if (lastTicket?.displayId) {
+          lastNumber = parseInt(lastTicket.displayId.split('-')[1]);
+        }
+        break;
+      case 'appr':
+        const lastApproval = await prisma.approvalRequest.findFirst({
+          select: { displayId: true },
+          orderBy: { displayId: 'desc' }
+        });
+        if (lastApproval?.displayId) {
+          lastNumber = parseInt(lastApproval.displayId.split('-')[1]);
+        }
+        break;
+      case 'comment':
+        const lastComment = await prisma.comment.findFirst({
+          select: { displayId: true },
+          orderBy: { displayId: 'desc' }
+        });
+        if (lastComment?.displayId) {
+          lastNumber = parseInt(lastComment.displayId.split('-')[1]);
+        }
+        break;
+      case 'inv':
+        const lastInventory = await prisma.inventoryItem.findFirst({
+          select: { displayId: true },
+          orderBy: { displayId: 'desc' }
+        });
+        if (lastInventory?.displayId) {
+          lastNumber = parseInt(lastInventory.displayId.split('-')[1]);
+        }
+        break;
+      case 'audit':
+        const lastAudit = await prisma.auditLogEntry.findFirst({
+          select: { displayId: true },
+          orderBy: { displayId: 'desc' }
+        });
+        if (lastAudit?.displayId) {
+          lastNumber = parseInt(lastAudit.displayId.split('-')[1]);
+        }
+        break;
+    }
+  } catch (error) {
+    console.error(`Error getting last ${prefix} ID:`, error);
+    // Si hay error, usar timestamp como fallback
+    return `${prefix}-${Date.now()}`;
+  }
   
   // Generar el nuevo número secuencial
   const newNumber = lastNumber + 1;
   
-  return `${prefix}-${newNumber}`;
+  // Agregar timestamp para evitar colisiones
+  const timestamp = Date.now();
+  return `${prefix}-${newNumber}-${timestamp}`;
 }

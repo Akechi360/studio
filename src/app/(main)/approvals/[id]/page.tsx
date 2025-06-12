@@ -1,19 +1,12 @@
 // src/app/(main)/approvals/page.tsx
-"use client";
-
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileCheck, ShoppingCart, CreditCard, ShieldAlert, ListChecks, Loader2, Printer } from "lucide-react"; // Added Printer icon
-import { useAuth, SPECIFIC_APPROVER_EMAILS } from '@/lib/auth-context';
 import { Alert, AlertDescription, AlertTitle as RadixAlertTitle } from '@/components/ui/alert';
-import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
-import type { ApprovalRequest } from "@/lib/types";
-import { CreatePurchaseRequestDialog } from "@/components/approvals/CreatePurchaseRequestDialog";
-import { CreatePaymentRequestDialog } from "@/components/approvals/CreatePaymentRequestDialog";
-import { getApprovalRequestsForUser } from "@/lib/actions";
+import { getApprovalRequestsForUser, getApprovalRequestById } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
+import { notFound } from "next/navigation";
 
 function AccessDeniedMessage() {
   return (
@@ -29,93 +22,7 @@ function AccessDeniedMessage() {
   );
 }
 
-export default function ApprovalsPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
-  const [submittedRequests, setSubmittedRequests] = useState<ApprovalRequest[]>([]);
-  const [isLoadingPresidente, setIsLoadingPresidente] = useState(false);
-  const [isLoadingSubmitted, setIsLoadingSubmitted] = useState(false);
-  const [isCreatePurchaseDialogOpen, setIsCreatePurchaseDialogOpen] = useState(false);
-  const [isCreatePaymentDialogOpen, setIsCreatePaymentDialogOpen] = useState(false);
-
-  const canAccessApprovals =
-    user?.role === "Admin" ||
-    user?.role === "Presidente" ||
-    (user?.email ? SPECIFIC_APPROVER_EMAILS.includes(user.email) : false);
-
-  const fetchPresidenteRequests = async () => {
-    if (user?.role === "Presidente" && user.id) {
-      setIsLoadingPresidente(true);
-      const requests = await getApprovalRequestsForUser(user.id, user.role);
-      setPendingApprovals(requests);
-      setIsLoadingPresidente(false);
-    } else {
-      setPendingApprovals([]);
-      setIsLoadingPresidente(false);
-    }
-  };
-
-  const fetchSubmittedRequests = async () => {
-    if (user && user.id && user.role && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente") {
-      setIsLoadingSubmitted(true);
-      const requests = await getApprovalRequestsForUser(user.id, user.role);
-      setSubmittedRequests(requests);
-      setIsLoadingSubmitted(false);
-    } else {
-      setSubmittedRequests([]);
-      setIsLoadingSubmitted(false);
-    }
-  };
-
-
-  useEffect(() => {
-    if (!canAccessApprovals) {
-        setPendingApprovals([]);
-        setSubmittedRequests([]);
-        setIsLoadingPresidente(false);
-        setIsLoadingSubmitted(false);
-        return;
-    }
-
-    if (user?.role === "Presidente") {
-        fetchPresidenteRequests();
-        setSubmittedRequests([]); // President doesn't see "submitted by them" here
-    } else if (user && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email)))) {
-        fetchSubmittedRequests();
-        setPendingApprovals([]); // Admins/Approvers don't see "pending for president" here
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, canAccessApprovals]);
-
-
-  if (!canAccessApprovals) {
-    return <AccessDeniedMessage />;
-  }
-
-  const handleNewPurchaseRequest = () => {
-    setIsCreatePurchaseDialogOpen(true);
-  };
-
-  const handleNewPaymentRequest = () => {
-    setIsCreatePaymentDialogOpen(true);
-  };
-
-  const handleRequestSuccess = async (approvalId: string) => {
-    console.log("Request created successfully with ID:", approvalId);
-    if (user?.role === "Presidente") {
-        fetchPresidenteRequests();
-    } else if (user && (user.role === "Admin" || (user.email && SPECIFIC_APPROVER_EMAILS.includes(user.email)))) {
-        fetchSubmittedRequests();
-    }
-    setIsCreatePurchaseDialogOpen(false);
-    setIsCreatePaymentDialogOpen(false);
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
+export default async function ApprovalsPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -129,135 +36,69 @@ export default function ApprovalsPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <Button onClick={handleNewPurchaseRequest} size="lg" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+            <Button size="lg" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
                 <ShoppingCart className="mr-2 h-5 w-5" />
                 Compras
             </Button>
-            <Button onClick={handleNewPaymentRequest} size="lg" variant="outline" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+            <Button size="lg" variant="outline" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
                 <CreditCard className="mr-2 h-5 w-5" />
                 Pago a Proveedores
             </Button>
             {/* Botón de Imprimir */}
-            <Button onClick={handlePrint} size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
+            <Button size="lg" variant="secondary" className="shadow-md hover:shadow-lg transition-shadow w-full sm:w-auto">
                 <Printer className="mr-2 h-5 w-5" />
                 Imprimir
             </Button>
         </div>
       </div>
 
-      {user?.role === "Presidente" && (
-        <Card className="shadow-lg w-full">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-                <ListChecks className="mr-2 h-6 w-6 text-primary" />
-                Mis Solicitudes Pendientes de Aprobación
-            </CardTitle>
-            <CardDescription>
-              Aquí se listarán las solicitudes que requieren tu acción.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingPresidente ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="mr-3 h-5 w-5 animate-spin text-primary" />
-                <span>Cargando solicitudes...</span>
-              </div>
-            ) : pendingApprovals.length === 0 ? (
-              <div className="text-center py-10">
-                <ListChecks className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                <p className="font-semibold">No tienes solicitudes pendientes de aprobación en este momento.</p>
-              </div>
-            ) : (
-              <ul className="space-y-3">
-                {pendingApprovals.map(req => (
-                    <li key={req.id} className="p-4 border rounded-md shadow-sm hover:shadow-md transition-shadow bg-muted/20">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-semibold text-primary">{req.subject}</h3>
-                            <Badge variant={req.type === "Compra" ? "default" : "secondary"}>{req.type}</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">Solicitante: {req.requesterName}</p>
-                        <p className="text-sm text-muted-foreground">Fecha Solicitud: {new Date(req.createdAt).toLocaleDateString('es-ES')}</p>
-                        {req.type === "Compra" && req.estimatedPrice && (
-                            <p className="text-sm text-muted-foreground">Monto Est.: {req.estimatedPrice.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
-                        )}
-                        {req.type === "PagoProveedor" && req.totalAmountToPay && (
-                            <p className="text-sm text-muted-foreground">Monto a Pagar: {req.totalAmountToPay.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
-                        )}
-                        <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" asChild>
-                            <Link href={`/approvals/${req.id}`}>Ver Detalles</Link>
-                        </Button>
-                    </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <Card className="shadow-lg w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+              <ListChecks className="mr-2 h-6 w-6 text-primary" />
+              Mis Solicitudes Pendientes de Aprobación
+          </CardTitle>
+          <CardDescription>
+            Aquí se listarán las solicitudes que requieren tu acción.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Implementation of the loading state and empty state */}
+        </CardContent>
+      </Card>
 
-       {(user?.role === "Admin" || (user?.email && SPECIFIC_APPROVER_EMAILS.includes(user.email))) && user.role !== "Presidente" && (
-         <Card className="shadow-lg w-full">
-           <CardHeader>
-             <CardTitle className="flex items-center">
-                <ListChecks className="mr-2 h-6 w-6 text-primary" />
-                Mis Solicitudes Enviadas
-             </CardTitle>
-             <CardDescription>Visualiza el estado de las solicitudes que has creado.</CardDescription>
-           </CardHeader>
-           <CardContent>
-            {isLoadingSubmitted ? (
-                <div className="flex items-center justify-center py-10">
-                    <Loader2 className="mr-3 h-5 w-5 animate-spin text-primary" />
-                    <span>Cargando tus solicitudes enviadas...</span>
-                </div>
-            ) : submittedRequests.length === 0 ? (
-                <div className="text-center py-10">
-                    <ListChecks className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
-                    <p className="font-semibold">No has enviado ninguna solicitud aún.</p>
-                    <p className="text-sm text-muted-foreground">Utiliza los botones de "Compras" o "Pago a Proveedores" para crear una nueva.</p>
-                </div>
-            ) : (
-                <ul className="space-y-3">
-                    {submittedRequests.map(req => (
-                        <li key={req.id} className="p-4 border rounded-md shadow-sm hover:shadow-md transition-shadow bg-muted/20">
-                            <div className="flex justify-between items-center">
-                                <h3 className="font-semibold text-primary">{req.subject}</h3>
-                                <div className="flex items-center gap-2">
-                                    <Badge variant={req.status === "Aprobado" ? "default" : (req.status === "Rechazado" ? "destructive" : "secondary")}
-                                        className={req.status === "Aprobado" ? "bg-green-500 text-white" : ""}
-                                    >
-                                        {req.status}
-                                    </Badge>
-                                    <Badge variant={req.type === "Compra" ? "outline" : "secondary"}>{req.type}</Badge>
-                                </div>
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1">Fecha Solicitud: {new Date(req.createdAt).toLocaleDateString('es-ES')}</p>
-                            <p className="text-sm text-muted-foreground">Última Actualización: {new Date(req.updatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                             {req.type === "Compra" && req.estimatedPrice && (
-                                <p className="text-sm text-muted-foreground">Monto Est.: {req.estimatedPrice.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
-                            )}
-                            {req.type === "PagoProveedor" && req.totalAmountToPay && (
-                                <p className="text-sm text-muted-foreground">Monto a Pagar: {req.totalAmountToPay.toLocaleString('es-ES', { style: 'currency', currency: 'USD' })}</p>
-                            )}
-                            <Button variant="link" size="sm" className="mt-2 p-0 h-auto text-primary" asChild>
-                               <Link href={`/approvals/${req.id}`}>Ver Detalles</Link>
-                            </Button>
-                        </li>
-                    ))}
-                </ul>
-            )}
-           </CardContent>
-         </Card>
-       )}
-      <CreatePurchaseRequestDialog
-        isOpen={isCreatePurchaseDialogOpen}
-        onClose={() => setIsCreatePurchaseDialogOpen(false)}
-        onSuccess={handleRequestSuccess}
-      />
-      <CreatePaymentRequestDialog
-        isOpen={isCreatePaymentDialogOpen}
-        onClose={() => setIsCreatePaymentDialogOpen(false)}
-        onSuccess={handleRequestSuccess}
-      />
+      <Card className="shadow-lg w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+             <ListChecks className="mr-2 h-6 w-6 text-primary" />
+             Mis Solicitudes Enviadas
+          </CardTitle>
+          <CardDescription>Visualiza el estado de las solicitudes que has creado.</CardDescription>
+        </CardHeader>
+        <CardContent>
+         {/* Implementation of the loading state and empty state */}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export async function ApprovalDetailPage({ params }: { params: { id: string } }) {
+  const approval = await getApprovalRequestById(params.id);
+
+  if (!approval) return notFound();
+
+  return (
+    <div className="max-w-2xl mx-auto mt-8 p-6 bg-white rounded shadow">
+      <h1 className="text-2xl font-bold mb-4">Detalle de Solicitud de Aprobación</h1>
+      <p><b>ID:</b> {approval.displayId}</p>
+      <p><b>Asunto:</b> {approval.subject}</p>
+      <p><b>Tipo:</b> {approval.type}</p>
+      <p><b>Estado:</b> {approval.status}</p>
+      <p><b>Solicitante:</b> {approval.requesterName}</p>
+      <p><b>Fecha de creación:</b> {new Date(approval.createdAt).toLocaleString('es-ES')}</p>
+      <p><b>Descripción:</b> {approval.description}</p>
+      {/* Agrega aquí más campos según tu modelo */}
     </div>
   );
 }

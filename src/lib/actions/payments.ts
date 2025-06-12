@@ -12,14 +12,6 @@ async function updateApprovalRequestCalculatedFields(approvalRequestId: string) 
     orderBy: { dueDate: 'asc' }
   });
 
-  const totalPaidAmount = installments
-    .filter(i => i.status === 'PAID')
-    .reduce((sum, i) => sum + i.amount, 0);
-
-  const remainingAmount = installments
-    .filter(i => i.status !== 'PAID')
-    .reduce((sum, i) => sum + i.amount, 0);
-
   const nextDueDate = installments
     .find(i => i.status === 'PENDING')?.dueDate;
 
@@ -29,8 +21,6 @@ async function updateApprovalRequestCalculatedFields(approvalRequestId: string) 
   await prisma.approvalRequest.update({
     where: { id: approvalRequestId },
     data: {
-      totalPaidAmount,
-      remainingAmount,
       nextDueDate,
       hasOverduePayments
     }

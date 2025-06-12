@@ -92,18 +92,17 @@ import { generateSequentialId } from "@/lib/utils";
 // --- Audit Log Actions ---
 export async function logAuditEvent(performingUserEmail: string, actionDescription: string, details?: string): Promise<void> { // [cite: 9]
   try {
-    await prisma.auditLogEntry.create({ // [cite: 9]
+    const displayId = await generateSequentialId('AUDIT');
+    await prisma.auditLogEntry.create({
       data: {
-        userEmail: performingUserEmail, // [cite: 9]
-        action: actionDescription, // [cite: 9]
-        details: details || undefined, // [cite: 9]
-        displayId: await generateSequentialId('AUDIT')
+        userEmail: performingUserEmail,
+        action: actionDescription,
+        details: details || undefined,
+        displayId
       }
     });
-    revalidatePath("/admin/audit"); // [cite: 10]
-  } catch (error) { // [cite: 10]
-    console.error("logAuditEvent Error:", error); // [cite: 10]
-    // Depending on requirements, you might want to throw the error or handle it silently
+  } catch (error) {
+    console.error('Error logging audit event:', error);
   }
 }
 
@@ -1084,39 +1083,20 @@ export async function createApprovalRequestAction(
         description: data.description || null,
         displayId: await generateSequentialId('APPR'),
         status: PrismaApprovalStatus.Pendiente,
-        
-        // El campo requesterId ya no se pasa aquí, se maneja con el `requester: { connect: ... }`
-        requesterName: data.requesterName, 
-        requesterEmail: data.requesterEmail || null, 
-
-        // *******************************************************************
-        // CORRECCIÓN CLAVE:
-        // ELIMINAR currentApproverId de aquí. Se establecerá a través de la conexión 'approver'.
-        // currentApproverId: presidente.id, // <-- ELIMINAR ESTA LÍNEA
-        // *******************************************************************
-
+        requester: { connect: { id: data.requesterId } },
+        requesterName: data.requesterName,
+        requesterEmail: data.requesterEmail,
+        approver: { connect: { id: presidente.id } },
+        approverName: presidente.name,
         ...(data.type === "Compra" && {
           itemDescription: data.itemDescription,
           estimatedPrice: data.estimatedPrice,
           supplierCompra: data.supplierCompra || null,
         }),
-
         ...(data.type === "PagoProveedor" && {
           supplierPago: data.supplierPago,
           totalAmountToPay: data.totalAmountToPay,
         }),
-
-        activityLog: {
-          create: [{
-            action: "Solicitud Creada",
-            userId: data.requesterId,
-            userName: data.requesterName,
-            comment: "Solicitud creada inicialmente.",
-            displayId: await generateSequentialId('LOG'),
-            userEmail: data.requesterEmail || ''
-          }]
-        },
-
         attachments: data.attachmentsData && data.attachmentsData.length > 0 ? {
           createMany: {
             data: await Promise.all(data.attachmentsData.map(async att => ({
@@ -1129,15 +1109,29 @@ export async function createApprovalRequestAction(
             })))
           }
         } : undefined,
-
-        requester: { connect: { id: data.requesterId } }, // Conexión para el solicitante
-        approver: { connect: { id: presidente.id } } // <--- AÑADIDO: Conexión para el aprobador
+        activityLog: {
+          create: [{
+            action: "Solicitud Creada",
+            userId: data.requesterId,
+            userName: data.requesterName,
+            comment: "Solicitud creada inicialmente.",
+            displayId: await generateSequentialId('LOG'),
+            userEmail: data.requesterEmail || ''
+          }]
+        },
+      },
+      include: {
+        attachments: true,
+        activityLog: true,
       }
     });
 
-    if (newApproval && data.requesterEmail) {
-      await logAuditEvent(data.requesterEmail, `Creación de Solicitud de Aprobación (${data.type})`, `Asunto: ${data.subject}, ID: ${newApproval.id}`);
-    }
+    // Registrar la acción en el log de auditoría
+    await logAuditEvent(
+      data.requesterEmail || '',
+      `Nueva solicitud de aprobación creada: ${newApproval.displayId}`,
+      `Tipo: ${data.type}, Asunto: ${data.subject}`
+    );
 
     await sendNtfyNotification({
       title: `Nueva Solicitud de Aprobación: ${data.type}`,
@@ -1718,6 +1712,16 @@ export async function updateUserSettingsAction(
     );
     return { success: false, message: "Error al guardar la configuración." };
   }
+}
+
+export async function getApprovalRequestById(id: string) {
+  return await prisma.approvalRequest.findUnique({
+    where: { id },
+    include: {
+      attachments: true,
+      activityLog: true,
+    },
+  });
 }
 
 export { registerUserServerAction as registerUser };
