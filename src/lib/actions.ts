@@ -87,6 +87,7 @@ import {
 } from "./schemas";
 import { sendNtfyNotification } from "./ntfy"; // [cite: 8]
 import { revalidatePath } from "next/cache"; // [cite: 8]
+import { generateSequentialId } from "@/lib/utils";
 
 // --- Audit Log Actions ---
 export async function logAuditEvent(performingUserEmail: string, actionDescription: string, details?: string): Promise<void> { // [cite: 9]
@@ -96,6 +97,7 @@ export async function logAuditEvent(performingUserEmail: string, actionDescripti
         userEmail: performingUserEmail, // [cite: 9]
         action: actionDescription, // [cite: 9]
         details: details || undefined, // [cite: 9]
+        displayId: await generateSequentialId('AUDIT')
       }
     });
     revalidatePath("/admin/audit"); // [cite: 10]
@@ -393,10 +395,11 @@ export async function createTicketAction( // [cite: 99]
         subject, // [cite: 104]
         description, // [cite: 104]
         priority: ticketPriorityStringToPrismaEnumMap[priority], // [cite: 104]
-        status: PrismaTicketStatus.Open, // [cite: 104]
+        status: "Open", // [cite: 104]
         userId, // [cite: 104]
         userName, // [cite: 104]
         userEmail, // [cite: 104]
+        displayId: await generateSequentialId('TICKET')
       } // [cite: 104]
     }); // [cite: 105]
     await logAuditEvent(userEmail, "Creación de Ticket", `Ticket Asunto: ${subject}, ID: ${newTicket.id}`); // [cite: 105]
@@ -458,6 +461,7 @@ export async function addCommentAction( // [cite: 111]
         userId: commenter.id, // [cite: 118]
         userName: commenter.name, // [cite: 118]
         userAvatarUrl: commenter.avatarUrl || null, // [cite: 118]
+        displayId: await generateSequentialId('COMMENT')
       } // [cite: 118]
     }); // [cite: 118]
     await prisma.ticket.update({ // [cite: 118]
@@ -742,6 +746,7 @@ export async function addInventoryItemAction( // [cite: 166]
       null, // [cite: 175]
       addedByUserId: currentUser.id, // [cite: 175]
       addedByUserName: currentUser.name, // [cite: 175]
+      displayId: await generateSequentialId('INV')
     }; // [cite: 176]
     const newItem = await prisma.inventoryItem.create({ // [cite: 176]
       data: dataToCreate, // [cite: 176]
@@ -990,6 +995,7 @@ export async function importInventoryItemsAction( // [cite: 231]
             null, // [cite: 259]
             addedByUserId: currentUserId, // [cite: 259]
             addedByUserName: currentUserName, // [cite: 259]
+            displayId: await generateSequentialId('INV')
         }; // [cite: 260]
         await prisma.inventoryItem.create({ data: dataToCreate }); // [cite: 260]
         successCount++; // [cite: 260]
@@ -1076,6 +1082,7 @@ export async function createApprovalRequestAction(
         type: approvalRequestTypeStringToPrismaEnumMap[data.type],
         subject: data.subject,
         description: data.description || null,
+        displayId: await generateSequentialId('APPR'),
         status: PrismaApprovalStatus.Pendiente,
         
         // El campo requesterId ya no se pasa aquí, se maneja con el `requester: { connect: ... }`
@@ -1102,22 +1109,24 @@ export async function createApprovalRequestAction(
         activityLog: {
           create: [{
             action: "Solicitud Creada",
-            userId: data.requesterId, // Este userId es para el log de actividad
+            userId: data.requesterId,
             userName: data.requesterName,
             comment: "Solicitud creada inicialmente.",
+            displayId: await generateSequentialId('LOG'),
+            userEmail: data.requesterEmail || ''
           }]
         },
 
-        attachments: data.attachmentsData
-        && data.attachmentsData.length > 0 ? {
+        attachments: data.attachmentsData && data.attachmentsData.length > 0 ? {
           createMany: {
-            data: data.attachmentsData.map(att => ({
+            data: await Promise.all(data.attachmentsData.map(async att => ({
               fileName: att.fileName,
               url: "uploads/placeholder/" + Date.now() + "_" + att.fileName.replace(/\s+/g, '_'),
               size: att.size,
               type: att.type || 'application/octet-stream',
-              uploadedById: data.requesterId, // Asegúrate de asignar quién subió el adjunto
-            }))
+              uploadedById: data.requesterId,
+              displayId: await generateSequentialId('ATTACH')
+            })))
           }
         } : undefined,
 
@@ -1295,6 +1304,8 @@ export async function approveRequestAction(
                 comment:
                 validatedData.comment || "Aprobado sin comentarios adicionales.",
                 // Eliminado: user: { connect: { id: approverId }},
+                displayId: await generateSequentialId('LOG'),
+                userEmail: approverEmail || ''
             }
         });
     });
@@ -1347,19 +1358,19 @@ export async function rejectRequestAction(
                 approverName: approverName,
                 approverComment: comment,
                 approver: { connect: { id: approverId }},
+                displayId: await generateSequentialId('LOG')
             }
         });
 
-        await
-        tx.approvalActivityLogEntry.create({
+        await tx.approvalActivityLogEntry.create({
             data: {
                 approvalRequestId: requestId,
                 action: "Solicitud Rechazada",
                 userId: approverId,
                 userName: approverName,
                 comment: comment,
-
-              // Eliminado: user: { connect: { id: approverId }},
+                displayId: await generateSequentialId('LOG'),
+                userEmail: approverEmail
             }
         });
     });
@@ -1420,7 +1431,9 @@ export async function requestMoreInfoAction(
                 action: "Información Adicional Solicitada",
                 userId: approverId,
                 userName: approverName,
-                comment: comment
+                comment: comment,
+                displayId: await generateSequentialId('LOG'),
+                userEmail: approverEmail
             }
         });
     });
@@ -1487,13 +1500,15 @@ export async function createCasoMantenimientoAction( // [cite: 356]
      // [cite: 360]    
         registeredByUserId: currentUserId, // [cite: 361]
         registeredByUserName: currentUserName, // [cite: 361]
+        displayId: await generateSequentialId('CASO'),
         log: {
           create: [{
             action: "Caso Registrado",
             notes: "Caso de mantenimiento inicial registrado.",
             userId: currentUserId,
             userName: currentUserName,
-            statusAfterAction: PrismaCasoMantenimientoStatus.Registrado
+            statusAfterAction: PrismaCasoMantenimientoStatus.Registrado,
+            displayId: await generateSequentialId('LOG')
           }]
         } // [cite: 363]
       } // [cite: 363]
@@ -1704,3 +1719,5 @@ export async function updateUserSettingsAction(
     return { success: false, message: "Error al guardar la configuración." };
   }
 }
+
+export { registerUserServerAction as registerUser };

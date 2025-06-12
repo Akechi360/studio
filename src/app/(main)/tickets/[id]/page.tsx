@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: TicketDetailPageProps) {
     return { title: "Ticket No Encontrado" };
   }
   return {
-    title: `Ticket #${ticket.id}: ${ticket.subject}`,
+    title: `Ticket #${ticket.displayId}: ${ticket.subject}`,
     description: ticket.description.substring(0, 150) + "...",
   };
 }

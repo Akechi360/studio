@@ -1,8 +1,7 @@
 // src/lib/constants.ts
 
-import type { TicketPriority, TicketStatus } from "@/lib/types";
-// Importar el enum TicketStatus y TicketPriority de Prisma para usarlos en los mapeos
-import { TicketStatus as PrismaTicketStatus, TicketPriority as PrismaTicketPriority } from "@prisma/client"; // <--- MODIFICADO: AÑADIDO PrismaTicketPriority
+import type { TicketPriority, TicketStatus, TicketCategory } from "@/lib/types";
+import { TicketStatus as PrismaTicketStatus, TicketPriority as PrismaTicketPriority, TicketCategory as PrismaTicketCategory } from "@prisma/client";
 
 export const TICKET_PRIORITIES_ENGLISH: TicketPriority[] = ["Low", "Medium", "High"];
 export const TICKET_STATUSES_ENGLISH: TicketStatus[] = ["Open", "InProgress", "Resolved", "Closed"];
@@ -10,10 +9,21 @@ export const TICKET_STATUSES_ENGLISH: TicketStatus[] = ["Open", "InProgress", "R
 export const TICKET_PRIORITIES: string[] = ["Baja", "Media", "Alta"];
 export const TICKET_STATUSES: string[] = ["Abierto", "En Progreso", "Resuelto", "Cerrado"];
 
+export const TICKET_CATEGORIES_ENGLISH: TicketCategory[] = [
+  "HardwareIssue",
+  "SoftwareIssue",
+  "NetworkIssue",
+  "AppAccess",
+  "InfoRequest",
+  "EquipmentMaintenance",
+  "PrintingIssue",
+  "EmailIssue",
+  "Other"
+];
+
 export const APP_NAME = "IEQ Nexo";
 
-// **** AÑADIDOS: Mapeos para el estado de los tickets ****
-// Mapea la cadena de texto de la UI (inglés) al valor del enum de Prisma (que va a la DB)
+// Mapeos para el estado de los tickets
 export const ticketStatusStringToPrismaEnumMap: Record<string, PrismaTicketStatus> = {
   "Open": PrismaTicketStatus.Open,
   "InProgress": PrismaTicketStatus.InProgress,
@@ -21,7 +31,6 @@ export const ticketStatusStringToPrismaEnumMap: Record<string, PrismaTicketStatu
   "Closed": PrismaTicketStatus.Closed,
 };
 
-// Mapea el valor del enum de Prisma (de la DB) a la cadena de texto en español para mostrar en la UI
 export const ticketStatusPrismaEnumToStringMap: Record<PrismaTicketStatus, string> = {
   [PrismaTicketStatus.Open]: "Abierto",
   [PrismaTicketStatus.InProgress]: "En Progreso",
@@ -29,11 +38,22 @@ export const ticketStatusPrismaEnumToStringMap: Record<PrismaTicketStatus, strin
   [PrismaTicketStatus.Closed]: "Cerrado",
 };
 
-// **** AÑADIDO: Mapeo para la prioridad de los tickets ****
-// Mapea la cadena de texto de la UI (inglés) al valor del enum de Prisma (que va a la DB)
+// Mapeo para la prioridad de los tickets
 export const ticketPriorityStringToPrismaEnumMap: Record<TicketPriority, PrismaTicketPriority> = {
-    "Low": PrismaTicketPriority.Low,
-    "Medium": PrismaTicketPriority.Medium,
-    "High": PrismaTicketPriority.High,
+  "Low": PrismaTicketPriority.Low,
+  "Medium": PrismaTicketPriority.Medium,
+  "High": PrismaTicketPriority.High,
 };
-// *******************************************************
+
+// Mapeo para la categoría de los tickets
+export const ticketCategoryStringToPrismaEnumMap: Record<string, PrismaTicketCategory> = {
+  HardwareIssue: PrismaTicketCategory.HardwareIssue,
+  SoftwareIssue: PrismaTicketCategory.SoftwareIssue,
+  NetworkIssue: PrismaTicketCategory.NetworkIssue,
+  AppAccess: PrismaTicketCategory.AppAccess,
+  InfoRequest: PrismaTicketCategory.InfoRequest,
+  EquipmentMaintenance: PrismaTicketCategory.EquipmentMaintenance,
+  PrintingIssue: PrismaTicketCategory.PrintingIssue,
+  EmailIssue: PrismaTicketCategory.EmailIssue,
+  Other: PrismaTicketCategory.Other,
+};

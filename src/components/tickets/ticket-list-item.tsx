@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Ticket, TicketPriority, TicketStatus } from "@/lib/types";
@@ -47,7 +46,7 @@ export function TicketListItem({ ticket }: TicketListItemProps) {
       <CardHeader>
         <div className="flex justify-between items-start">
           <CardTitle className="text-lg font-semibold leading-tight">
-            <Link href={`/tickets/${ticket.id}`} className="hover:underline text-primary">
+            <Link href={`/tickets/${ticket.displayId}`} className="hover:underline text-primary">
               {ticket.subject}
             </Link>
           </CardTitle>
@@ -56,7 +55,7 @@ export function TicketListItem({ ticket }: TicketListItemProps) {
           </Badge>
         </div>
         <CardDescription className="text-xs text-muted-foreground">
-          Ticket #{ticket.id} por {ticket.userName}
+          Ticket #{ticket.displayId} por {ticket.userName}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -83,7 +82,7 @@ export function TicketListItem({ ticket }: TicketListItemProps) {
         </div>
       </CardContent>
       <CardFooter className="flex justify-end">
-        <Link href={`/tickets/${ticket.id}`} className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
+        <Link href={`/tickets/${ticket.displayId}`} className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
           Ver Detalles <ArrowRight className="h-4 w-4" />
         </Link>
       </CardFooter>

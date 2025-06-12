@@ -139,13 +139,13 @@ const ChartsSection = memo(({ statsData }: { statsData: TicketStats }) => {
       <Card className="col-span-4 shadow-ammie-lg rounded-2xl backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Distribución de Tickets</CardTitle>
-        </CardHeader>
-        <CardContent>
+      </CardHeader>
+      <CardContent>
           <Suspense fallback={<Skeleton className="h-[300px] w-full" />}>
             <TicketStatsCharts stats={statsData.stats} />
           </Suspense>
-        </CardContent>
-      </Card>
+      </CardContent>
+    </Card>
 
       <div className="col-span-3 space-y-4">
         <InfoCard
@@ -189,53 +189,7 @@ const TrendsSection = memo(() => (
   </Card>
 ));
 
-const FutureFeatures = memo(() => (
-  <Card className="shadow-ammie-lg rounded-2xl border-0 bg-card/50 backdrop-blur-sm">
-    <CardHeader className="pb-4">
-      <CardTitle className="text-2xl font-bold">Analíticas Avanzadas Planeadas</CardTitle>
-      <CardDescription className="text-base">
-        Funcionalidades detalladas y personalizables para una toma de decisiones informada que se implementarán a futuro.
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <InfoCard
-          title="Tendencias de Tickets"
-          description="Visualiza la creación de tickets por día, semana o mes para identificar patrones."
-        />
-        <InfoCard
-          title="Tiempos de Respuesta y Resolución"
-          description="Analiza el tiempo promedio de primera respuesta y el tiempo total de resolución de tickets."
-        />
-        <InfoCard
-          title="Data Detallada de Tickets"
-          description="Analiza métricas detalladas de tickets, incluyendo asignaciones, progresos y otros KPIs relevantes (funcionalidad futura)."
-        />
-        <InfoCard
-          title="Distribución de Tickets"
-          description="Desglosa los tickets por categoría, prioridad, estado, departamento, etc."
-        />
-        <InfoCard
-          title="Exportación de Datos"
-          description="Opción para exportar los datos de los reportes en formatos como CSV o PDF."
-        />
-        <InfoCard
-          title="Gráficos Interactivos"
-          description="Presentación de datos mediante gráficos dinámicos y fáciles de interpretar."
-        />
-      </div>
-      <Alert className="mt-6 border-primary/50 bg-primary/5 rounded-2xl">
-        <AlertTriangle className="h-5 w-5 text-primary" />
-        <AlertTitle className="font-semibold text-primary">En Desarrollo</AlertTitle>
-        <AlertDescription className="text-primary/80">
-          Las funcionalidades de analíticas avanzadas detalladas aquí están planificadas y se implementarán en futuras actualizaciones del sistema.
-        </AlertDescription>
-      </Alert>
-    </CardContent>
-  </Card>
-));
-
-FutureFeatures.displayName = 'FutureFeatures';
+TrendsSection.displayName = 'TrendsSection';
 
 export default function AnalyticsPage() {
   const { role } = useAuth();
@@ -244,7 +198,7 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchStats = async () => {
+      const fetchStats = async () => {
       try {
         const data = await getTicketStats();
         setStatsData({
@@ -261,9 +215,9 @@ export default function AnalyticsPage() {
       } finally {
         setIsLoading(false);
       }
-    };
+      };
 
-    fetchStats();
+      fetchStats();
   }, []);
 
   const handlePrint = useCallback(() => {
@@ -293,14 +247,14 @@ export default function AnalyticsPage() {
             Visualiza y analiza el rendimiento de los tickets del sistema
           </p>
         </div>
-        <Button 
+          <Button
           variant="outline" 
           className="shadow-ammie rounded-xl hover:bg-primary hover:text-primary-foreground transition-colors"
-          onClick={handlePrint}
-        >
+            onClick={handlePrint}
+          >
           <Printer className="mr-2 h-4 w-4" />
           Imprimir Reporte
-        </Button>
+          </Button>
       </div>
 
       {isLoading ? (
@@ -316,8 +270,6 @@ export default function AnalyticsPage() {
           <TrendsSection />
         </>
       )}
-
-      <FutureFeatures />
     </div>
   );
 }

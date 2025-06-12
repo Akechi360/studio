@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -85,7 +84,7 @@ Por favor, contactar al usuario para establecer la conexión remota.
       if (ticketResult.success && ticketResult.ticketId) {
         toast({
           title: "Solicitud Enviada y Ticket Creado",
-          description: `Tu solicitud de acceso remoto ha sido registrada (Ticket #${ticketResult.ticketId}). Un técnico se pondrá en contacto.`,
+          description: `Tu solicitud de acceso remoto ha sido registrada (Ticket #${ticketResult.displayId}). Un técnico se pondrá en contacto.`,
         });
         setSubmittedAnyDeskId(data.userAnyDeskId);
         setRequestSent(true);

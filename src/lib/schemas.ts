@@ -11,8 +11,9 @@ import {
   TicketPriority,
   TicketStatus,
   Role,
+  TicketCategory,
 } from "./types";
-import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH } from "./constants";
+import { TICKET_PRIORITIES_ENGLISH, TICKET_STATUSES_ENGLISH, TICKET_CATEGORIES_ENGLISH } from "./constants";
 
 
 // --- User Schemas (from auth-context originally, moved here for server action use) ---
@@ -33,6 +34,7 @@ export const CreateTicketClientSchema = z.object({
   description: z.string().min(10).max(2000),
   priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]),
   userEmail: z.string().email(),
+  category: z.enum(TICKET_CATEGORIES_ENGLISH as [TicketCategory, ...TicketCategory[]]),
 });
 
 export const AddCommentClientSchema = z.object({

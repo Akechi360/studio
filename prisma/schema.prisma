@@ -16,6 +16,7 @@ enum Role {
 
 model User {
   id                        String                @id @default(cuid())
+  displayId                 String?               @unique
   name                      String
   email                     String                @unique
   password                  String // Will store hashed password
@@ -58,14 +59,28 @@ enum TicketStatus {
   Closed
 }
 
+enum TicketCategory {
+  HardwareIssue
+  SoftwareIssue
+  NetworkIssue
+  AppAccess
+  InfoRequest
+  EquipmentMaintenance
+  PrintingIssue
+  EmailIssue
+  Other
+}
+
 model Ticket {
   id          String         @id @default(cuid())
+  displayId   String         @unique
   subject     String
   description String         @db.Text
   priority    TicketPriority
   status      TicketStatus
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+  category    TicketCategory   @default(Other)
 
   userId      String
   user        User           @relation("TicketsCreatedByUser", fields: [userId], references: [id])
@@ -81,6 +96,7 @@ model Ticket {
 
 model Comment {
   id        String   @id @default(cuid())
+  displayId String   @unique
   text      String   @db.Text
   createdAt DateTime @default(now())
 
@@ -97,6 +113,7 @@ model Comment {
 
 model Attachment {
   id       String  @id @default(cuid())
+  displayId String @unique
   fileName String
   url      String // In a real app, this might point to a cloud storage URL
   size     Int
@@ -159,6 +176,7 @@ enum StorageType {
 
 model InventoryItem {
   id            String                @id @default(cuid())
+  displayId     String                @unique
   name          String
   category      InventoryItemCategory
   brand         String?
@@ -207,12 +225,17 @@ enum PaymentType {
 
 model ApprovalRequest {
   id            String              @id @default(cuid())
+  displayId     String              @unique
   type          ApprovalRequestType
   subject       String
   description   String?             @db.Text
   status        ApprovalStatus
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
+  totalPaidAmount Float             @default(0)
+  remainingAmount Float             @default(0)
+  nextDueDate   DateTime?
+  hasOverduePayments Boolean         @default(false)
 
   requesterId   String
   requester     User                @relation("ApprovalRequestedByUser", fields: [requesterId], references: [id])
@@ -243,31 +266,54 @@ model ApprovalRequest {
   @@index([approverId])
   @@index([status])
   @@index([type])
+  @@index([status, type])
+  @@index([requesterId, status])
+  @@index([approverId, status])
+  @@index([hasOverduePayments])
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
 }
 
 model PaymentInstallment {
-  id                String   @id @default(cuid())
+  id                String          @id @default(cuid())
+  displayId         String          @unique
   amount            Float
   dueDate           DateTime
-  // status         String? // Future: Pendiente, Pagado, Atrasado
+  status            PaymentStatus   @default(PENDING)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  isOverdue         Boolean         @default(false)
+  daysOverdue       Int             @default(0)
 
   approvalRequestId String
-  approvalRequest   ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  approvalRequest   ApprovalRequest @relation(fields: [approvalRequestId], references: [id])
 
   @@index([approvalRequestId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([isOverdue])
+  @@index([status, dueDate])
+  @@index([approvalRequestId, status])
 }
 
 model ApprovalActivityLogEntry {
-  id                String   @id @default(cuid())
-  action            String
-  timestamp         DateTime @default(now())
-  comment           String?  @db.Text
-
-  userId            String // Denormalized user ID for the log
-  userName          String // Denormalized user name
-
+  id                String           @id @default(cuid())
+  displayId         String
   approvalRequestId String
-  approvalRequest   ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  approvalRequest   ApprovalRequest  @relation(fields: [approvalRequestId], references: [id])
+  action            String
+  userId            String
+  userName          String
+  userEmail         String
+  timestamp         DateTime         @default(now())
+  comment           String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@index([approvalRequestId])
 }
@@ -292,6 +338,7 @@ enum CasoMantenimientoPriority {
 
 model CasoDeMantenimiento {
   id                       String                     @id @default(cuid())
+  displayId                String                     @unique
   title                    String
   description              String                     @db.Text
   location                 String
@@ -321,7 +368,8 @@ model CasoDeMantenimiento {
 }
 
 model CasoMantenimientoLogEntry {
-  id                String   @id @default(cuid())
+  id                String              @id @default(cuid())
+  displayId         String              @unique
   timestamp         DateTime @default(now())
   action            String
   notes             String   @db.Text
@@ -339,15 +387,16 @@ model CasoMantenimientoLogEntry {
 }
 
 model AuditLogEntry {
-  id        String   @id @default(cuid())
-  timestamp DateTime @default(now())
+  id                String              @id @default(cuid())
+  displayId         String              @unique
+  timestamp         DateTime @default(now())
   // CORRECCIÓN: userEmail se hace opcional para permitir onDelete: SetNull
-  userEmail String?  // Email of the user performing the action
+  userEmail         String?  // Email of the user performing the action
 
-  action    String
-  details   String?  @db.Text
+  action            String
+  details           String?  @db.Text
 
-  user      User?    @relation(fields: [userEmail], references: [email], onDelete: SetNull, onUpdate: Cascade)
+  user              User?    @relation(fields: [userEmail], references: [email], onDelete: SetNull, onUpdate: Cascade)
 
 
   @@index([userEmail])
@@ -388,7 +437,8 @@ enum EstadoFalla {
 }
 
 model Falla {
-  id                String   @id @default(uuid())
+  id                String              @id @default(cuid())
+  displayId         String              @unique
   titulo            String
   descripcion       String
   equipoId          String?  // Relación futura con InventoryItem
@@ -419,13 +469,21 @@ model Falla {
 }
 
 model FallaBitacora {
-  id        String   @id @default(uuid())
-  fallaId   String
-  falla     Falla    @relation(fields: [fallaId], references: [id])
-  usuarioId String
-  usuario   User     @relation("FallaBitacoraUsuario", fields: [usuarioId], references: [id])
-  mensaje   String
-  fecha     DateTime @default(now())
-  adjuntos  Json?
-  tipo      String   // "comentario", "cambio_estado", etc.
+  id                String              @id @default(cuid())
+  displayId         String              @unique
+  fallaId           String
+  falla             Falla    @relation(fields: [fallaId], references: [id])
+  usuarioId         String
+  usuario           User     @relation("FallaBitacoraUsuario", fields: [usuarioId], references: [id])
+  mensaje           String
+  fecha             DateTime @default(now())
+  adjuntos          Json?
+  tipo              String   // "comentario", "cambio_estado", etc.
+}
+
+model IdCounter {
+  entityName     String @unique
+  lastUsedNumber Int    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

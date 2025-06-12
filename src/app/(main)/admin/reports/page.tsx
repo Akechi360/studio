@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { getDashboardStats } from '@/lib/actions';
 import type { TicketSummary } from '@/lib/types/index';
 import type { TicketStats } from '@/lib/types/ticket-stats';
-import { TicketStatsCharts } from '@/components/dashboard/ticket-stats-charts';
+import { TicketStatsCharts } from '@/components/dashboard/ticket-stats-charts'; 
 import { AnimatedLoader } from '@/components/ui/animated-loader';
 
 interface DashboardStats {
@@ -46,7 +46,7 @@ export default function ReportsPage() {
       const fetchStats = async () => {
         setIsLoading(true);
         try {
-          const data = await getDashboardStats();
+        const data = await getDashboardStats();
           setStatsData({
             summary: {
               total: data.summary.total,
@@ -64,7 +64,7 @@ export default function ReportsPage() {
         } catch (error) {
           console.error('Error al cargar estadísticas:', error);
         } finally {
-          setIsLoading(false);
+        setIsLoading(false);
         }
       };
       fetchStats();

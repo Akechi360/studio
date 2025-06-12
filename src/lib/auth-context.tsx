@@ -5,7 +5,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter } from "next/navigation";
 import { 
   loginUserServerAction,
-  registerUserServerAction,
+  registerUser as createUser,
   getUserByIdServerAction,
   updateUserProfileServerAction,
   updateUserPasswordServerAction,
@@ -108,14 +108,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const register = async (name: string, email: string, pass: string): Promise<boolean> => {
     setIsLoading(true);
-    const result = await registerUserServerAction(name, email, pass);
-    setIsLoading(false);
-    if (result.success && result.user) {
-      setUser(cleanUser(result.user));
-      // No guardar en localStorage
-      return true;
+    try {
+      const user = await createUser(name, email, pass);
+      setIsLoading(false);
+      if (user) {
+        setUser(cleanUser(user));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      setIsLoading(false);
+      console.error("Error en registro:", error);
+      return false;
     }
-    return false;
   };
 
   const updateProfile = async (name: string, email: string): Promise<boolean> => {

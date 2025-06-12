@@ -35,8 +35,20 @@ export interface Comment {
   ticketId: string; // Relation to Ticket
 }
 
+export type TicketCategory =
+  | "HardwareIssue"
+  | "SoftwareIssue"
+  | "NetworkIssue"
+  | "AppAccess"
+  | "InfoRequest"
+  | "EquipmentMaintenance"
+  | "PrintingIssue"
+  | "EmailIssue"
+  | "Other";
+
 export interface Ticket {
   id: string;
+  displayId: string;
   subject: string;
   description: string;
   priority: TicketPriority;
@@ -44,10 +56,11 @@ export interface Ticket {
   attachments: Attachment[];
   userId: string;
   userName: string;
-  userEmail: string | null; // Corregido: puede ser null
+  userEmail: string | null;
   createdAt: Date;
   updatedAt: Date;
   comments: Comment[];
+  category: TicketCategory;
 }
 
 export interface TicketSummary {

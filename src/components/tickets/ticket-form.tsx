@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -25,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { TICKET_PRIORITIES, TICKET_PRIORITIES_ENGLISH } from "@/lib/constants";
+import { TICKET_PRIORITIES, TICKET_PRIORITIES_ENGLISH, TICKET_CATEGORIES_ENGLISH } from "@/lib/constants";
 import type { TicketPriority } from "@/lib/types";
 import { Loader2, Send } from "lucide-react";
 
@@ -35,6 +34,9 @@ const ticketFormSchema = z.object({
   description: z.string().min(10, { message: "La descripción debe tener al menos 10 caracteres." }).max(2000, { message: "La descripción debe tener como máximo 2000 caracteres." }),
   priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]], { // Keep Zod enum with English values for backend
     required_error: "Necesitas seleccionar una prioridad para el ticket.",
+  }),
+  category: z.enum(TICKET_CATEGORIES_ENGLISH as [string, ...string[]], {
+    required_error: "Necesitas seleccionar una categoría para el ticket.",
   }),
 });
 
@@ -60,6 +62,7 @@ export function TicketForm({
       subject: defaultValues?.subject || "",
       description: defaultValues?.description || "",
       priority: defaultValues?.priority || "Medium",
+      category: defaultValues?.category || "Other",
     },
   });
 
@@ -67,6 +70,18 @@ export function TicketForm({
     "Low": "Baja",
     "Medium": "Media",
     "High": "Alta"
+  };
+
+  const categoryMap: Record<string, string> = {
+    HardwareIssue: 'Problemas de Hardware',
+    SoftwareIssue: 'Problemas de Software',
+    NetworkIssue: 'Problemas de Red',
+    AppAccess: 'Acceso a Aplicaciones',
+    InfoRequest: 'Solicitudes de Información',
+    EquipmentMaintenance: 'Mantenimiento de Equipos',
+    PrintingIssue: 'Problemas de Impresión',
+    EmailIssue: 'Problemas de Correo Electrónico',
+    Other: 'Otros',
   };
 
 
@@ -138,6 +153,30 @@ export function TicketForm({
                   <FormDescription>
                     ¿Qué tan urgente es este problema?
                   </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Categoría</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value || 'Other'}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una categoría" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {TICKET_CATEGORIES_ENGLISH.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {categoryMap[cat]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

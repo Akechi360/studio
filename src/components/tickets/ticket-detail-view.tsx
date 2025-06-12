@@ -1,6 +1,6 @@
 "use client";
 
-import type { Ticket, TicketStatus, TicketPriority as TicketPriorityType } from "@/lib/types";
+import type { Ticket, TicketStatus, TicketPriority as TicketPriorityType, TicketCategory } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { AddCommentForm } from "./add-comment-form";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
 import { Paperclip, UserCircle, CalendarDays, Tag, Info, MessageSquare, ExternalLink, Loader2 } from "lucide-react"; 
-import { TICKET_STATUSES, TICKET_PRIORITIES_ENGLISH, TICKET_PRIORITIES as TICKET_PRIORITIES_SPANISH } from "@/lib/constants";
+import { TICKET_STATUSES, TICKET_PRIORITIES_ENGLISH, TICKET_PRIORITIES as TICKET_PRIORITIES_SPANISH, TICKET_CATEGORIES_ENGLISH } from "@/lib/constants";
 import {
   Select,
   SelectContent,
@@ -54,6 +54,17 @@ const statusColors: Record<TicketStatus, string> = {
   Closed: "bg-gray-100 text-gray-700 border-gray-300",
 };
 
+const categoryDisplayMap: Record<TicketCategory, string> = {
+  HardwareIssue: 'Problemas de Hardware',
+  SoftwareIssue: 'Problemas de Software',
+  NetworkIssue: 'Problemas de Red',
+  AppAccess: 'Acceso a Aplicaciones',
+  InfoRequest: 'Solicitudes de Información',
+  EquipmentMaintenance: 'Mantenimiento de Equipos',
+  PrintingIssue: 'Problemas de Impresión',
+  EmailIssue: 'Problemas de Correo Electrónico',
+  Other: 'Otros',
+};
 
 export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProps) {
   const { user, role } = useAuth();
@@ -106,7 +117,7 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
             <div>
               <CardTitle className="text-3xl font-bold leading-tight">{ticket.subject}</CardTitle>
               <CardDescription className="text-sm text-muted-foreground mt-1">
-                Ticket #{ticket.id} &bull; Última actualización: {format(new Date(ticket.updatedAt), "PPp", { locale: es })}
+                Ticket #{ticket.displayId} • Última actualización: {format(ticket.updatedAt, "d MMM yyyy, HH:mm", { locale: es })}
               </CardDescription>
             </div>
             {role === 'Admin' ? (
@@ -135,7 +146,7 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-sm">
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
               <UserCircle className="h-5 w-5 text-primary" />
               <div>
@@ -150,6 +161,12 @@ export function TicketDetailView({ ticket: initialTicket }: TicketDetailViewProp
             </div>
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
               <Badge className={cn("text-xs px-2 py-0.5", priorityColors[ticket.priority])}>Prioridad {priorityDisplayMap[ticket.priority]}</Badge>
+            </div>
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+              <Tag className="h-5 w-5 text-primary" />
+              <div>
+                <span className="font-medium">Categoría:</span> {categoryDisplayMap[ticket.category as TicketCategory]}
+              </div>
             </div>
           </div>
           

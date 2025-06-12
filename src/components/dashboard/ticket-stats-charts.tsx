@@ -94,10 +94,10 @@ export const TicketStatsCharts = memo(function TicketStatsCharts({ stats, type =
   // --- NO DATA ---
   const allZero = useMemo(() => chartData.every(item => item.value === 0), [chartData]);
   if (!chartData.length || allZero) {
-    return (
+  return (
       <div className="flex items-center justify-center h-[300px] text-muted-foreground">
         No hay datos disponibles
-      </div>
+            </div>
     );
   }
 
@@ -145,7 +145,7 @@ export const TicketStatsCharts = memo(function TicketStatsCharts({ stats, type =
               domain={yDomain}
               allowDecimals={false}
             />
-            <Tooltip 
+                <Tooltip
               content={<CustomTooltip />}
               cursor={{ fill: 'hsl(var(--muted)/0.1)' }}
             />
@@ -156,8 +156,8 @@ export const TicketStatsCharts = memo(function TicketStatsCharts({ stats, type =
               barSize={48}
               isAnimationActive={false}
             />
-          </BarChart>
-        </ResponsiveContainer>
+              </BarChart>
+            </ResponsiveContainer>
       </div>
     );
   }
@@ -214,7 +214,7 @@ export const TicketStatsCharts = memo(function TicketStatsCharts({ stats, type =
             />
           </LineChart>
         </ResponsiveContainer>
-      </div>
+            </div>
     );
   }
 
@@ -223,28 +223,28 @@ export const TicketStatsCharts = memo(function TicketStatsCharts({ stats, type =
     return (
       <div className="h-[300px] w-full bg-white rounded-xl p-4 flex items-center justify-center">
         <ResponsiveContainer width="100%" aspect={aspect}>
-          <PieChart>
-            <Pie
+              <PieChart>
+                <Pie
               data={pieData}
               dataKey="value"
               nameKey="name"
-              cx="50%"
-              cy="50%"
+                  cx="50%"
+                  cy="50%"
               outerRadius={80}
               fill="hsl(var(--primary))"
               label
             >
               {pieData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS_STATUS[index % COLORS_STATUS.length]} />
-              ))}
-            </Pie>
+                    <Cell key={`cell-${index}`} fill={COLORS_STATUS[index % COLORS_STATUS.length]} />
+                  ))}
+                </Pie>
             <Tooltip />
             <Legend />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
+              </PieChart>
+            </ResponsiveContainer>
+    </div>
+  );
+}
 
   // --- DEFAULT ---
   return null;
