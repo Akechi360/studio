@@ -35,15 +35,15 @@ import { es } from 'date-fns/locale';
 // Usamos un fallback si crypto.randomUUID no está disponible (ej. en ciertos entornos de prueba o SSR sin polyfill)
 const generateUniqueId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
+    return String(crypto.randomUUID());
   }
-  // Fallback simple para entornos donde crypto.randomUUID no está disponible
-  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  return String(Date.now().toString(36) + Math.random().toString(36).substring(2));
 };
 
 
 const paymentInstallmentSchema = z.object({
   id: z.string(),
+  displayId: z.string(),
   amount: z.coerce.number().positive("El monto debe ser positivo."),
   dueDate: z.date({ required_error: "La fecha de vencimiento es obligatoria." }),
 });
@@ -105,6 +105,12 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionToConfirm, setActionToConfirm] = useState<"approve" | "reject" | "requestInfo" | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [openCalendarIndex, setOpenCalendarIndex] = useState<number | null>(null);
+
+  // Log global para depuración
+  useEffect(() => {
+    console.log('DEBUG: openCalendarIndex', openCalendarIndex);
+  }, [openCalendarIndex]);
 
   const form = useForm<ApprovalActionsFormValues>({
     resolver: zodResolver(approvalActionsFormSchema),
@@ -124,7 +130,6 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
   useEffect(() => {
     if (currentRequest) {
       const defaultPaymentType = currentRequest.approvedPaymentType || (requestType === "PagoProveedor" ? 'Contado' : undefined);
-      // Aseguramos que el valor defaultApprovedAmount nunca sea null, sino 0 o undefined
       const defaultApprovedAmount = currentRequest.approvedAmount !== null && currentRequest.approvedAmount !== undefined 
           ? currentRequest.approvedAmount 
           : (requestType === "PagoProveedor" ? (currentRequest.totalAmountToPay || 0) : undefined);
@@ -132,10 +137,11 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
       form.reset({
         comment: currentRequest.approverComment || "",
         approvedPaymentType: defaultPaymentType,
-        approvedAmount: defaultApprovedAmount, // Aseguramos que sea un número o undefined
+        approvedAmount: defaultApprovedAmount,
         installments: (defaultPaymentType === 'Cuotas' && Array.isArray(currentRequest.paymentInstallments)) ?
             currentRequest.paymentInstallments.map(inst => ({
-                id: inst.id || generateUniqueId(), // Usar la función generateUniqueId
+                id: String(inst.id || generateUniqueId()),
+                displayId: String(inst.displayId || generateUniqueId()),
                 amount: inst.amount || 0,
                 dueDate: inst.dueDate && !isNaN(new Date(inst.dueDate).getTime()) ? new Date(inst.dueDate) : new Date(),
             }))
@@ -215,7 +221,6 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
       if (actionToConfirm === 'approve') {
         if (requestType === "PagoProveedor" && user.role === 'Presidente') { 
           actionData.approvedPaymentType = formData.approvedPaymentType;
-          // Aseguramos que approvedAmount sea un número antes de enviarlo
           actionData.approvedAmount = formData.approvedAmount !== undefined ? formData.approvedAmount : 0;
           if (formData.approvedPaymentType === 'Cuotas') {
             actionData.installments = formData.installments;
@@ -223,6 +228,18 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
             actionData.installments = []; 
           }
         }
+        // --- Log para depuración antes de enviar ---
+        if (actionData.installments) {
+          actionData.installments = actionData.installments.map((inst: any) => ({
+            ...inst,
+            displayId:
+              typeof inst.displayId === 'string' && inst.displayId.length > 0
+                ? inst.displayId
+                : String(generateUniqueId()),
+          }));
+          console.log("Installments to send:", actionData.installments);
+        }
+        // ---------------------------------------------------
          result = await approveRequestAction(actionData);
       } else if (actionToConfirm === 'reject') {
         result = await rejectRequestAction({ ...actionData, comment: formData.comment!.trim() });
@@ -246,6 +263,18 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
       setIsConfirmOpen(false);
       setActionToConfirm(null);
     }
+  };
+
+  const handleDateSelect = (date: Date | undefined, index: number, onChange: (date: Date | undefined) => void) => {
+    onChange(date);
+    setOpenCalendarIndex(null); // Cierra el Popover siempre
+  };
+
+  const handleCalendarOpen = (index: number, e: React.MouseEvent) => {
+    console.log('handleCalendarOpen llamado:', { index, currentOpenIndex: openCalendarIndex });
+    e.preventDefault();
+    e.stopPropagation();
+    setOpenCalendarIndex(openCalendarIndex === index ? null : index);
   };
 
   if (!currentRequest) {
@@ -351,16 +380,22 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
                             )}
                         />
                         <CardTitle className="text-sm pt-2">Definición de Cuotas</CardTitle>
-                        {fields.map((item, index) => (
-                            <div key={item.id} className="flex flex-col sm:flex-row items-start gap-3 p-3 border rounded-md bg-muted/30">
+                        {fields.map((field, index) => (
+                            <div key={field.id} className="flex items-start gap-2">
                             <FormField
                                 control={form.control}
                                 name={`installments.${index}.amount`}
                                 render={({ field }) => (
                                 <FormItem className="flex-1">
-                                    <FormLabel>Monto Cuota {index + 1}</FormLabel>
+                                    <FormLabel className="mb-1.5 block sm:hidden">Monto Cuota {index + 1}</FormLabel>
+                                    <FormLabel className="mb-1.5 hidden sm:block">&nbsp;</FormLabel>
                                     <FormControl>
-                                    <Input type="number" placeholder="Monto" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                                    <Input
+                                        type="number"
+                                        placeholder="Monto de la cuota"
+                                        {...field}
+                                        onChange={e => field.onChange(parseFloat(e.target.value) || 0)}
+                                    />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -370,31 +405,53 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
                                 control={form.control}
                                 name={`installments.${index}.dueDate`}
                                 render={({ field }) => (
-                                <FormItem className="flex flex-col flex-1 mt-0 sm:mt-[6px]">
-                                    <FormLabel className="mb-1.5 block sm:hidden">Fecha Cuota {index + 1}</FormLabel>
-                                    <FormLabel className="mb-1.5 hidden sm:block">&nbsp;</FormLabel>
-                                    <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                        variant={"outline"}
-                                        className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
-                                        type="button"
+                                    <FormItem className="flex flex-col flex-1 mt-0 sm:mt-[6px]">
+                                        <FormLabel className="mb-1.5 block sm:hidden">Fecha Cuota {index + 1}</FormLabel>
+                                        <FormLabel className="mb-1.5 hidden sm:block">&nbsp;</FormLabel>
+                                        <Popover
+                                            open={openCalendarIndex === index}
+                                            onOpenChange={(open) => {
+                                                setOpenCalendarIndex(open ? index : null);
+                                            }}
                                         >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {field.value ? format(field.value instanceof Date ? field.value : new Date(field.value), "PPP", { locale: es }) : <span>Selecciona fecha</span>}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0 z-[51]" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={field.value instanceof Date ? field.value : (field.value ? new Date(field.value) : undefined)}
-                                            onSelect={field.onChange}
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                </FormItem>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    role="combobox"
+                                                    aria-expanded={openCalendarIndex === index}
+                                                    className={cn(
+                                                        "w-full justify-start text-left font-normal",
+                                                        !field.value && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {field.value ? (
+                                                        format(field.value instanceof Date ? field.value : new Date(field.value), "PPP", { locale: es })
+                                                    ) : (
+                                                        <span>Selecciona fecha</span>
+                                                    )}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent
+                                                className="w-auto p-0"
+                                                align="start"
+                                                side="bottom"
+                                                sideOffset={4}
+                                            >
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={field.value instanceof Date ? field.value : (field.value ? new Date(field.value) : undefined)}
+                                                    onSelect={(date) => handleDateSelect(date, index, field.onChange)}
+                                                    initialFocus
+                                                    disabled={(date) => date < new Date()}
+                                                    locale={es}
+                                                    className="rounded-md border"
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                        <FormMessage />
+                                    </FormItem>
                                 )}
                             />
                             <Button
@@ -409,7 +466,7 @@ export function ApprovalActionsPanel({ requestId, currentRequest, requestType, o
                             </Button>
                             </div>
                         ))}
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateUniqueId(), amount: 0, dueDate: new Date() })}> {/* Usar generateUniqueId */}
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ id: String(generateUniqueId()), displayId: String(generateUniqueId()), amount: 0, dueDate: new Date() })}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Añadir Cuota
                         </Button>
                         <div className="mt-2 text-sm space-y-1">

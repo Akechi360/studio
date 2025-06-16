@@ -1,8 +1,6 @@
-
 "use client";
 
 import type { ApprovalRequest } from "@/lib/types";
-import Link from "next/link";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from 'date-fns';
@@ -12,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 interface ApprovalRequestListItemProps {
   request: ApprovalRequest;
+  onViewDetails: (requestId: string) => void;
 }
 
 const typeDisplayMap: Record<ApprovalRequest["type"], string> = {
@@ -38,19 +37,18 @@ const statusColors: Record<ApprovalRequest["status"], string> = {
   InformacionSolicitada: "bg-blue-500 hover:bg-blue-600",
 };
 
-
-export function ApprovalRequestListItem({ request }: ApprovalRequestListItemProps) {
+export function ApprovalRequestListItem({ request, onViewDetails }: ApprovalRequestListItemProps) {
   const TypeIcon = typeIconMap[request.type] || FileCheck;
 
   return (
-    <Card className="shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col h-full">
+    <Card className="shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col h-full cursor-pointer" onClick={() => onViewDetails(request.id)}>
       <CardHeader>
         <div className="flex justify-between items-start gap-2">
           <CardTitle className="text-lg font-semibold leading-tight">
-            <Link href={`/approvals/${request.id}`} className="hover:underline text-primary flex items-center">
+            <div className="hover:underline text-primary flex items-center">
               <TypeIcon className="mr-2 h-5 w-5 shrink-0" />
               {request.subject}
-            </Link>
+            </div>
           </CardTitle>
           <Badge className={cn("text-xs text-white whitespace-nowrap", statusColors[request.status])}>
             {statusDisplayMap[request.status]}
@@ -78,13 +76,13 @@ export function ApprovalRequestListItem({ request }: ApprovalRequestListItemProp
           {request.description || "Sin descripción adicional."}
         </p>
       </CardContent>
-      <CardFooter className="flex justify-between items-center text-xs text-muted-foreground pt-4">
+      <CardFooter className="flex justify-between items-center text-sm text-muted-foreground">
         <time dateTime={new Date(request.createdAt).toISOString()} title={format(new Date(request.createdAt), "PPPppp", { locale: es })}>
           {formatDistanceToNow(new Date(request.createdAt), { addSuffix: true, locale: es })}
         </time>
-        <Link href={`/approvals/${request.id}`} className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
+        <div className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
           Ver Detalles <ArrowRight className="h-4 w-4" />
-        </Link>
+        </div>
       </CardFooter>
     </Card>
   );

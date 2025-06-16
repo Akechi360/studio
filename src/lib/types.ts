@@ -180,8 +180,8 @@ export interface PaymentInstallment {
   id: string;
   amount: number;
   dueDate: Date;
-  approvalRequestId: string; // Relation to ApprovalRequest
-  // status?: 'Pendiente' | 'Pagado' | 'Atrasado'; // Future
+  displayId: string;
+  approvalRequestId: string;
 }
 
 export interface AttachmentClientData {
@@ -207,7 +207,7 @@ export interface ApprovalRequest {
 
   approverId?: string | null;
   approverName?: string | null;
-  approverEmail?: string | null; // Added from schema
+  approverEmail?: string | null;
   approverComment?: string | null;
   approvedAt?: Date | null;
   rejectedAt?: Date | null;
@@ -225,7 +225,6 @@ export interface ApprovalRequest {
   // Payment specific
   supplierPago?: string | null;
   totalAmountToPay?: number | null;
-  // paymentDueDate is no longer a direct field, handled in description
 }
 
 export interface AuditLogEntry {

@@ -1276,13 +1276,25 @@ export async function approveRequestAction(
             await tx.paymentInstallment.deleteMany({ where: { approvalRequestId: requestId }});
 
             if (validatedData.approvedPaymentType === "Cuotas" && validatedData.installments && validatedData.installments.length > 0) {
-                await tx.paymentInstallment.createMany({
-                    data: validatedData.installments.map((inst: { amount: number; dueDate: Date; }) => ({
+                // Log para depuración antes de guardar
+                console.log("Installments en backend antes de createMany:", validatedData.installments);
+                
+                const installmentsData = [];
+                for (const inst of validatedData.installments) {
+                    // Generamos un ID único combinando PAY con timestamp y un número aleatorio
+                    const uniqueId = `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    const displayId = (typeof inst.displayId === 'string' && inst.displayId.length > 0)
+                        ? inst.displayId
+                        : uniqueId;
+                    installmentsData.push({
                         amount: inst.amount,
                         dueDate: new Date(inst.dueDate),
                         approvalRequestId: requestId,
-
-                    }))
+                        displayId
+                    });
+                }
+                await tx.paymentInstallment.createMany({
+                    data: installmentsData
                 });
             }
         }
@@ -1715,13 +1727,23 @@ export async function updateUserSettingsAction(
 }
 
 export async function getApprovalRequestById(id: string) {
-  return await prisma.approvalRequest.findUnique({
-    where: { id },
-    include: {
-      attachments: true,
-      activityLog: true,
-    },
-  });
+  try {
+    return await prisma.approvalRequest.findUnique({
+      where: { id },
+      include: {
+        attachments: true,
+        activityLog: {
+          orderBy: { timestamp: 'desc' }
+        },
+        paymentInstallments: {
+          orderBy: { dueDate: 'asc' }
+        }
+      }
+    });
+  } catch (error) {
+    console.error(`getApprovalRequestById Error for ID ${id}:`, error);
+    return null;
+  }
 }
 
 export { registerUserServerAction as registerUser };

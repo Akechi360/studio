@@ -6,6 +6,7 @@ import { getAllTickets, getApprovalRequestsForUser } from '@/lib/actions';
 import type { Ticket, TicketPriority, ApprovalRequest } from '@/lib/types';
 import { TicketListItem } from '@/components/tickets/ticket-list-item';
 import { ApprovalRequestListItem } from '@/components/approvals/approval-request-list-item';
+import { ApprovalDetailsModal } from '@/components/approvals/ApprovalDetailsModal';
 import { Ticket as TicketIcon, ListChecks, AlertCircle, FileCheck } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,7 @@ export default function DashboardPage() {
 
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
   const [isLoadingApprovals, setIsLoadingApprovals] = useState(false); // Changed from true to false initially
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -74,6 +76,37 @@ export default function DashboardPage() {
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     : [];
 
+  const handleViewRequestDetails = (requestId: string) => {
+    setSelectedRequestId(requestId);
+  };
+
+  const handleCloseRequestDetails = () => {
+    setSelectedRequestId(null);
+  };
+
+  const handleRequestActionSuccess = () => {
+    // Recargar las aprobaciones pendientes después de una acción exitosa
+    if (user && role === 'Presidente') {
+      setIsLoadingApprovals(true);
+      getApprovalRequestsForUser(user.id, user.role)
+        .then(approvals => {
+          setPendingApprovals(approvals);
+        })
+        .catch(error => {
+          console.error("Error recargando aprobaciones:", error);
+          toast({ 
+            title: "Error", 
+            description: "No se pudieron recargar las aprobaciones pendientes.", 
+            variant: "destructive" 
+          });
+        })
+        .finally(() => {
+          setIsLoadingApprovals(false);
+        });
+    }
+    setSelectedRequestId(null);
+  };
+
   if (isLoadingTickets && !user) { 
     return (
       <div className="flex h-screen items-center justify-center">
@@ -124,13 +157,25 @@ export default function DashboardPage() {
             ) : (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {pendingApprovals.map(req => (
-                  <ApprovalRequestListItem key={req.id} request={req} />
+                  <ApprovalRequestListItem 
+                    key={req.id} 
+                    request={req} 
+                    onViewDetails={handleViewRequestDetails}
+                  />
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
       )}
+
+      {/* Modal de detalles de la solicitud */}
+      <ApprovalDetailsModal
+        isOpen={selectedRequestId !== null}
+        onClose={handleCloseRequestDetails}
+        requestId={selectedRequestId}
+        onActionSuccess={handleRequestActionSuccess}
+      />
 
       {(isLoadingTickets && (role === 'Admin' || role === 'User')) && (
         <Loading message="Cargando tickets..." variant="circles" size="md" />
