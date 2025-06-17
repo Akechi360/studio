@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -18,36 +17,37 @@ import { APP_NAME } from "@/lib/constants";
 import Link from "next/link";
 
 export function AppSidebar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { state: sidebarState } = useSidebar();
 
   return (
     <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r">
       <SidebarHeader className="p-4">
-         <Link href="/dashboard" className="flex items-center gap-2">
-          <Hospital className="h-8 w-8 text-primary"/>
-          {sidebarState === "expanded" && <span className="text-xl font-semibold">{APP_NAME}</span>}
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <span className="flex items-center gap-2">
+            <Hospital className="h-8 w-8 text-primary"/>
+            {sidebarState === "expanded" && <span className="text-xl font-semibold">{APP_NAME}</span>}
+          </span>
         </Link>
       </SidebarHeader>
-      
       <SidebarContent>
         <SidebarGroup>
           <AppSidebarNav />
         </SidebarGroup>
       </SidebarContent>
-      
       <SidebarSeparator />
-      
       <SidebarFooter className="p-4">
         {user && (
           <div className={`flex items-center gap-2 ${sidebarState === "collapsed" ? "justify-center" : ""}`}>
+            <a href="/api/auth/logout" className="w-full">
+              <Button variant="ghost" className={`w-full justify-start ${sidebarState === "collapsed" ? "px-2" : ""}`}>
+                <LogOut className="mr-2 h-4 w-4" />
+                {sidebarState === "expanded" && <span>Cerrar Sesión</span>}
+                {sidebarState === "collapsed" && <span className="sr-only">Cerrar Sesión</span>}
+              </Button>
+            </a>
           </div>
         )}
-        <Button variant="ghost" onClick={logout} className={`w-full justify-start ${sidebarState === "collapsed" ? "px-2" : ""}`}>
-          <LogOut className="mr-2 h-4 w-4" />
-          {sidebarState === "expanded" && <span>Cerrar Sesión</span>}
-          {sidebarState === "collapsed" && <span className="sr-only">Cerrar Sesión</span>}
-        </Button>
       </SidebarFooter>
     </Sidebar>
   );

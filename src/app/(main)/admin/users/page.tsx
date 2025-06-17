@@ -306,12 +306,12 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
                       <SelectContent>
                         {ROLES_OPTIONS_BASE.map((roleOption) => (
                            // El 'value' debe ser 'Presidente' sin espacio para la validación/DB
-                           <SelectItem key={roleOption} value={
+                           (<SelectItem key={roleOption} value={
                                roleOption === "Presidente" ? "Presidente" : roleOption
                            }>
                              {/* El texto que se muestra al usuario puede seguir siendo con espacio */}
                              {roleOption}
-                           </SelectItem>
+                           </SelectItem>)
                         ))}
                       </SelectContent>
                     </Select>
@@ -379,7 +379,6 @@ function EditUserDialog({ userToEdit, currentUser, isOpen, onClose, onUserUpdate
           </Form>
         </DialogContent>
       </Dialog>
-
       <DeleteUserConfirmationDialog
         isOpen={isDeleteConfirmOpen}
         onClose={() => setIsDeleteConfirmOpen(false)}

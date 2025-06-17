@@ -29,7 +29,7 @@ import {
   Wrench,
   Bug,
 } from "lucide-react";
-import { useAuth, SPECIFIC_APPROVER_EMAILS, SPECIFIC_INVENTORY_EMAILS } from "@/lib/auth-context";
+import { useAuth, SPECIFIC_APPROVER_EMAILS } from "@/lib/auth-context";
 import type { Role, User as UserType } from "@/lib/types";
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -89,7 +89,7 @@ const navItems: NavItem[] = [
   { href: "/inventory", label: "Inventario", icon: Archive, exact: true, 
     specialAccessCheck: (currentUser) =>
       !!currentUser && (currentUser.role === "Admin" ||
-      (currentUser.email ? SPECIFIC_INVENTORY_EMAILS.includes(currentUser.email) : false))
+      (currentUser.email ? SPECIFIC_APPROVER_EMAILS.includes(currentUser.email) : false))
   },
   { href: "/agenda-it", label: "Agenda IT", icon: CalendarDays, exact: true, allowedRoles: ["Admin"] },
   { href: "/remote-access", label: "Acceso Remoto", icon: ScreenShare, exact: true, allowedRoles: ["User", "Admin"] },
@@ -123,7 +123,7 @@ export function AppSidebarNav() {
         const isParentActiveDueToChild = item.subItems.some(
           subItem => {
             const subItemPath = subItem.href.endsWith('/') ? subItem.href.slice(0, -1) : subItem.href;
-            const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+            const currentPath = (pathname ?? "").endsWith('/') ? (pathname ?? "").slice(0, -1) : (pathname ?? "");
             return currentPath === subItemPath || currentPath.startsWith(subItemPath + '/');
           }
         );
@@ -182,7 +182,7 @@ export function AppSidebarNav() {
 
           const isAnySubItemActive = visibleSubItems.some(subItem => {
              const subItemPath = subItem.href.endsWith('/') ? subItem.href.slice(0, -1) : subItem.href;
-             const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+             const currentPath = (pathname ?? "").endsWith('/') ? (pathname ?? "").slice(0, -1) : (pathname ?? "");
              return currentPath === subItemPath || (subItemPath !== '/' && currentPath.startsWith(subItemPath + '/'));
           });
 
@@ -215,12 +215,12 @@ export function AppSidebarNav() {
                   {visibleSubItems.map((subItem) => {
                     const SubIcon = subItem.icon;
                     const subItemPath = subItem.href.endsWith('/') ? subItem.href.slice(0, -1) : subItem.href;
-                    const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+                    const currentPath = (pathname ?? "").endsWith('/') ? (pathname ?? "").slice(0, -1) : (pathname ?? "");
                     const isSubItemActive = currentPath === subItemPath || (subItemPath !== '/' && currentPath.startsWith(subItemPath + '/'));
 
                     return (
                       <SidebarMenuSubItem key={subItem.href}>
-                        <Link href={subItem.href} passHref legacyBehavior>
+                        <Link href={subItem.href}>
                           <SidebarMenuSubButton
                             isActive={isSubItemActive}
                             aria-current={isSubItemActive ? "page" : undefined}
@@ -238,11 +238,11 @@ export function AppSidebarNav() {
           );
         } else {
           const itemPath = item.href.endsWith('/') ? item.href.slice(0, -1) : item.href;
-          const currentPath = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+          const currentPath = (pathname ?? "").endsWith('/') ? (pathname ?? "").slice(0, -1) : (pathname ?? "");
           const isActive = item.exact ? currentPath === itemPath : currentPath.startsWith(itemPath);
           return (
             <SidebarMenuItem key={item.label}>
-              <Link href={item.href} passHref legacyBehavior>
+              <Link href={item.href}>
                 <SidebarMenuButton
                   isActive={isActive}
                   tooltip={{ children: item.label, hidden: sidebarState === "expanded" }}
@@ -251,9 +251,7 @@ export function AppSidebarNav() {
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
                     <Icon className="shrink-0" />
-                    <span className={cn("truncate", sidebarState === "collapsed" ? "sr-only" : "")}>
-                      {item.label}
-                    </span>
+                    <span className={cn("truncate", sidebarState === "collapsed" ? "sr-only" : "")}>{item.label}</span>
                   </div>
                 </SidebarMenuButton>
               </Link>

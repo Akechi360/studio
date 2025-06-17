@@ -15,7 +15,7 @@ export default function HomePage() {
       if (user) {
         router.replace('/dashboard');
       } else {
-        router.replace('/login');
+        router.replace('/api/auth/login');
       }
     }
   }, [user, isLoading, router]);

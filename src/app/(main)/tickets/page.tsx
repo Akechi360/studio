@@ -1,14 +1,14 @@
-
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { TicketListItem } from '@/components/tickets/ticket-list-item';
 import { getAllTickets } from '@/lib/actions';
 import { PlusCircle, Filter } from 'lucide-react';
 import { TicketFilters } from '@/components/tickets/ticket-filters'; // Import the new client component
+import type { Ticket } from '@/lib/types';
 
 
 export default async function TicketsPage() {
-  const tickets = await getAllTickets(); 
+  const tickets: Ticket[] = await getAllTickets(); 
 
   return (
     <div className="space-y-8">
@@ -21,14 +21,14 @@ export default async function TicketsPage() {
         </div>
         <Button asChild size="lg" className="shadow-md hover:shadow-lg transition-shadow">
           <Link href="/tickets/new">
-            <PlusCircle className="mr-2 h-5 w-5" />
-            Crear Nuevo Ticket
+            <span className="flex items-center">
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Crear Nuevo Ticket
+            </span>
           </Link>
         </Button>
       </div>
-
       <TicketFilters />
-
       {tickets.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-12 text-center">
           <Filter className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -38,8 +38,10 @@ export default async function TicketsPage() {
           </p>
           <Button asChild>
             <Link href="/tickets/new">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Crea Tu Primer Ticket
+              <span className="flex items-center">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Crea Tu Primer Ticket
+              </span>
             </Link>
           </Button>
         </div>

@@ -2,7 +2,6 @@
 
 import { z } from "zod";
 import { prisma } from "./db";
-import bcrypt from 'bcryptjs';
 
 // Import Prisma types (interfaces, model types)
 import type {
@@ -120,150 +119,6 @@ export async function getAuditLogs(): Promise<PrismaAuditLogEntry[]> { // [cite:
 
 // --- Authentication Server Actions ---
 
-export async function loginUserServerAction(email: string, pass: string): Promise<{ success: boolean; user: Omit<PrismaUserType, 'password'> | null; // [cite: 13]
-  message?: string }> { // [cite: 14]
-  try {
-    const dbUser = await prisma.user.findUnique({ where: { email } }); // [cite: 14]
-    if (dbUser && dbUser.password) { // [cite: 15]
-      const passwordMatch = await bcrypt.compare(pass, dbUser.password); // [cite: 15]
-      if (passwordMatch) { // [cite: 16]
-        const { password, ...userToReturn } = dbUser; // [cite: 16]
-        await logAuditEvent(email, "Inicio de Sesión Exitoso"); // [cite: 17]
-        return { success: true, user: userToReturn, message: "Inicio de sesión exitoso." }; // [cite: 17]
-      } // [cite: 18]
-    } // [cite: 18]
-    await logAuditEvent(email, "Intento de Inicio de Sesión Fallido", `Intento con email: ${email}`); // [cite: 18]
-    return { success: false, user: null, message: "Correo electrónico o contraseña no válidos." }; // [cite: 19]
-  } catch (error) { // [cite: 20]
-    console.error("loginUserServerAction Error:", error); // [cite: 20]
-    await logAuditEvent(email, "Error en Inicio de Sesión", `Error: ${error instanceof Error ? error.message : String(error)}`); // [cite: 21]
-    return { success: false, user: null, message: "Error del servidor durante el inicio de sesión." }; // [cite: 22]
-  } // [cite: 23]
-}
-
-export async function registerUserServerAction(name: string, email: string, pass: string): Promise<{ success: boolean; user: Omit<PrismaUserType, 'password'> | null; // [cite: 23]
-  message?: string }> { // [cite: 24]
-  try {
-    const existingUser = await prisma.user.findUnique({ where: { email } }); // [cite: 24]
-    if (existingUser) { // [cite: 25]
-      return { success: false, user: null, message: "Este correo electrónico ya está en uso." // [cite: 25]
-      }; // [cite: 26]
-    } // [cite: 26]
-    const hashedPassword = await bcrypt.hash(pass, 10); // [cite: 26]
-    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2); // [cite: 26]
-    const newUser = await prisma.user.create({ // [cite: 27]
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        role: PrismaRole.User, // Default role
-        avatarUrl: '/bg-login.jpg',
-      },
-    }); // [cite: 27]
-    const { password, ...userToReturn } = newUser; // [cite: 28]
-    await logAuditEvent(email, "Registro de Nuevo Usuario", `Usuario: ${name} (${email})`); // [cite: 28]
-    return { success: true, user: userToReturn, message: "Registro exitoso." }; // [cite: 29]
-  } catch (error) { // [cite: 29]
-    console.error("registerUserServerAction Error:", error); // [cite: 30]
-    await logAuditEvent(email, "Error en Registro de Usuario", `Error: ${error instanceof Error ? error.message : String(error)}`); // [cite: 30]
-    return { success: false, user: null, message: "Error del servidor durante el registro." }; // [cite: 31]
-  } // [cite: 32]
-}
-
-export async function getUserByIdServerAction(userId: string): Promise<Omit<PrismaUserType, 'password'> | null> { // [cite: 32]
-  try {
-    const dbUser = await prisma.user.findUnique({ where: { id: userId } }); // [cite: 33]
-    if (dbUser) { // [cite: 33]
-      const { password, ...userToReturn } = dbUser; // [cite: 33]
-      return userToReturn; // [cite: 34]
-    } // [cite: 34]
-    return null; // [cite: 34]
-  } catch (error) { // [cite: 34]
-    console.error("getUserByIdServerAction Error:", error); // [cite: 34]
-    return null; // [cite: 35]
-  } // [cite: 35]
-}
-
-export async function updateUserProfileServerAction(userId: string, name: string, email: string): Promise<{ success: boolean; user: Omit<PrismaUserType, 'password'> | null; // [cite: 35]
-  message?: string }> { // [cite: 36]
-  try {
-    const currentUserData = await prisma.user.findUnique({ where: { id: userId }}); // [cite: 36]
-    if (!currentUserData) { // [cite: 37]
-        return { success: false, user: null, message: "Usuario no encontrado." // [cite: 37]
-        }; // [cite: 38]
-    } // [cite: 38]
-
-    if (email && email !== currentUserData.email) { // [cite: 38]
-      const existingUser = await prisma.user.findUnique({ where: { email } }); // [cite: 39]
-      if (existingUser && existingUser.id !== userId) { // [cite: 39]
-        return { success: false, user: null, message: "El correo electrónico ya está en uso por otro usuario." // [cite: 39]
-        }; // [cite: 40]
-      } // [cite: 40]
-    } // [cite: 40]
-
-    const updatedDbUser = await prisma.user.update({ // [cite: 40]
-      where: { id: userId }, // [cite: 40]
-      data: { name, email }, // [cite: 40]
-    }); // [cite: 40]
-    const { password, ...userToReturn } = updatedDbUser; // [cite: 41]
-    if (currentUserData.email) { // [cite: 41]
-        await logAuditEvent(currentUserData.email, "Actualización de Perfil", `Usuario ID: ${userId}, Antiguo Email: ${currentUserData.email || 'N/A'}, Nuevo Email: ${email}`); // [cite: 41]
-    } // [cite: 42]
-    revalidatePath("/profile"); // [cite: 42]
-    revalidatePath("/admin/users"); // [cite: 42]
-    return { success: true, user: userToReturn, message: "Perfil actualizado." }; // [cite: 43]
-  } catch (error) { // [cite: 43]
-    console.error("updateUserProfileServerAction Error:", error); // [cite: 43]
-    const userEmailForLog = (await prisma.user.findUnique({where: {id: userId}}))?.email || 'unknown_user_profile_update'; // [cite: 43]
-    await logAuditEvent(userEmailForLog, "Error en Actualización de Perfil", `Usuario ID: ${userId}, Error: ${error instanceof Error ? error.message : String(error)}`); // [cite: 44]
-    return { success: false, user: null, message: "Error del servidor al actualizar el perfil." }; // [cite: 45]
-  } // [cite: 46]
-}
-
-export async function updateUserPasswordServerAction(userId: string, newPasswordValue: string): Promise<{ success: boolean; // [cite: 46]
-  message: string }> { // [cite: 47]
-  try {
-    const userToUpdate = await prisma.user.findUnique({ where: { id: userId } }); // [cite: 47]
-    if (!userToUpdate || !userToUpdate.email) { // [cite: 48]
-        return { success: false, message: "Usuario no encontrado o email no disponible." // [cite: 48]
-        }; // [cite: 49]
-    } // [cite: 49]
-    const hashedPassword = await bcrypt.hash(newPasswordValue, 10); // [cite: 49]
-    await prisma.user.update({ // [cite: 50]
-      where: { id: userId }, // [cite: 50]
-      data: { password: hashedPassword }, // [cite: 50]
-    }); // [cite: 50]
-    await logAuditEvent(userToUpdate.email, "Actualización de Contraseña Propia", `Usuario ID: ${userId}`); // [cite: 51]
-    return { success: true, message: "Contraseña actualizada exitosamente." }; // [cite: 51]
-  } catch (error) { // [cite: 52]
-    console.error("updateUserPasswordServerAction Error:", error); // [cite: 52]
-    const userEmailForLog = (await prisma.user.findUnique({where: {id: userId}}))?.email || 'unknown_user_for_password_update'; // [cite: 52]
-    await logAuditEvent(userEmailForLog, "Error en Actualización de Contraseña Propia", `Usuario ID: ${userId}, Error: ${error instanceof Error ? error.message : String(error)}`); // [cite: 53]
-    return { success: false, message: "Error del servidor al actualizar la contraseña." }; // [cite: 54]
-  } // [cite: 55]
-}
-
-export async function resetUserPasswordByEmailServerAction(email: string, newPasswordValue: string): Promise<{ success: boolean; // [cite: 55]
-  message: string }> { // [cite: 56]
-  try {
-    const targetUser = await prisma.user.findUnique({ where: { email } }); // [cite: 56]
-    if (!targetUser) { // [cite: 57]
-      return { success: false, message: "Usuario no encontrado con ese correo." }; // [cite: 57]
-    } // [cite: 58]
-    const hashedPassword = await bcrypt.hash(newPasswordValue, 10); // [cite: 58]
-    await prisma.user.update({ // [cite: 59]
-      where: { email }, // [cite: 59]
-      data: { password: hashedPassword }, // [cite: 59]
-    }); // [cite: 59]
-    await logAuditEvent(email, "Restablecimiento de Contraseña por Olvido", `Usuario: ${email}`); // [cite: 60]
-    return { success: true, message: "Contraseña restablecida exitosamente." }; // [cite: 60]
-  } catch (error) { // [cite: 61]
-    console.error("resetUserPasswordByEmailServerAction Error:", error); // [cite: 61]
-    await logAuditEvent(email, "Error en Restablecimiento de Contraseña", `Usuario: ${email}, Error: ${error instanceof Error ? error.message : String(error)}`); // [cite: 62]
-    return { success: false, message: "Error del servidor al restablecer la contraseña." }; // [cite: 63]
-  } // [cite: 64]
-}
-
 export async function getAllUsersServerAction(): Promise<Omit<PrismaUserType, 'password'>[]> { // [cite: 64]
   try {
     const dbUsers = await prisma.user.findMany({ // [cite: 64]
@@ -293,17 +148,14 @@ export async function updateUserByAdminServerAction( // [cite: 67]
     if (!validatedFields.success) { // [cite: 69]
       return { success: false, message: "Error de validación: " + JSON.stringify(validatedFields.error.flatten().fieldErrors) }; // [cite: 69]
     } // [cite: 70]
-    const { name, email, role, department, password: newPassword } = validatedFields.data; // [cite: 70]
-    const updateData: any = { // [cite: 71]
+    const { name, email, role, department } = validatedFields.data; // [cite: 70]
+    const updateData = { // [cite: 71]
       name, // [cite: 71]
       email, // [cite: 72]
       role: roleStringToPrismaEnumMap[role as ClientUserRole] || // [cite: 71]
       PrismaRole.User, // [cite: 72]
       department: department === "_NO_DEPARTMENT_" ? null : department || null, // [cite: 72]
     }; // [cite: 72]
-    if (newPassword && newPassword.trim() !== "") { // [cite: 73]
-      updateData.password = await bcrypt.hash(newPassword, 10); // [cite: 73]
-    } // [cite: 74]
 
     if (email) { // [cite: 74]
         const userBeingEdited = await prisma.user.findUnique({ where: { email: email } }); // [cite: 75]
@@ -1746,4 +1598,36 @@ export async function getApprovalRequestById(id: string) {
   }
 }
 
-export { registerUserServerAction as registerUser };
+export async function getUserByIdServerAction(userId: string) {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return { success: false, message: "Usuario no encontrado." };
+    }
+    return { success: true, user };
+  } catch (error) {
+    console.error(`getUserByIdServerAction Error for ID ${userId}:`, error);
+    return { success: false, message: "Error al obtener el usuario." };
+  }
+}
+
+export async function updateUserProfileServerAction(
+  userId: string,
+  data: { name: string; email: string }
+) {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return { success: false, message: "Usuario no encontrado." };
+    }
+    const updateData = {
+      name: data.name,
+      email: data.email,
+    };
+    await prisma.user.update({ where: { id: userId }, data: updateData });
+    return { success: true, message: "Perfil de usuario actualizado exitosamente." };
+  } catch (error) {
+    console.error(`updateUserProfileServerAction Error for ID ${userId}:`, error);
+    return { success: false, message: "Error al actualizar el perfil del usuario." };
+  }
+}

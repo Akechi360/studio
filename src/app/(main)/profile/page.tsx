@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useForm as usePasswordForm } from "react-hook-form"; // alias useForm for password form
+import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,38 +33,18 @@ const profileFormSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
 
-const passwordFormSchema = z.object({
-  newPassword: z.string().min(6, { message: "La nueva contraseña debe tener al menos 6 caracteres." }),
-  confirmPassword: z.string().min(6, { message: "La confirmación de contraseña debe tener al menos 6 caracteres." }),
-}).refine(data => data.newPassword === data.confirmPassword, {
-  message: "Las contraseñas no coinciden.",
-  path: ["confirmPassword"], // Set error on confirmPassword field
-});
-
-type PasswordFormValues = z.infer<typeof passwordFormSchema>;
-
 export default function ProfilePage() {
-  const { user, updateProfile, updateSelfPassword, isLoading: authLoading, logout } = useAuth();
+  const { user, updateProfile, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
-  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
-  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
       name: user?.name || "",
       email: user?.email || "",
-    },
-  });
-
-  const passwordForm = usePasswordForm<PasswordFormValues>({ // Use aliased hook
-    resolver: zodResolver(passwordFormSchema),
-    defaultValues: {
-      newPassword: "",
-      confirmPassword: "",
     },
   });
 
@@ -100,25 +80,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function onPasswordSubmit(data: PasswordFormValues) {
-    setIsSubmittingPassword(true);
-    const success = await updateSelfPassword(data.newPassword);
-    setIsSubmittingPassword(false);
-    if (success) {
-      toast({
-        title: "Contraseña Actualizada",
-        description: "Tu contraseña ha sido cambiada exitosamente.",
-      });
-      passwordForm.reset();
-    } else {
-      toast({
-        title: "Fallo al Cambiar Contraseña",
-        description: "No se pudo actualizar tu contraseña. Inténtalo de nuevo.",
-        variant: "destructive",
-      });
-    }
-  }
-  
   if (authLoading && !user) {
       return <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
@@ -188,57 +149,6 @@ export default function ProfilePage() {
           </Form>
         </DialogContent>
       </Dialog>
-      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center"><KeyRound className="mr-2 h-6 w-6 text-primary" />Cambiar Contraseña</DialogTitle>
-            <DialogDescription>Actualiza tu contraseña de acceso.</DialogDescription>
-          </DialogHeader>
-          <Form {...passwordForm}>
-            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6 py-2">
-              <FormField
-                control={passwordForm.control}
-                name="newPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nueva Contraseña</FormLabel>
-                    <FormControl>
-                      <Input className="rounded-lg" type="password" placeholder="Nueva contraseña" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={passwordForm.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirmar Contraseña</FormLabel>
-                    <FormControl>
-                      <Input className="rounded-lg" type="password" placeholder="Repite la nueva contraseña" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter className="pt-4">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancelar</Button>
-                </DialogClose>
-                <Button type="submit" className="rounded-lg px-6 py-2 text-base font-semibold shadow-ammie" disabled={isSubmittingPassword || authLoading}>
-                  {isSubmittingPassword ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="mr-2 h-4 w-4" />
-                  )}
-                  Cambiar Contraseña
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Columna izquierda: Perfil y menú */}
         <div className="flex flex-col gap-6 md:col-span-1">
@@ -265,19 +175,16 @@ export default function ProfilePage() {
           {/* Menú lateral */}
           <div className="bg-card rounded-xl shadow-ammie p-6">
             <ul className="space-y-3">
-              <li className="flex items-center gap-2 font-semibold text-primary"><UserCircle2 className="h-5 w-5" />Mi Perfil</li>
+              <li className="flex items-center gap-2 font-semibold text-primary">
+                <UserCircle2 className="h-5 w-5" />Mi Perfil
+              </li>
               <li>
                 <Button variant="outline" className="w-full flex items-center gap-2 justify-start text-foreground" onClick={() => setEditOpen(true)}>
                   <Pencil className="h-5 w-5 text-primary" />Editar Perfil
                 </Button>
               </li>
               <li>
-                <Button variant="outline" className="w-full flex items-center gap-2 justify-start text-foreground" onClick={() => setPasswordOpen(true)}>
-                  <KeyRound className="h-5 w-5 text-primary" />Cambiar Contraseña
-                </Button>
-              </li>
-              <li>
-                <Button variant="destructive" className="w-full flex items-center gap-2 justify-start" onClick={logout}>
+                <Button variant="destructive" className="w-full flex items-center gap-2 justify-start" onClick={() => window.location.href = '/api/auth/logout'}>
                   <LogOut className="h-5 w-5" />Cerrar Sesión
                 </Button>
               </li>

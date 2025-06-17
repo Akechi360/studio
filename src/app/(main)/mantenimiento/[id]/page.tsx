@@ -23,7 +23,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, CalendarIcon, CheckCircle, DollarSign, Edit, FileText, History, Info, ListChecks, Loader2, LocateFixed, Tag, UserCircle, Wrench, MessageSquare, AlertTriangle, CalendarClock, Printer } from 'lucide-react'; // Added Printer icon
+import { ArrowLeft, CalendarIcon, CheckCircle, DollarSign, Edit, FileText, History, Info, ListChecks, LocateFixed, Tag, UserCircle, Wrench, MessageSquare, AlertTriangle, CalendarClock, Printer } from 'lucide-react'; // Added Printer icon
 import { cn } from '@/lib/utils';
 import { UpdateCasoMantenimientoFormSchema } from '@/lib/schemas';
 // CORRECCIÓN: Importar Alert y AlertDescription
@@ -181,7 +181,7 @@ export default function CasoMantenimientoDetailPage() {
           <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
           <AlertTitleShadcn className="text-xl font-bold">Caso No Encontrado</AlertTitleShadcn> {/* Usar AlertTitleShadcn */}
           <AlertDescription className="mb-4">El caso de mantenimiento que estás buscando no existe (ID: {casoId}).</AlertDescription>
-          <Button asChild variant="outline"><Link href="/mantenimiento"><ArrowLeft className="mr-2 h-4 w-4" /> Volver a Gestión</Link></Button>
+          <Button asChild variant="outline"><Link href="/mantenimiento" legacyBehavior><ArrowLeft className="mr-2 h-4 w-4" /> Volver a Gestión</Link></Button>
         </Alert>
       </div>
     );
@@ -222,11 +222,14 @@ export default function CasoMantenimientoDetailPage() {
                 Imprimir
             </Button>
             <Button asChild variant="outline" size="sm">
-            <Link href="/mantenimiento"><ArrowLeft className="mr-2 h-4 w-4" />Volver</Link>
+              <Link href="/mantenimiento">
+                <span className="flex items-center">
+                  <ArrowLeft className="mr-2 h-4 w-4" />Volver
+                </span>
+              </Link>
             </Button>
         </div>
       </div>
-
       <Card className="w-full shadow-lg">
         <CardHeader>
           <div className="flex justify-between items-start">
@@ -258,7 +261,6 @@ export default function CasoMantenimientoDetailPage() {
           )}
         </CardContent>
       </Card>
-
       <Card className="w-full shadow-lg">
         <CardHeader><CardTitle className="text-lg flex items-center"><History className="mr-2 h-5 w-5 text-primary"/>Bitácora de Actividad</CardTitle></CardHeader>
         <CardContent>
@@ -280,7 +282,6 @@ export default function CasoMantenimientoDetailPage() {
           ) : <p className="text-muted-foreground">No hay actividad registrada para este caso.</p>}
         </CardContent>
       </Card>
-
       {canManageCase && (
         <Card className="w-full shadow-lg border-primary/30">
           <CardHeader><CardTitle className="text-lg flex items-center"><Edit className="mr-2 h-5 w-5 text-primary"/>Actualizar Caso de Mantenimiento</CardTitle></CardHeader>

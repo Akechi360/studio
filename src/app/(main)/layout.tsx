@@ -19,7 +19,7 @@ export default function MainAppLayout({
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.replace('/login');
+      router.replace('/api/auth/login');
     }
   }, [user, isLoading, router]);
 

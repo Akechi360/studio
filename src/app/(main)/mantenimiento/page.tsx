@@ -118,15 +118,12 @@ export default function MantenimientoPage() {
             </Button>
         </div>
       </div>
-
       {/* Placeholder for Role-Specific Summary Cards (Admin/Presidente) - Future implementation */}
       {/* Placeholder for Filters - Future implementation */}
       {/* <Card className="shadow-md">
         <CardHeader><CardTitle className="text-lg flex items-center"><ListFilter className="mr-2 h-5 w-5 text-primary"/>Filtros</CardTitle></CardHeader>
         <CardContent><p className="text-muted-foreground">Filtros por estado, proveedor y prioridad se implementarán aquí.</p></CardContent>
       </Card> */}
-
-
       <Card className="shadow-lg w-full">
         <CardHeader>
           <CardTitle>Lista de Casos de Mantenimiento</CardTitle>
@@ -187,7 +184,9 @@ export default function MantenimientoPage() {
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" asChild>
                           <Link href={`/mantenimiento/${caso.id}`}>
-                            <Eye className="mr-1.5 h-4 w-4" /> Ver
+                            <span className="flex items-center">
+                              <Eye className="mr-1.5 h-4 w-4" /> Ver
+                            </span>
                           </Link>
                         </Button>
                       </TableCell>
@@ -199,7 +198,6 @@ export default function MantenimientoPage() {
           )}
         </CardContent>
       </Card>
-
       {user && (
           <CreateCasoMantenimientoDialog
             isOpen={isCreateDialogOpen}

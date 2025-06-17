@@ -26,7 +26,9 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
           </AlertDescription>
           <Button asChild variant="outline">
             <Link href="/tickets">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Tickets
+              <span className="flex items-center">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Tickets
+              </span>
             </Link>
           </Button>
         </Alert>

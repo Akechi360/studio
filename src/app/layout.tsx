@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { Inter, Roboto_Mono } from 'next/font/google';
 import './globals.css';
-import { AuthProvider } from '@/lib/auth-context';
+import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { Toaster } from '@/components/ui/toaster';
 import { APP_NAME } from '@/lib/constants';
 import { ThemeProvider } from 'next-themes';
+import { AuthProvider } from '@/lib/auth-context';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -37,10 +38,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            {children}
-            <Toaster />
-          </AuthProvider>
+          <UserProvider>
+            <AuthProvider>
+              {children}
+              <Toaster />
+            </AuthProvider>
+          </UserProvider>
         </ThemeProvider>
       </body>
     </html>

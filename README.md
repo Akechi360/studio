@@ -83,3 +83,70 @@ Abre tu terminal (CMD o PowerShell) y clona el repositorio de GitHub:
 ```bash
 git clone <URL_DEL_REPOSITORIO>
 cd Akechi_App # O el nombre de la carpeta de tu proyecto
+
+```
+
+### **2. Configuración de Auth0**
+
+1. Crea una cuenta en [Auth0](https://auth0.com) si aún no tienes una.
+2. Crea una nueva aplicación en el dashboard de Auth0:
+   - Selecciona "Regular Web Application"
+   - En la sección "Application URIs":
+     - Allowed Callback URLs: `http://localhost:9002/api/auth/callback`
+     - Allowed Logout URLs: `http://localhost:9002`
+     - Allowed Web Origins: `http://localhost:9002`
+3. Copia las credenciales de la aplicación (Client ID y Client Secret)
+4. Crea un archivo `.env` en la raíz del proyecto basado en `.env.example`
+5. Configura las variables de entorno de Auth0:
+   ```env
+   AUTH0_SECRET='NREDpZ11Qr4PC3aiebLV23tCx73mAW69ns+GxPRbxPA='
+   AUTH0_BASE_URL='http://localhost:9002'
+   AUTH0_ISSUER_BASE_URL='https://dev-llqkbtzj18dieomm.us.auth0.com'
+   AUTH0_CLIENT_ID='8xjzAI3QKcsSIIE0zzy2GxFrnRXjlfTE'
+   AUTH0_CLIENT_SECRET='tf1NmkoxzYc-mrOekLRZgjeYuDngMcQ2-MAWBCCP_fGJWOXC9Mj4nvC8dpfwJaOD'
+   ```
+
+### **3. Configuración de la Base de Datos**
+
+1. Asegúrate de que MySQL esté corriendo (usando Laragon o tu gestor de base de datos preferido)
+2. Ejecuta las migraciones de Prisma:
+   ```bash
+   npx prisma migrate dev
+   ```
+3. (Opcional) Si deseas datos de prueba:
+   ```bash
+   npx prisma db seed
+   ```
+
+### **4. Instalación de Dependencias**
+
+```bash
+npm install
+```
+
+### **5. Configuración de la Base de Datos**
+
+1. Asegúrate de que MySQL esté corriendo (usando Laragon o tu gestor de base de datos preferido)
+2. Ejecuta las migraciones de Prisma:
+   ```bash
+   npx prisma migrate dev
+   ```
+3. (Opcional) Si deseas datos de prueba:
+   ```bash
+   npx prisma db seed
+   ```
+
+### **6. Iniciar el Servidor de Desarrollo**
+
+```bash
+npm run dev
+```
+
+La aplicación estará disponible en `http://localhost:3000`
+
+### **Notas Importantes sobre Auth0**
+
+* Los usuarios se crearán automáticamente en la base de datos local cuando inicien sesión por primera vez
+* Los roles de usuario se gestionan a través de la base de datos local
+* Para desarrollo local, asegúrate de que las URLs de callback y logout coincidan con tu entorno
+* En producción, actualiza las URLs en Auth0 y las variables de entorno correspondientes

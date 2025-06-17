@@ -1,23 +1,27 @@
-import { Role } from '@prisma/client';
-
 export interface CreateUserData {
   name: string;
   email: string;
-  password: string;
   role: string;
   department: string;
   avatarUrl?: string;
 }
 
+export type Role = 'User' | 'Admin' | 'Presidente' | 'Electromedicina';
+
 export interface User {
   id: string;
-  displayId?: string;
   name: string;
   email: string;
-  password: string;
-  role: string;
-  department: string;
+  role: Role;
+  department?: string;
+  picture?: string;
+  email_verified?: boolean;
+  sub?: string; // Auth0 user ID
+  updated_at?: string;
+  created_at?: string;
+  displayId?: string;
   avatarUrl?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  emailOnNewTicket?: boolean;
+  emailOnNewComment?: boolean;
+  customAppName?: string;
 } 

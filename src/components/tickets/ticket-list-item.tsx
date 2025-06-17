@@ -46,8 +46,11 @@ export function TicketListItem({ ticket }: TicketListItemProps) {
       <CardHeader>
         <div className="flex justify-between items-start">
           <CardTitle className="text-lg font-semibold leading-tight">
-            <Link href={`/tickets/${ticket.displayId}`} className="hover:underline text-primary">
-              {ticket.subject}
+            <Link
+              href={`/tickets/${ticket.displayId}`}
+              className="hover:underline text-primary"
+            >
+              <span>{ticket.subject}</span>
             </Link>
           </CardTitle>
           <Badge className={cn("text-xs text-white", priorityColors[ticket.priority])}>
@@ -82,8 +85,13 @@ export function TicketListItem({ ticket }: TicketListItemProps) {
         </div>
       </CardContent>
       <CardFooter className="flex justify-end">
-        <Link href={`/tickets/${ticket.displayId}`} className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
-          Ver Detalles <ArrowRight className="h-4 w-4" />
+        <Link
+          href={`/tickets/${ticket.displayId}`}
+          className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+        >
+          <span className="flex items-center gap-1">
+            Ver Detalles <ArrowRight className="h-4 w-4" />
+          </span>
         </Link>
       </CardFooter>
     </Card>
