@@ -99,11 +99,11 @@ cd Akechi_App # O el nombre de la carpeta de tu proyecto
 4. Crea un archivo `.env` en la raíz del proyecto basado en `.env.example`
 5. Configura las variables de entorno de Auth0:
    ```env
-   AUTH0_SECRET='NREDpZ11Qr4PC3aiebLV23tCx73mAW69ns+GxPRbxPA='
+   AUTH0_SECRET='YOUR-SECRET'
    AUTH0_BASE_URL='http://localhost:9002'
-   AUTH0_ISSUER_BASE_URL='https://dev-llqkbtzj18dieomm.us.auth0.com'
-   AUTH0_CLIENT_ID='8xjzAI3QKcsSIIE0zzy2GxFrnRXjlfTE'
-   AUTH0_CLIENT_SECRET='tf1NmkoxzYc-mrOekLRZgjeYuDngMcQ2-MAWBCCP_fGJWOXC9Mj4nvC8dpfwJaOD'
+   AUTH0_ISSUER_BASE_URL='YOUR DOMAIN'
+   AUTH0_CLIENT_ID='YOUR ID'
+   AUTH0_CLIENT_SECRET='YOUR OTHER SECRET'
    ```
 
 ### **3. Configuración de la Base de Datos**
