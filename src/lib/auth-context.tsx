@@ -21,6 +21,12 @@ export const SPECIFIC_APPROVER_EMAILS = [
   "suministros@clinicaieq.com",
 ];
 
+export const SPECIFIC_INVENTORY_EMAILS = [
+  "inventario1@clinicaieq.com",
+  "inventario2@clinicaieq.com",
+  "sistemas@clinicaieq.com",
+];
+
 interface AuthContextType {
   user: User | null;
   role: Role | null;

@@ -1,4 +1,5 @@
 import { TicketStatus, TicketPriority, TicketCategory } from '@prisma/client';
+import type { Attachment } from './attachments';
 
 export interface Ticket {
   id: string;
@@ -11,6 +12,7 @@ export interface Ticket {
   userId: string;
   userName: string;
   userEmail?: string;
+  departamento: string;
   createdAt: Date;
   updatedAt: Date;
   comments: Comment[];
@@ -25,4 +27,5 @@ export interface CreateTicketData {
   userId: string;
   userName: string;
   userEmail?: string;
+  departamento: string;
 } 

@@ -220,15 +220,16 @@ export function AppSidebarNav() {
 
                     return (
                       <SidebarMenuSubItem key={subItem.href}>
-                        <Link href={subItem.href}>
-                          <SidebarMenuSubButton
-                            isActive={isSubItemActive}
-                            aria-current={isSubItemActive ? "page" : undefined}
-                          >
+                        <SidebarMenuSubButton
+                          asChild
+                          isActive={isSubItemActive}
+                          aria-current={isSubItemActive ? "page" : undefined}
+                        >
+                          <Link href={subItem.href}>
                             <SubIcon className="shrink-0" />
                             {subItem.label}
-                          </SidebarMenuSubButton>
-                        </Link>
+                          </Link>
+                        </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
                     );
                   })}

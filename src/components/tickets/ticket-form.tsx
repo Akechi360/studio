@@ -28,6 +28,13 @@ import { TICKET_PRIORITIES, TICKET_PRIORITIES_ENGLISH, TICKET_CATEGORIES_ENGLISH
 import type { TicketPriority } from "@/lib/types";
 import { Loader2, Send } from "lucide-react";
 
+// Opciones de departamentos
+const DEPARTAMENTOS = [
+  "Electromedicina",
+  "Sistemas",
+  "Mantenimiento",
+  "Desarrollo (Vinicio)",
+];
 
 const ticketFormSchema = z.object({
   subject: z.string().min(5, { message: "El asunto debe tener al menos 5 caracteres." }).max(100, { message: "El asunto debe tener como máximo 100 caracteres." }),
@@ -38,6 +45,7 @@ const ticketFormSchema = z.object({
   category: z.enum(TICKET_CATEGORIES_ENGLISH as [string, ...string[]], {
     required_error: "Necesitas seleccionar una categoría para el ticket.",
   }),
+  departamento: z.string().min(1, { message: "Debes seleccionar un departamento." }),
 });
 
 export type TicketFormValues = z.infer<typeof ticketFormSchema>;
@@ -63,6 +71,7 @@ export function TicketForm({
       description: defaultValues?.description || "",
       priority: defaultValues?.priority || "Medium",
       category: defaultValues?.category || "Other",
+      departamento: defaultValues?.departamento || "",
     },
   });
 
@@ -132,6 +141,33 @@ export function TicketForm({
             />
             <FormField
               control={form.control}
+              name="departamento"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Departamento</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un departamento" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent side="bottom">
+                      {DEPARTAMENTOS.map((departamento) => (
+                        <SelectItem key={departamento} value={departamento}>
+                          {departamento}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Selecciona el departamento al que va dirigido este ticket.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="priority"
               render={({ field }) => (
                 <FormItem>
@@ -142,7 +178,7 @@ export function TicketForm({
                         <SelectValue placeholder="Selecciona la prioridad del ticket" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent side="bottom">
                       {TICKET_PRIORITIES_ENGLISH.map((priorityKey) => (
                         <SelectItem key={priorityKey} value={priorityKey}>
                           {priorityMap[priorityKey]} 
@@ -169,7 +205,7 @@ export function TicketForm({
                         <SelectValue placeholder="Selecciona una categoría" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent side="bottom">
                       {TICKET_CATEGORIES_ENGLISH.map((cat) => (
                         <SelectItem key={cat} value={cat}>
                           {categoryMap[cat]}

@@ -35,6 +35,7 @@ export const CreateTicketClientSchema = z.object({
   priority: z.enum(TICKET_PRIORITIES_ENGLISH as [TicketPriority, ...TicketPriority[]]),
   userEmail: z.string().email(),
   category: z.enum(TICKET_CATEGORIES_ENGLISH as [TicketCategory, ...TicketCategory[]]),
+  departamento: z.string().min(1, "Debes seleccionar un departamento."),
 });
 
 export const AddCommentClientSchema = z.object({
