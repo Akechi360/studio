@@ -2,7 +2,7 @@
 
 ## Descripción del Proyecto
 
-**IEQ Nexo (anteriormente Project AkechiApp)** es un sistema de gestión integral de IT y procesos internos diseñado para la Clínica IEQ. Su objetivo principal es modernizar y centralizar las operaciones de soporte técnico, inventario y gestión de aprobaciones, eliminando procesos obsoletos y mejorando la eficiencia operativa.
+**IEQ Nexo (anteriormente Project AkechiApp)** es un sistema de gestión integral de IT y procesos internos diseñado para Clínicas o cualquier tipo de rubro que maneje dichos modulos. Su objetivo principal es modernizar y centralizar las operaciones de soporte técnico, inventario y gestión de aprobaciones, eliminando procesos obsoletos y mejorando la eficiencia operativa.
 
 Desarrollado con Next.js y un stack moderno, IEQ Nexo proporciona una interfaz de usuario intuitiva y robusta para gestionar tickets de soporte, controlar el inventario de equipos, supervisar y aprobar solicitudes de compra o pagos a proveedores, y llevar un registro detallado de las actividades de mantenimiento.
 
